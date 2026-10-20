@@ -1,0 +1,2 @@
+# ruff reads [tool.ruff] from pyproject.toml; this file only pins the root so the CLI never walks upward.
+extend = "pyproject.toml"

@@ -1,0 +1,46 @@
+# TraceGreen — guide for coding agents
+
+TraceGreen turns a UBL 2.1 e-invoice into a supplier graph with a spend-based CO2e estimate per node, lets a supplier verify a node in two taps through a signed single-use link, and shows a buyer the cost / carbon / lead-time trade-off of a greener choice. Three services behind one browser origin: `api/` (C#, .NET 10, owns every carbon number), `ai/` (Python FastAPI, classifies line items and suggests alternatives, never computes carbon), `web/` (Vite + React SPA, renders only).
+
+Technical roadmap and acceptance criteria: `docs/ROADMAP.md`. Architecture and seams: `docs/ARCHITECTURE.md`. How to run: `docs/RUNBOOK.md`.
+
+## Commands
+
+Everything: `docker compose build && docker compose up` (Postgres, API on :8080, AI on :8000, web on :3000 with `/api` proxied). Demo image: `docker compose -f compose.yml -f compose.demo.yml up --build`.
+
+| Service | Run | Test | Lint / typecheck |
+|---|---|---|---|
+| `api/` | `dotnet run --project src/TraceGreen.Api` | `dotnet test` (one test: `dotnet test --filter-method "*Name*"`) | build has `TreatWarningsAsErrors` |
+| `ai/` | `uv run uvicorn app.main:app --reload --port 8000` | `uv run pytest` (one: `uv run pytest -k name`) | `uv run ruff check . && uv run ruff format --check .` |
+| `web/` | `pnpm dev` | `pnpm test` (vitest), `pnpm e2e` (Playwright against Compose) | `pnpm typecheck && pnpm lint` |
+
+The host SDK for the API is .NET 10 (`api/global.json`); on this machine it is installed under `%LOCALAPPDATA%\Microsoft\dotnet` — put that directory first on `PATH` or run the commands inside `docker compose exec api`.
+
+## Map
+
+- `api/src/TraceGreen.Domain` — pure C#: model records, carbon math (`Carbon/`), UBL parser (`Ubl/`), canonical JSON + hashing + HMAC tokens (`Security/`), audit chain (`Audit/`), plausibility rules, ports (`Ports/IRepository`, `IEventBus`; `Ai/IAiClient`; `Security/ILinkSigner`), use-case services (`Services/`). No package references.
+- `api/src/TraceGreen.Infrastructure` — adapters: `Memory/` (in-memory repository + event bus), `Postgres/` (EF Core + Npgsql, migrations), `Ai/` (HTTP client to the Python service, stub).
+- `api/src/TraceGreen.Api` — host: `Program.cs`, `AppConfig.cs` (env → config, fails fast), `Endpoints/*.cs` (thin: parse → service → status), `StartupTasks.cs` (`--migrate --seed --exit`).
+- `ai/app` — FastAPI routes, pydantic schemas, provider chain (cached → anthropic-if-configured → stub), prompts.
+- `web/src` — `api/` (generated OpenAPI types + openapi-fetch client), `store/` (Zustand, presentation-only selectors), `pages/`, `components/`, `hooks/`.
+- `seed/` — shared fixtures with fixed UUIDs: invoices (UBL XML), factors, lanes, alternatives, categories (the AI allow-list), ai-cache, demo-state.
+
+Demo-critical path: F1 import → F2 graph → F3 verify loop → F4 simulator. After touching services, events, carbon math or the store, run the Playwright smoke (`cd web && pnpm e2e`) against a running Compose stack.
+
+## Invariants
+
+- Product name is TraceGreen; the string "VerdantFlow" must not appear anywhere.
+- Pin exact versions (`Directory.Packages.props`, `uv.lock`, `pnpm-lock.yaml`, no `^`/`~`); do not upgrade before 2026-11-08; note any new dependency here.
+- Every feature works in both `DATA_MODE=memory` and `DATA_MODE=postgres`; both repositories are seeded through `IRepository.SeedAsync` and pass the same contract tests.
+- Carbon math is server-side C# only; every factor lookup returns value + unit + source + year + row label; every division is guarded (a MAC with zero or negative carbon saving is "not an abatement option", never infinity). `decimal` for money and kilograms; kg internally, tonnes with one decimal in UI, euros without decimals, days as integers.
+- Node status is `ESTIMATED | PARTIAL | VERIFIED`; the hotspot ring is a derived overlay.
+- The AI never produces a carbon number. Categories outside the allow-list become `UNCLASSIFIED`. Invoice text is passed as delimited data. The API calls the AI service with a 10 s timeout and falls back to the stub; ingest never blocks on AI. Every AI-derived value in the UI is labelled (`AI-mapped`, `AI-suggested · illustrative`, `AI-extracted · check fields`); lane costs and lead times are labelled illustrative.
+- Verification tokens are `v1.`-prefixed HMAC-SHA256, expiring, bound to the invoice content hash; single use is enforced by the repository's unique nonce. Replay → 409, expired or hash mismatch → 410, bad signature → 401, rate limit → 429. Tokens never appear in logs or audit payloads.
+- `audit_log` is append-only and hash-chained from a genesis hash of 64 zeros; never update or delete rows.
+- No `dangerouslySetInnerHTML` (lint error). No cookies, login, email, camera or clipboard APIs on `/verify/*`. Secrets only in server env; never commit `.env` or `.env.*.local` (`.env.demo` is committed on purpose and is demo-only).
+- LF line endings; scripts are Node `.mjs`, PowerShell, `dotnet` or `uv` entry points — no `.sh`.
+- Commit subjects reference feature or control IDs, e.g. `F3: single-use token check`. No attribution trailers.
+
+## Working style
+
+Deliver what was asked at the scope intended; make routine judgment calls yourself and check in only when readings would lead to materially different work. Finish the whole task and say plainly what is missing if something cannot be done. Lead with the outcome when reporting; write complete sentences a teammate can follow without your context. Run the real commands (tests, lint, Compose) instead of adding self-check prompts or verification scaffolding. Use subagents only for sizeable independent tracks, never to verify your own work.

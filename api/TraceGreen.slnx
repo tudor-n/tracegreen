@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TraceGreen.Api/TraceGreen.Api.csproj" />
+    <Project Path="src/TraceGreen.Domain/TraceGreen.Domain.csproj" />
+    <Project Path="src/TraceGreen.Infrastructure/TraceGreen.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TraceGreen.Tests/TraceGreen.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,35 @@
+# Planning document stays local (contains non-technical strategy)
+TRACEGREEN_ROADMAP ala bun.md
+
+# Secrets and local env (NOT .env.demo, which is committed on purpose)
+.env
+.env.*.local
+.env.local
+
+# .NET
+**/bin/
+**/obj/
+api/artifacts/
+*.user
+.vs/
+
+# Python
+ai/.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Node / web
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/.vite/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

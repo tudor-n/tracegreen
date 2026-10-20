@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Pure domain: no package references by design (carbon math, parsing, hashing, tokens, audit chain, services). -->
+</Project>
