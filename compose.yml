@@ -1,0 +1,99 @@
+# Development stack: `docker compose build && docker compose up`
+#   db   Postgres 17                               localhost:5432
+#   ai   FastAPI with --reload                     (internal) ai:8000
+#   api  ASP.NET Core via dotnet watch, applies migrations + seed on boot   localhost:8080
+#   web  Vite dev server, proxies /api -> api       localhost:3000   <- open this
+# Source trees are bind-mounted; build outputs live in anonymous volumes; every watcher polls (Windows bind mounts emit no inotify events).
+name: tracegreen
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tracegreen
+      POSTGRES_PASSWORD: tracegreen
+      POSTGRES_DB: tracegreen
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracegreen -d tracegreen"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ai:
+    build:
+      context: ./ai
+      target: dev
+    volumes:
+      - ./ai:/app
+      - /app/.venv
+      - ./seed:/seed:ro
+    environment:
+      SEED_DIR: /seed
+      WATCHFILES_FORCE_POLLING: "true"
+      AI_MODEL: ${AI_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_TIMEOUT_S: "10"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: ./api
+      target: dev
+    volumes:
+      - ./api:/src
+      - /src/artifacts
+      - nuget:/root/.nuget/packages
+      - ./seed:/seed:ro
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      DATABASE_URL: postgres://tracegreen:tracegreen@db:5432/tracegreen
+      LINK_SECRET: dev-only-secret-change-me-0123456789
+      DEMO_TOOLS: "1"
+      AI_BASE_URL: http://ai:8000
+      AI_TIMEOUT_MS: "10000"
+      SEED_DIR: /seed
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      ETS_PRICE_EUR_PER_T: "70"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 90s
+
+  web:
+    build:
+      context: ./web
+      target: dev
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    environment:
+      API_URL: http://api:8080
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  pgdata:
+  nuget:

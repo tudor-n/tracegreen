@@ -3,7 +3,8 @@ using System.Text.Json.Serialization;
 using TraceGreen.Api;
 using TraceGreen.Api.Endpoints;
 
-var builder = WebApplication.CreateBuilder(args);
+var (startup, hostArgs) = StartupOptions.Parse(args);
+var builder = WebApplication.CreateBuilder(hostArgs);
 
 var config = AppConfig.FromProcessEnvironment();
 builder.Services.AddSingleton(config);
@@ -15,6 +16,12 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 var app = builder.Build();
+
+await StartupTasks.RunAsync(startup, app.Services, CancellationToken.None);
+if (startup.Exit)
+{
+    return;
+}
 
 app.MapOpenApi();
 app.MapHealth();
