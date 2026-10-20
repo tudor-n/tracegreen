@@ -1,0 +1,177 @@
+[
+  {
+    "id": "CN-RO",
+    "origin": "Shenzhen, CN",
+    "dest": "Sibiu, RO",
+    "modeDefault": "air",
+    "distanceKm": {
+      "road": null,
+      "rail": 11000,
+      "sea": 16000,
+      "air": 7500
+    },
+    "leadDaysByMode": {
+      "road": null,
+      "rail": 20,
+      "sea": 40,
+      "air": 7
+    },
+    "costPerKgByMode": {
+      "road": null,
+      "rail": 0.6,
+      "sea": 0.3,
+      "air": 2.0
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "TW-RO",
+    "origin": "Taoyuan, TW",
+    "dest": "Sibiu, RO",
+    "modeDefault": "sea",
+    "distanceKm": {
+      "road": null,
+      "rail": null,
+      "sea": 15000,
+      "air": 8500
+    },
+    "leadDaysByMode": {
+      "road": null,
+      "rail": null,
+      "sea": 38,
+      "air": 8
+    },
+    "costPerKgByMode": {
+      "road": null,
+      "rail": null,
+      "sea": 0.3,
+      "air": 2.1
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "RO-CJ-SB",
+    "origin": "Cluj-Napoca, RO",
+    "dest": "Sibiu, RO",
+    "modeDefault": "road",
+    "distanceKm": {
+      "road": 180,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "leadDaysByMode": {
+      "road": 2,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "costPerKgByMode": {
+      "road": 0.8,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "RO-OR-SB",
+    "origin": "Oradea, RO",
+    "dest": "Sibiu, RO",
+    "modeDefault": "road",
+    "distanceKm": {
+      "road": 320,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "leadDaysByMode": {
+      "road": 2,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "costPerKgByMode": {
+      "road": 0.8,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "RO-SB-SB",
+    "origin": "Sibiu, RO",
+    "dest": "Sibiu, RO",
+    "modeDefault": "road",
+    "distanceKm": {
+      "road": 10,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "leadDaysByMode": {
+      "road": 1,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "costPerKgByMode": {
+      "road": 0.5,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "DE-HH-SB",
+    "origin": "Hamburg, DE",
+    "dest": "Sibiu, RO",
+    "modeDefault": "road",
+    "distanceKm": {
+      "road": 1500,
+      "rail": 1600,
+      "sea": null,
+      "air": null
+    },
+    "leadDaysByMode": {
+      "road": 4,
+      "rail": 6,
+      "sea": null,
+      "air": null
+    },
+    "costPerKgByMode": {
+      "road": 0.9,
+      "rail": 0.6,
+      "sea": null,
+      "air": null
+    },
+    "note": "illustrative"
+  },
+  {
+    "id": "RO-TM-SB",
+    "origin": "Timisoara, RO",
+    "dest": "Sibiu, RO",
+    "modeDefault": "road",
+    "distanceKm": {
+      "road": 270,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "leadDaysByMode": {
+      "road": 2,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "costPerKgByMode": {
+      "road": 0.8,
+      "rail": null,
+      "sea": null,
+      "air": null
+    },
+    "note": "illustrative"
+  }
+]

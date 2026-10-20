@@ -1,0 +1,64 @@
+{
+  "workspaceId": "00000000-0000-4000-8000-000000000001",
+  "nodes": [
+    {
+      "key": "N1",
+      "nodeId": "11111111-1111-4111-8111-000000000001",
+      "invoiceId": "22222222-2222-4222-8222-000000000001",
+      "invoiceFile": "invoices/N1-shenzhen.xml",
+      "laneId": "CN-RO",
+      "present": false,
+      "status": "ESTIMATED",
+      "transportMode": null,
+      "energySource": null
+    },
+    {
+      "key": "N2",
+      "nodeId": "11111111-1111-4111-8111-000000000002",
+      "invoiceId": "22222222-2222-4222-8222-000000000002",
+      "invoiceFile": "invoices/N2-taiwan.xml",
+      "laneId": "TW-RO",
+      "present": true,
+      "status": "VERIFIED",
+      "transportMode": "sea",
+      "energySource": "grid",
+      "verificationId": "33333333-3333-4333-8333-000000000002",
+      "nonce": "seed-nonce-n2-000000000000"
+    },
+    {
+      "key": "N3",
+      "nodeId": "11111111-1111-4111-8111-000000000003",
+      "invoiceId": "22222222-2222-4222-8222-000000000003",
+      "invoiceFile": "invoices/N3-oradea.xml",
+      "laneId": "RO-OR-SB",
+      "present": true,
+      "status": "ESTIMATED",
+      "transportMode": null,
+      "energySource": null
+    },
+    {
+      "key": "N4",
+      "nodeId": "11111111-1111-4111-8111-000000000004",
+      "invoiceId": "22222222-2222-4222-8222-000000000004",
+      "invoiceFile": "invoices/N4-sibiu.xml",
+      "laneId": "RO-SB-SB",
+      "present": true,
+      "status": "ESTIMATED",
+      "transportMode": null,
+      "energySource": null
+    },
+    {
+      "key": "N5",
+      "nodeId": "11111111-1111-4111-8111-000000000005",
+      "invoiceId": "22222222-2222-4222-8222-000000000005",
+      "invoiceFile": "invoices/N5-hamburg.xml",
+      "laneId": "DE-HH-SB",
+      "present": true,
+      "status": "PARTIAL",
+      "transportMode": "road",
+      "energySource": null,
+      "verificationId": "33333333-3333-4333-8333-000000000005",
+      "nonce": "seed-nonce-n5-000000000000"
+    }
+  ]
+}

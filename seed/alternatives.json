@@ -1,0 +1,20 @@
+[
+  {
+    "id": "N1-alt",
+    "nodeCategory": "zinc_diecast",
+    "label": "Cluj Metal Works SRL",
+    "country": "RO",
+    "laneId": "RO-CJ-SB",
+    "costEur": 55200,
+    "massT": 2.3
+  },
+  {
+    "id": "N2-alt",
+    "nodeCategory": "pcb",
+    "label": "Banat Circuits SRL",
+    "country": "RO",
+    "laneId": "RO-TM-SB",
+    "costEur": 41000,
+    "massT": 0.9
+  }
+]

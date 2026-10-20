@@ -1,0 +1,27 @@
+[
+  {
+    "listId": "CPV",
+    "prefix": "4441",
+    "categoryId": "zinc_diecast"
+  },
+  {
+    "listId": "CPV",
+    "prefix": "3171",
+    "categoryId": "pcb"
+  },
+  {
+    "listId": "CPV",
+    "prefix": "3132",
+    "categoryId": "wire_harness"
+  },
+  {
+    "listId": "CPV",
+    "prefix": "4482",
+    "categoryId": "packaging_paper"
+  },
+  {
+    "listId": "CPV",
+    "prefix": "3122",
+    "categoryId": "connectors"
+  }
+]

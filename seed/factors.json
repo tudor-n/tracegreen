@@ -1,0 +1,192 @@
+[
+  {
+    "id": "transport.road",
+    "kind": "transport",
+    "key": "road",
+    "value": 0.1,
+    "unit": "kgCO2e/t.km",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "HGV road freight, average laden (placeholder)"
+  },
+  {
+    "id": "transport.rail",
+    "kind": "transport",
+    "key": "rail",
+    "value": 0.03,
+    "unit": "kgCO2e/t.km",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Rail freight (placeholder)"
+  },
+  {
+    "id": "transport.sea",
+    "kind": "transport",
+    "key": "sea",
+    "value": 0.016,
+    "unit": "kgCO2e/t.km",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Sea container freight (placeholder)"
+  },
+  {
+    "id": "transport.air",
+    "kind": "transport",
+    "key": "air",
+    "value": 0.8,
+    "unit": "kgCO2e/t.km",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Air freight, long-haul (placeholder)"
+  },
+  {
+    "id": "material.zinc_diecast",
+    "kind": "material",
+    "key": "zinc_diecast",
+    "value": 3000,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Zinc die-cast, primary production (placeholder)"
+  },
+  {
+    "id": "material.pcb",
+    "kind": "material",
+    "key": "pcb",
+    "value": 5000,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Electrical items: printed circuit boards (placeholder)"
+  },
+  {
+    "id": "material.wire_harness",
+    "kind": "material",
+    "key": "wire_harness",
+    "value": 2500,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Copper wire harness (placeholder)"
+  },
+  {
+    "id": "material.packaging_paper",
+    "kind": "material",
+    "key": "packaging_paper",
+    "value": 1000,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Paper and board packaging (placeholder)"
+  },
+  {
+    "id": "material.connectors",
+    "kind": "material",
+    "key": "connectors",
+    "value": 4000,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Electrical connectors (placeholder)"
+  },
+  {
+    "id": "material.plastics",
+    "kind": "material",
+    "key": "plastics",
+    "value": 3100,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Average plastics (placeholder)"
+  },
+  {
+    "id": "material.generic",
+    "kind": "material",
+    "key": "generic",
+    "value": 2000,
+    "unit": "kgCO2e/t",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Generic manufactured goods (placeholder)"
+  },
+  {
+    "id": "spend.metals",
+    "kind": "spend",
+    "key": "metals",
+    "value": 0.45,
+    "unit": "kgCO2e/EUR",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Fabricated metal products (placeholder)"
+  },
+  {
+    "id": "spend.electronics",
+    "kind": "spend",
+    "key": "electronics",
+    "value": 0.35,
+    "unit": "kgCO2e/EUR",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Electronic components (placeholder)"
+  },
+  {
+    "id": "spend.packaging",
+    "kind": "spend",
+    "key": "packaging",
+    "value": 0.3,
+    "unit": "kgCO2e/EUR",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Paper packaging (placeholder)"
+  },
+  {
+    "id": "spend.other",
+    "kind": "spend",
+    "key": "other",
+    "value": 0.4,
+    "unit": "kgCO2e/EUR",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Other manufactured goods (placeholder)"
+  },
+  {
+    "id": "grid.RO",
+    "kind": "grid",
+    "key": "RO",
+    "value": 0.25,
+    "unit": "kgCO2e/kWh",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Romania grid average (placeholder)"
+  },
+  {
+    "id": "grid.CN",
+    "kind": "grid",
+    "key": "CN",
+    "value": 0.55,
+    "unit": "kgCO2e/kWh",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "China grid average (placeholder)"
+  },
+  {
+    "id": "grid.TW",
+    "kind": "grid",
+    "key": "TW",
+    "value": 0.5,
+    "unit": "kgCO2e/kWh",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Taiwan grid average (placeholder)"
+  },
+  {
+    "id": "grid.DE",
+    "kind": "grid",
+    "key": "DE",
+    "value": 0.35,
+    "unit": "kgCO2e/kWh",
+    "source": "PLACEHOLDER - replace with DESNZ 2026 / EEA row at T4",
+    "year": 2026,
+    "rowLabel": "Germany grid average (placeholder)"
+  }
+]
