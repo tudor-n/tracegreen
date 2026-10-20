@@ -1,3 +1,9 @@
+using Microsoft.EntityFrameworkCore;
+using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Ports;
+using TraceGreen.Domain.Seed;
+using TraceGreen.Infrastructure.Postgres;
+
 namespace TraceGreen.Api;
 
 /// <summary>
@@ -31,17 +37,30 @@ public sealed record StartupOptions(bool Migrate, bool Seed, bool Reset, bool Ex
 
 public static class StartupTasks
 {
-    public static Task RunAsync(StartupOptions options, IServiceProvider services, CancellationToken ct)
+    public static async Task RunAsync(StartupOptions options, IServiceProvider services, CancellationToken ct)
     {
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
-        if (options.Migrate)
+        var config = services.GetRequiredService<AppConfig>();
+        var bundle = services.GetRequiredService<SeedBundle>();
+        var repo = services.GetRequiredService<IRepository>();
+
+        logger.LogInformation("Data mode {Mode}; seed directory {SeedDir}", config.DataMode, bundle.Directory);
+
+        if (config.DataMode == DataMode.Postgres && options.Migrate)
         {
-            logger.LogInformation("--migrate requested: no migrations are defined yet");
+            var factory = services.GetRequiredService<IDbContextFactory<TraceGreenDbContext>>();
+            await using var db = await factory.CreateDbContextAsync(ct);
+            var pending = (await db.Database.GetPendingMigrationsAsync(ct)).ToList();
+            await db.Database.MigrateAsync(ct);
+            logger.LogInformation("Migrations applied: {Count} pending before start", pending.Count);
         }
-        if (options.Seed)
+
+        // The in-memory store starts empty, so memory mode always seeds; Postgres seeds only when asked.
+        if (options.Seed || config.DataMode == DataMode.Memory)
         {
-            logger.LogInformation("--seed requested (reset={Reset}): no repository is defined yet", options.Reset);
+            await repo.SeedAsync(bundle, reset: options.Reset, ct);
+            var nodes = await repo.ListNodesAsync(new Ctx(bundle.DemoState.WorkspaceId, "startup"), ct);
+            logger.LogInformation("Seed loaded (reset={Reset}): {Nodes} nodes in the demo workspace", options.Reset, nodes.Count);
         }
-        return Task.CompletedTask;
     }
 }

@@ -1,7 +1,7 @@
 # Development stack: `docker compose build && docker compose up`
 #   db   Postgres 17                               localhost:5432
 #   ai   FastAPI with --reload                     (internal) ai:8000
-#   api  ASP.NET Core via dotnet watch, applies migrations + seed on boot   localhost:8080
+#   api  ASP.NET Core (dotnet run; `docker compose restart api` after C# edits), applies migrations + seed on boot   localhost:8080
 #   web  Vite dev server, proxies /api -> api       localhost:3000   <- open this
 # Source trees are bind-mounted; build outputs live in anonymous volumes; every watcher polls (Windows bind mounts emit no inotify events).
 name: tracegreen
@@ -55,7 +55,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
-      DOTNET_USE_POLLING_FILE_WATCHER: "1"
       DATABASE_URL: postgres://tracegreen:tracegreen@db:5432/tracegreen
       LINK_SECRET: dev-only-secret-change-me-0123456789
       DEMO_TOOLS: "1"

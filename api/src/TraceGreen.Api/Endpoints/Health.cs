@@ -1,9 +1,19 @@
 using System.Diagnostics;
 using System.Reflection;
+using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Ports;
+using TraceGreen.Domain.Seed;
 
 namespace TraceGreen.Api.Endpoints;
 
-public sealed record HealthResponse(bool Ok, string Mode, string Version, double UptimeSeconds, bool DemoTools);
+public sealed record HealthResponse(
+    bool Ok,
+    string Mode,
+    string Db,
+    int SeedNodes,
+    string Version,
+    double UptimeSeconds,
+    bool DemoTools);
 
 public static class HealthEndpoints
 {
@@ -16,15 +26,26 @@ public static class HealthEndpoints
 
     public static IEndpointRouteBuilder MapHealth(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/health", (AppConfig config) =>
-                TypedResults.Ok(new HealthResponse(
-                    Ok: true,
+        app.MapGet("/api/health", async (AppConfig config, IRepository repo, SeedBundle seed, CancellationToken ct) =>
+            {
+                var db = await repo.HealthAsync(ct);
+                var seedNodes = db.Ok
+                    ? (await repo.ListNodesAsync(new Ctx(seed.DemoState.WorkspaceId, "health"), ct)).Count
+                    : 0;
+                var response = new HealthResponse(
+                    Ok: db.Ok,
                     Mode: config.DataMode.ToString().ToLowerInvariant(),
+                    Db: db.Ok ? "ok" : "error: " + db.Detail,
+                    SeedNodes: seedNodes,
                     Version: Version,
                     UptimeSeconds: Math.Round(Uptime.Elapsed.TotalSeconds, 1),
-                    DemoTools: config.DemoTools)))
+                    DemoTools: config.DemoTools);
+                return db.Ok ? Results.Ok(response) : Results.Json(response, statusCode: StatusCodes.Status503ServiceUnavailable);
+            })
             .WithName("GetHealth")
-            .WithTags("Health");
+            .WithTags("Health")
+            .Produces<HealthResponse>()
+            .Produces<HealthResponse>(StatusCodes.Status503ServiceUnavailable);
         return app;
     }
 }

@@ -17,13 +17,14 @@ RUN dotnet restore
 FROM restore AS dev
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
-    ASPNETCORE_ENVIRONMENT=Development \
-    DOTNET_USE_POLLING_FILE_WATCHER=1 \
-    DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=1 \
-    DOTNET_WATCH_RESTART_ON_RUDE_EDIT=1
+    ASPNETCORE_ENVIRONMENT=Development
 COPY . .
+# Pre-build so the first `dotnet run` against the bind mount is incremental (artifacts live in a volume seeded from this layer).
+RUN dotnet build src/TraceGreen.Api -c Debug --no-restore
 EXPOSE 8080
-CMD ["dotnet", "watch", "--no-hot-reload", "--project", "src/TraceGreen.Api", "run", "--", "--migrate", "--seed"]
+# `dotnet watch` is deliberately not used here: its polling watcher crashes on Windows bind mounts
+# (duplicate directory entries). After editing C# run `docker compose restart api`; the rebuild is incremental.
+CMD ["dotnet", "run", "--project", "src/TraceGreen.Api", "--", "--migrate", "--seed"]
 
 FROM restore AS build
 COPY . .

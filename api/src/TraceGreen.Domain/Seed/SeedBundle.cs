@@ -19,7 +19,7 @@ public sealed record DemoNodeSpec(
     Guid? VerificationId,
     string? Nonce);
 
-public sealed record DemoState(Guid WorkspaceId, IReadOnlyList<DemoNodeSpec> Nodes);
+public sealed record DemoStateSpec(Guid WorkspaceId, IReadOnlyList<DemoNodeSpec> Nodes);
 
 /// <summary>Everything under <c>seed/</c>, validated. Shared by both repositories and by the demo endpoints.</summary>
 public sealed record SeedBundle(
@@ -31,7 +31,7 @@ public sealed record SeedBundle(
     IReadOnlyList<Alternative> Alternatives,
     IReadOnlyList<ClassificationMapEntry> ClassificationMap,
     IReadOnlyDictionary<string, CachedClassification> AiCache,
-    DemoState DemoState)
+    DemoStateSpec DemoState)
 {
     private IReadOnlySet<string>? _allowList;
 

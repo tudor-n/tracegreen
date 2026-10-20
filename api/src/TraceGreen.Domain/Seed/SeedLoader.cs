@@ -33,7 +33,7 @@ public static class SeedLoader
         var alternatives = Read<List<Alternative>>(directory, "alternatives.json");
         var classificationMap = Read<List<ClassificationMapEntry>>(directory, "classification-map.json");
         var aiCache = Read<Dictionary<string, CachedClassification>>(directory, "ai-cache.json");
-        var demoState = Read<DemoState>(directory, "demo-state.json");
+        var demoState = Read<DemoStateSpec>(directory, "demo-state.json");
 
         var bundle = new SeedBundle(
             Path.GetFullPath(directory), buyer, categories, factors, lanes, alternatives, classificationMap, aiCache, demoState);

@@ -9,7 +9,7 @@ How to run TraceGreen for development, for the demo laptop, and what to do when 
 3. `docker compose up` — brings up Postgres, the AI service, the API (applies migrations and the seed on boot) and the Vite dev server.
 4. Open `http://localhost:3000`. The API is also reachable directly at `http://localhost:8080/api/health`; its OpenAPI document is at `http://localhost:8080/openapi/v1.json`.
 
-Every service reloads on save (file watchers poll, so expect a second or two of delay). After changing dependencies (`Directory.Packages.props`, `pyproject.toml`, `package.json`) run `docker compose build` again and `docker compose up -V` to refresh the dependency volumes.
+The web and AI services reload on save (their watchers poll, so expect a second or two of delay). The API does not hot-reload inside Docker (`dotnet watch` is unreliable on Windows bind mounts): after editing C# run `docker compose restart api`; the rebuild is incremental and takes about 15 s. After changing dependencies (`Directory.Packages.props`, `pyproject.toml`, `package.json`) run `docker compose build` again and `docker compose up -V` to refresh the dependency volumes.
 
 Tests inside the containers:
 
@@ -20,6 +20,8 @@ docker compose exec web pnpm test
 ```
 
 Wipe the database and reseed from scratch: `docker compose down -v && docker compose up`.
+
+The Postgres repository contract runs only when `DATABASE_URL` is set. Create a scratch database once (`docker compose exec db psql -U tracegreen -d tracegreen -c "CREATE DATABASE tracegreen_test"`), then `DATABASE_URL=postgres://tracegreen:tracegreen@localhost:5432/tracegreen_test dotnet test` from `api/`. Never point it at the dev database: the tests reset the demo workspace.
 
 ## Demo laptop (production images)
 

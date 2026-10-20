@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace TraceGreen.Tests.Api;
 
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests : IClassFixture<TestWebAppFactory>
 {
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly TestWebAppFactory _factory;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    public HealthEndpointTests(TestWebAppFactory factory) => _factory = factory;
 
     [Fact]
     public async Task HealthReportsOkAndMemoryMode()
@@ -18,6 +18,15 @@ public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.True(body.GetProperty("ok").GetBoolean());
         Assert.Equal("memory", body.GetProperty("mode").GetString());
         Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("version").GetString()));
+    }
+
+    [Fact]
+    public async Task HealthReportsRepositoryAndSeedState()
+    {
+        var client = _factory.CreateClient();
+        var body = await client.GetFromJsonAsync<JsonElement>("/api/health", TestContext.Current.CancellationToken);
+        Assert.Equal("ok", body.GetProperty("db").GetString());
+        Assert.Equal(4, body.GetProperty("seedNodes").GetInt32());
     }
 
     [Fact]
