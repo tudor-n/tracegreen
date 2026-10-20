@@ -17,4 +17,8 @@ public static class Hashing
 
     /// <summary>Content hash the verification token is bound to (C2): canonical JSON of the extracted fields.</summary>
     public static string InvoiceHash(ExtractedInvoice invoice) => Sha256Hex(CanonicalJson.Serialize(invoice));
+
+    /// <summary>Keyed hash of a client address for rate limiting and audit without storing the address itself (C7).</summary>
+    public static string IpHash(string ip, string secret) =>
+        Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(ip)));
 }
