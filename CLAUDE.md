@@ -2,7 +2,7 @@
 
 TraceGreen turns a UBL 2.1 e-invoice into a supplier graph with a spend-based CO2e estimate per node, lets a supplier verify a node in two taps through a signed single-use link, and shows a buyer the cost / carbon / lead-time trade-off of a greener choice. Three services behind one browser origin: `api/` (C#, .NET 10, owns every carbon number), `ai/` (Python FastAPI, classifies line items and suggests alternatives, never computes carbon), `web/` (Vite + React SPA, renders only).
 
-Technical roadmap and acceptance criteria: `docs/ROADMAP.md`. Architecture and seams: `docs/ARCHITECTURE.md`. How to run: `docs/RUNBOOK.md`.
+Current status, remaining work and decisions: `docs/NEXT.md`. How to run: `docs/RUNBOOK.md`. (`docs/ROADMAP.md` and `docs/ARCHITECTURE.md` are still to be written; until then `docs/NEXT.md` is the entry point.)
 
 ## Commands
 

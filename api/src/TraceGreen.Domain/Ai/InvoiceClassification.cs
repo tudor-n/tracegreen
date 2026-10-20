@@ -20,16 +20,16 @@ public static class InvoiceClassification
     }
 
     /// <summary>Invoice code first, then the pre-computed cache; otherwise UNCLASSIFIED (the live AI is consulted by the service).</summary>
-    public static (string CategoryId, double? Confidence, ClassificationSource Source) Offline(ExtractedLine line, SeedBundle bundle)
+    public static (string CategoryId, double? Confidence, ClassificationSource Source, string Rationale) Offline(ExtractedLine line, SeedBundle bundle)
     {
         if (Match(line, bundle.ClassificationMap) is { } mapped)
         {
-            return (mapped.CategoryId, 1.0, ClassificationSource.Invoice);
+            return (mapped.CategoryId, 1.0, ClassificationSource.Invoice, $"Item classification code {line.ClassificationCode} ({mapped.ListId})");
         }
         if (bundle.AiCache.TryGetValue(CacheKey.Compute(line.Description), out var cached) && bundle.AllowList.Contains(cached.CategoryId))
         {
-            return (cached.CategoryId, cached.Confidence, ClassificationSource.Cache);
+            return (cached.CategoryId, cached.Confidence, ClassificationSource.Cache, cached.Rationale);
         }
-        return (Ids.Unclassified, null, ClassificationSource.Stub);
+        return (Ids.Unclassified, null, ClassificationSource.Stub, "No classification available");
     }
 }

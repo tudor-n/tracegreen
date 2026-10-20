@@ -88,7 +88,7 @@ public static class DemoState
             extracted.IssueDate, extracted.Currency, extracted.Total, Hashing.RawXmlHash(xml), Hashing.InvoiceHash(extracted), extracted, createdAt);
 
         var dominant = extracted.Lines.MaxBy(l => l.Amount)!;
-        var (categoryId, confidence, source) = InvoiceClassification.Offline(dominant, bundle);
+        var (categoryId, confidence, source, _) = InvoiceClassification.Offline(dominant, bundle);
         var category = bundle.CategoryOf(categoryId);
         var mode = spec.TransportMode ?? lane.ModeDefault;
         var massT = InvoiceFacts.MassTFromLines(extracted.Lines);

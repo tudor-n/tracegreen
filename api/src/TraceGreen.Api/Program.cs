@@ -3,8 +3,10 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using TraceGreen.Api;
 using TraceGreen.Api.Endpoints;
+using TraceGreen.Domain.Ai;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Infrastructure.Ai;
 using TraceGreen.Infrastructure.Memory;
 using TraceGreen.Infrastructure.Postgres;
 
@@ -27,6 +29,15 @@ else
 {
     builder.Services.AddSingleton<IRepository, MemoryRepository>();
 }
+builder.Services.AddSingleton<IEventBus>(sp => new InMemoryEventBus(sp.GetRequiredService<TimeProvider>()));
+
+var aiOptions = new AiOptions(new Uri(config.AiBaseUrl + "/"), TimeSpan.FromMilliseconds(config.AiTimeoutMs));
+builder.Services.AddSingleton(aiOptions);
+builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
+{
+    client.BaseAddress = aiOptions.BaseUrl;
+    client.Timeout = aiOptions.Timeout;
+});
 
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -45,6 +56,7 @@ if (startup.Exit)
 
 app.MapOpenApi();
 app.MapHealth();
+app.MapEvents();
 
 app.Run();
 
