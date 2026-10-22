@@ -42,7 +42,9 @@ builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
 builder.Services.AddSingleton(new ServiceOptions(AiTimeout: TimeSpan.FromMilliseconds(config.AiTimeoutMs)));
 builder.Services.AddSingleton<NodeViewMapper>();
 builder.Services.AddSingleton<GraphService>();
-builder.Services.AddSingleton<DemoService>();
+// Scoped: they hold the typed AI HttpClient, which the client factory hands out per resolution.
+builder.Services.AddScoped<IngestService>();
+builder.Services.AddScoped<DemoService>();
 
 builder.Services.AddOpenApi(options => options.AddSchemaTransformer(EventsEndpoints.RequireEventType));
 builder.Services.ConfigureHttpJsonOptions(options => ApiJson.Configure(options.SerializerOptions));

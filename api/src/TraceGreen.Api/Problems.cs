@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using TraceGreen.Domain.Ubl;
+using TraceGreen.Domain.Services;
 
 namespace TraceGreen.Api;
 
@@ -42,12 +42,15 @@ public static class Problems
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);
     }
 
-    public static ProblemCode From(ParseErrorCode code) => code switch
+    public static ProblemCode From(IngestErrorCode code) => code switch
     {
-        ParseErrorCode.TooLarge => ProblemCode.TooLarge,
-        ParseErrorCode.DoctypeForbidden => ProblemCode.DoctypeForbidden,
-        ParseErrorCode.NotUblInvoice => ProblemCode.NotUblInvoice,
-        ParseErrorCode.Schema => ProblemCode.Schema,
+        IngestErrorCode.TooLarge => ProblemCode.TooLarge,
+        IngestErrorCode.DoctypeForbidden => ProblemCode.DoctypeForbidden,
+        IngestErrorCode.NotUblInvoice => ProblemCode.NotUblInvoice,
+        IngestErrorCode.Schema => ProblemCode.Schema,
+        IngestErrorCode.Duplicate => ProblemCode.Duplicate,
+        IngestErrorCode.UnsupportedCurrency => ProblemCode.UnsupportedCurrency,
+        IngestErrorCode.NoLane => ProblemCode.NoLane,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 
