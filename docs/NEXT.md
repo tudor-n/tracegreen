@@ -18,7 +18,7 @@ Monorepo with three services behind one browser origin, brought up by `docker co
 
 Test counts at hand-off: 125 .NET tests (109 before Task 8 plus the event bus, AI client, classification and SSE tests), 1 Python test, web typecheck/lint/build.
 
-Test counts after A2: 172 .NET tests; in memory mode 161 run and the 11 Postgres contract tests are skipped, with `DATABASE_URL` all 172 run.
+Test counts after A2: 193 .NET tests; in memory mode 180 run and the 13 Postgres contract tests are skipped, with `DATABASE_URL` all 193 run.
 
 ## Wire contract (slice 1)
 
@@ -48,6 +48,7 @@ Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
 - **`baseUrl` is a display hint, not a trusted value:** for forwarded headers the last value wins (an appending proxy adds its own after the client's), but a direct caller can still choose them. Never write it into audit payloads.
 - **Errors are `ApiProblem`** (RFC 9457 fields plus a typed `code`); clients switch on `code`, never on titles.
 - **Non-EUR invoices are rejected with `UnsupportedCurrency`** until a spend-factor source with FX conversion is chosen (D1), and **a supplier country without a lane is rejected with `NoLane`** instead of inventing a lane (CN → `CN-RO`, TW → `TW-RO`, DE → `DE-HH-SB`, RO → `RO-SB-SB`).
+- **Ingest refuses input it cannot estimate safely, with 422 `Schema` and a detail:** elements nested deeper than 64 levels (checked by a streaming pass before any tree is built), a total that is not positive or above 10¹² EUR, a line amount above 10¹², a negative quantity (returns are not supported yet) or one above 10⁹. The bounds keep every later sum inside `decimal`'s range, so one hostile invoice cannot make `/api/graph` fail for everyone.
 
 ## What remains (in order)
 
@@ -72,9 +73,9 @@ The implementation plan lives outside the repo (Claude plan file `read-the-trace
 
 ## Caveats to know before continuing
 
-- Ingest checks for a duplicate (same normalised raw XML hash) before inserting, and `invoices` has no unique index on that hash, so two identical uploads racing each other could both land. Acceptable for the demo; add a unique index in a migration if it ever matters.
+- Duplicates are refused by the repository itself, under the same lock as the insert (raw XML hash, invoice id or node id already stored), so two identical uploads or two "Load demo" clicks at the same instant give one 201 and one 409. Ingest also checks before classifying, only to spare the AI wait.
 - Seed nodes are stamped `2026-11-01T08:00Z` (`DemoState.SeedTime`), so a node imported before that date sorts before them in `GET /api/graph`. The layout must not depend on node order.
-- A VERIFIED node without a known mass gets an activity estimate of 0 kg (`Estimate.ActivityBasedKg` returns zeros when `MassUnknown`), and `carbonKg` would show 0. Every seed invoice carries a mass in `KGM`; the verify flow (A6) must ask for `massT` when the invoice has none, or keep such a node on the spend figure.
+- KPIs and events are published after the insert, outside any lock. Two imports at the same instant can publish in reverse order, so the last `node.created` may carry KPIs without the other node until the next event or snapshot; a reset landing between an insert and its publish can deliver a `node.created` for a node the reset removed (the next snapshot drops it). Both need two actions within milliseconds; serialise publishing if it ever shows.
 
 - `.NET 10 SDK` on this machine is installed under `%LOCALAPPDATA%\Microsoft\dotnet` (user-local); put it first on `PATH` or use the containers.
 - `dotnet-ef` global tool is 10.0.5 while the runtime is 10.0.13: it works but warns; `dotnet tool update -g dotnet-ef` removes the warning.

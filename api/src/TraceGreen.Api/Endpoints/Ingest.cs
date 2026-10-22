@@ -91,6 +91,11 @@ public static class IngestEndpoints
         {
             return Fail(ProblemCode.MissingFile, "The multipart body could not be read.");
         }
+        catch (IOException) when (!ct.IsCancellationRequested)
+        {
+            // A cut-off or garbled upload (e.g. the hotspot dropped mid-transfer) is the client's problem, not a 500.
+            return Fail(ProblemCode.MissingFile, "The upload was incomplete; send the file again.");
+        }
     }
 
     private static async Task<Result<string, BodyError>> ReadCappedAsync(Stream stream, CancellationToken ct)

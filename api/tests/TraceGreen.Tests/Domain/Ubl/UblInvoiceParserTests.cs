@@ -70,6 +70,21 @@ public class UblInvoiceParserTests
     }
 
     [Fact]
+    public void RejectsDeepNestingBeforeBuildingATree()
+    {
+        var xml = N1;
+        var deep = string.Concat(Enumerable.Repeat("<a>", 200_000)) + string.Concat(Enumerable.Repeat("</a>", 200_000));
+        var started = DateTime.UtcNow;
+
+        var result = Parser.Parse(xml.Replace("<cbc:ID>SDC-2026-1028</cbc:ID>", "<cbc:ID>" + deep + "</cbc:ID>"));
+
+        Assert.False(result.IsOk);
+        Assert.Equal(ParseErrorCode.Schema, result.Error.Code);
+        Assert.Contains("nested deeper", result.Error.Message);
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
     public void RejectsDoctype()
     {
         var result = Parser.Parse("<!DOCTYPE x [<!ENTITY e \"x\">]><Invoice xmlns=\"urn:oasis:names:specification:ubl:schema:xsd:Invoice-2\"/>");

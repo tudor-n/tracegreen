@@ -13,6 +13,10 @@ public sealed class UblInvoiceParser : IInvoiceParser
 {
     public const int MaxChars = 2 * 1024 * 1024;
 
+    /// <summary>UBL invoices nest about ten levels deep. Deeper input is refused before a tree is built: building and
+    /// reading a deeply nested tree costs quadratic time and recurses until the process overflows its stack.</summary>
+    public const int MaxDepth = 64;
+
     public string Name => "ubl-2.1";
 
     public bool Detect(string input)
@@ -42,6 +46,10 @@ public sealed class UblInvoiceParser : IInvoiceParser
                 IgnoreComments = true,
                 IgnoreProcessingInstructions = true,
             };
+            if (ExceedsDepth(input, settings))
+            {
+                return Fail(ParseErrorCode.Schema, $"Elements are nested deeper than {MaxDepth} levels.");
+            }
             using var reader = XmlReader.Create(new StringReader(input), settings);
             document = XDocument.Load(reader);
         }
@@ -64,6 +72,20 @@ public sealed class UblInvoiceParser : IInvoiceParser
         {
             return Fail(ParseErrorCode.Schema, ex.Message);
         }
+    }
+
+    /// <summary>A streaming pass that stops at the first element deeper than <see cref="MaxDepth"/>; it never builds a tree.</summary>
+    private static bool ExceedsDepth(string input, XmlReaderSettings settings)
+    {
+        using var reader = XmlReader.Create(new StringReader(input), settings);
+        while (reader.Read())
+        {
+            if (reader.Depth > MaxDepth)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static ExtractedInvoice Extract(XElement root)

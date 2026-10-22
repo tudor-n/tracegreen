@@ -9,6 +9,11 @@ public enum RecordVerificationStatus { Ok, AlreadyUsed }
 
 public sealed record RecordVerificationResult(RecordVerificationStatus Status, SupplierNode? Node, AuditEntry? Entry);
 
+public enum InsertInvoiceStatus { Ok, Duplicate }
+
+/// <summary><see cref="ExistingNodeId"/> is the node that already holds the invoice when <see cref="Status"/> is Duplicate.</summary>
+public sealed record InsertInvoiceResult(InsertInvoiceStatus Status, AuditEntry? Entry, Guid? ExistingNodeId);
+
 /// <summary>
 /// Persistence port. Write methods that touch several rows are atomic in every adapter, and the audit builder is
 /// invoked under the adapter's lock or transaction so the chain can never fork. Single use of a verification
@@ -33,7 +38,11 @@ public interface IRepository
 
     Task<IReadOnlyList<SupplierNode>> ListNodesAsync(Ctx ctx, CancellationToken ct);
 
-    Task<AuditEntry> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct);
+    /// <summary>
+    /// Refuses, under the same lock as the write, an invoice whose raw hash or id is already stored or a node id already
+    /// taken, so a duplicate cannot slip in between a caller's own check and the insert.
+    /// </summary>
+    Task<InsertInvoiceResult> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct);
 
     Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct);
 

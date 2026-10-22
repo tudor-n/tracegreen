@@ -69,18 +69,20 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
-    public Task<AuditEntry> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct)
+    public Task<InsertInvoiceResult> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct)
     {
         lock (_gate)
         {
             var ws = Get(ctx.WorkspaceId);
-            if (ws.Invoices.ContainsKey(invoice.Id) || ws.Nodes.ContainsKey(node.Id))
+            var existing = ws.Invoices.Values.FirstOrDefault(i => i.RawXmlHash == invoice.RawXmlHash) ?? ws.Invoices.GetValueOrDefault(invoice.Id);
+            if (existing is not null || ws.Nodes.ContainsKey(node.Id))
             {
-                throw new InvalidOperationException("Invoice or node id already exists.");
+                var existingNodeId = existing is null ? node.Id : ws.Nodes.Values.FirstOrDefault(n => n.InvoiceId == existing.Id)?.Id;
+                return Task.FromResult(new InsertInvoiceResult(InsertInvoiceStatus.Duplicate, null, existingNodeId));
             }
             ws.Invoices[invoice.Id] = invoice;
             ws.Nodes[node.Id] = node;
-            return Task.FromResult(ws.Append(audit));
+            return Task.FromResult(new InsertInvoiceResult(InsertInvoiceStatus.Ok, ws.Append(audit), null));
         }
     }
 

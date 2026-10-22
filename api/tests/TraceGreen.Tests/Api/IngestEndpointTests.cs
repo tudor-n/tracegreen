@@ -221,6 +221,71 @@ public class IngestEndpointTests : IClassFixture<TestWebAppFactory>
     }
 
     [Fact]
+    public async Task DeeplyNestedXmlIs422WithoutHoldingTheServer()
+    {
+        var deep = string.Concat(Enumerable.Repeat("<a>", 280_000)) + string.Concat(Enumerable.Repeat("</a>", 280_000));
+        var started = DateTime.UtcNow;
+
+        var response = await PostXml(N1Xml.Replace("<cbc:ID>SDC-2026-1028</cbc:ID>", "<cbc:ID>" + deep + "</cbc:ID>"));
+
+        await AssertProblem(response, HttpStatusCode.UnprocessableEntity, "Schema");
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [InlineData("-48000.00", "positive")]
+    [InlineData("0.00", "positive")]
+    [InlineData("50000000000000000000000000000", "exceeds")]
+    public async Task ATotalOutsideTheSaneRangeIs422(string total, string reason)
+    {
+        var xml = N1Xml.Replace("<cbc:TaxExclusiveAmount currencyID=\"EUR\">48000.00</cbc:TaxExclusiveAmount>",
+            $"<cbc:TaxExclusiveAmount currencyID=\"EUR\">{total}</cbc:TaxExclusiveAmount>");
+
+        var problem = await AssertProblem(await PostXml(xml), HttpStatusCode.UnprocessableEntity, "Schema");
+
+        Assert.Contains(reason, problem.GetProperty("detail").GetString());
+    }
+
+    [Theory]
+    [InlineData("<cbc:InvoicedQuantity unitCode=\"TNE\">70000000000000000000000000000</cbc:InvoicedQuantity>", "exceeds")]
+    [InlineData("<cbc:InvoicedQuantity unitCode=\"KGM\">-2300</cbc:InvoicedQuantity>", "negative")]
+    public async Task AQuantityOutsideTheSaneRangeIs422(string quantity, string reason)
+    {
+        var xml = N1Xml.Replace("<cbc:InvoicedQuantity unitCode=\"KGM\">2300</cbc:InvoicedQuantity>", quantity);
+
+        var problem = await AssertProblem(await PostXml(xml), HttpStatusCode.UnprocessableEntity, "Schema");
+
+        Assert.Contains(reason, problem.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task ATruncatedMultipartUploadIs400()
+    {
+        var body = new StringContent(
+            "--cut\r\nContent-Disposition: form-data; name=\"file\"; filename=\"invoice.xml\"\r\nContent-Type: text/xml\r\n\r\n<Invoice",
+            Encoding.UTF8);
+        body.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=cut");
+
+        var response = await _client.PostAsync("/api/ingest/ubl", body, Ct);
+
+        await AssertProblem(response, HttpStatusCode.BadRequest, "MissingFile");
+    }
+
+    [Fact]
+    public async Task TwoDemoImportsAtTheSameInstantGiveOneNodeAndOneConflict()
+    {
+        await Reset();
+
+        var responses = await Task.WhenAll(
+            _client.PostAsync("/api/ingest/demo", null, Ct),
+            _client.PostAsync("/api/ingest/demo", null, Ct));
+
+        Assert.Equal([HttpStatusCode.Created, HttpStatusCode.Conflict], responses.Select(r => r.StatusCode).Order());
+        var conflict = await AssertProblem(responses.Single(r => r.StatusCode == HttpStatusCode.Conflict), HttpStatusCode.Conflict, "Duplicate");
+        Assert.Equal(TestNodes.N1Id, conflict.GetProperty("nodeId").GetGuid());
+    }
+
+    [Fact]
     public async Task ThePromptInjectionInvoiceIsClassifiedFromTheCacheAsData()
     {
         await Reset();
