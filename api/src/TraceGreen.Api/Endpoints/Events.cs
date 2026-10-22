@@ -1,7 +1,8 @@
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 using System.Threading.Channels;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
@@ -16,12 +17,6 @@ namespace TraceGreen.Api.Endpoints;
 /// </summary>
 public static class EventsEndpoints
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-    };
-
     private static readonly TimeSpan Heartbeat = TimeSpan.FromSeconds(20);
 
     public static IEndpointRouteBuilder MapEvents(this IEndpointRouteBuilder app)
@@ -49,11 +44,26 @@ public static class EventsEndpoints
                 }
             })
             .WithName("GetEvents")
-            .ExcludeFromDescription();
+            .WithTags("Events")
+            .WithSummary("Server-Sent Events: each domain event's data is a DomainEvent; control events hello, resync and ping carry no domain data")
+            // Described (not excluded) so the event records reach the generated client types like any response body.
+            .Produces<DomainEvent>(StatusCodes.Status200OK, "text/event-stream");
         return app;
     }
 
-    public static string Serialize(DomainEvent e) => JsonSerializer.Serialize(e, e.GetType(), Json);
+    /// <summary>The serializer always writes the discriminator, so each event schema lists <c>type</c> as required.</summary>
+    public static Task RequireEventType(OpenApiSchema schema, OpenApiSchemaTransformerContext context, CancellationToken ct)
+    {
+        if (context.JsonTypeInfo.Type.IsSubclassOf(typeof(DomainEvent)) && schema.Properties?.ContainsKey("type") == true)
+        {
+            schema.Required ??= new HashSet<string>();
+            schema.Required.Add("type");
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Serialised as the base type so the <c>type</c> discriminator leads, matching the <c>DomainEvent</c> OpenAPI component.</summary>
+    public static string Serialize(DomainEvent e) => JsonSerializer.Serialize(e, ApiJson.Options);
 
     private static async IAsyncEnumerable<SseItem<string>> Stream(
         IEventBus bus, Guid workspaceId, long? since, [EnumeratorCancellation] CancellationToken ct)

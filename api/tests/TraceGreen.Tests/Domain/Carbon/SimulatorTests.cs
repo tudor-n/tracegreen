@@ -63,4 +63,11 @@ public class SimulatorTests
 
         Assert.Equal(7488.8m - 21600m, result.Delta.CarbonKg);
     }
+
+    [Fact]
+    public void AvailableModesAreTheLegsWithDistanceLeadTimeAndCost()
+    {
+        Assert.Equal([TransportMode.Rail, TransportMode.Sea, TransportMode.Air], Simulator.AvailableModes(CnRo));
+        Assert.Equal([TransportMode.Road], Simulator.AvailableModes(Seed.Lanes.Single(l => l.Id == "RO-SB-SB")));
+    }
 }

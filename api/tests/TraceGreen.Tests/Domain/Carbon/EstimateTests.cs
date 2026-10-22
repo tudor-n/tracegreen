@@ -71,4 +71,15 @@ public class EstimateTests
     [InlineData(null, null, NodeStatus.Estimated)]
     public void DeriveStatusFromAnswers(TransportMode? mode, EnergySource? energy, NodeStatus expected) =>
         Assert.Equal(expected, Estimate.DeriveStatus(mode, energy));
+
+    [Theory]
+    [InlineData(NodeStatus.Estimated, null, 2.3, Uncertainty.High)]
+    [InlineData(NodeStatus.Partial, null, 2.3, Uncertainty.High)]
+    [InlineData(NodeStatus.Partial, EnergySource.Renewable, 2.3, Uncertainty.High)]
+    [InlineData(NodeStatus.Verified, EnergySource.Unknown, 2.3, Uncertainty.Medium)]
+    [InlineData(NodeStatus.Verified, EnergySource.Grid, null, Uncertainty.Medium)]
+    [InlineData(NodeStatus.Verified, EnergySource.Grid, 2.3, Uncertainty.Low)]
+    [InlineData(NodeStatus.Verified, EnergySource.Renewable, 2.3, Uncertainty.Low)]
+    public void DeriveUncertaintyFollowsRuling4(NodeStatus status, EnergySource? energy, double? massT, Uncertainty expected) =>
+        Assert.Equal(expected, Estimate.DeriveUncertainty(status, energy, (decimal?)massT));
 }

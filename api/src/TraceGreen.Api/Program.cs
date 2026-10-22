@@ -1,11 +1,10 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using TraceGreen.Api;
 using TraceGreen.Api.Endpoints;
 using TraceGreen.Domain.Ai;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Services;
 using TraceGreen.Infrastructure.Ai;
 using TraceGreen.Infrastructure.Memory;
 using TraceGreen.Infrastructure.Postgres;
@@ -39,12 +38,14 @@ builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
     client.Timeout = aiOptions.Timeout;
 });
 
-builder.Services.AddOpenApi();
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
-});
+// Use-case services live in the Domain and get configuration through ServiceOptions, built here from AppConfig.
+builder.Services.AddSingleton(new ServiceOptions(AiTimeout: TimeSpan.FromMilliseconds(config.AiTimeoutMs)));
+builder.Services.AddSingleton<NodeViewMapper>();
+builder.Services.AddSingleton<GraphService>();
+builder.Services.AddSingleton<DemoService>();
+
+builder.Services.AddOpenApi(options => options.AddSchemaTransformer(EventsEndpoints.RequireEventType));
+builder.Services.ConfigureHttpJsonOptions(options => ApiJson.Configure(options.SerializerOptions));
 
 var app = builder.Build();
 
@@ -57,6 +58,9 @@ if (startup.Exit)
 app.MapOpenApi();
 app.MapHealth();
 app.MapEvents();
+app.MapGraph();
+app.MapIngest();
+app.MapDev();
 
 app.Run();
 

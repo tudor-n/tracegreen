@@ -5,6 +5,9 @@ namespace TraceGreen.Domain.Ubl;
 /// <summary>Facts derived from invoice lines before any AI runs.</summary>
 public static class InvoiceFacts
 {
+    /// <summary>The line that decides the node's category: the largest amount, first one on a tie.</summary>
+    public static ExtractedLine DominantLine(IReadOnlyList<ExtractedLine> lines) => lines.MaxBy(l => l.Amount)!;
+
     /// <summary>Total mass in tonnes from lines whose quantity carries a mass unit code (UN/ECE Rec. 20), or null when none does.</summary>
     public static decimal? MassTFromLines(IEnumerable<ExtractedLine> lines)
     {
