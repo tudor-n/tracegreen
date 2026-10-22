@@ -1,0 +1,3 @@
+# Git-ignored files Claude Code copies into new worktrees (claude -w, isolated subagents).
+# The priority file is private; CLAUDE.md imports it, so a worktree without it runs without the rulings.
+docs/PRIORITY-CHANGES.md

@@ -96,4 +96,32 @@ public class NodeViewMapperTests
         Assert.Equal(invoice.Extracted.Number, n2.Invoice.Number);
         Assert.Equal(invoice.TotalAmount, n2.Invoice.Total);
     }
+
+    [Fact]
+    public void AVerifiedNodeWithoutMassStaysOnTheSpendFigureWithMediumUncertainty()
+    {
+        var spec = Seed.DemoState.Nodes.Single(n => n.Key == "N2");
+        var node = State.Nodes.Single(n => n.Id == spec.NodeId) with { MassT = null, ActivityKg = null };
+
+        var view = Mapper.Map(node, State.Invoices.Single(i => i.Id == node.InvoiceId));
+
+        Assert.Equal(CarbonBasis.Spend, view.Basis);
+        Assert.Equal(node.SpendKg, view.CarbonKg);
+        Assert.Null(view.Activity);
+        Assert.Equal(Uncertainty.Medium, view.Uncertainty);
+    }
+
+    [Fact]
+    public void AFactorRowThatNoLongerExistsIsLeftOutInsteadOfFailingTheGraph()
+    {
+        var mapper = new NodeViewMapper(Seed with { Factors = Seed.Factors.Where(f => f.Key != "electronics").ToList() });
+        var spec = Seed.DemoState.Nodes.Single(n => n.Key == "N2");
+        var node = State.Nodes.Single(n => n.Id == spec.NodeId);
+
+        var view = mapper.Map(node, State.Invoices.Single(i => i.Id == node.InvoiceId));
+
+        Assert.Empty(view.Spend.Factors);
+        Assert.Equal(node.SpendKg, view.Spend.Kg);
+        Assert.Equal(2, view.Activity!.Factors.Count);
+    }
 }

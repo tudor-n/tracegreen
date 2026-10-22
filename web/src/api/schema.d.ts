@@ -234,7 +234,7 @@ export interface components {
             workspaceId: string;
         };
         /** @enum {unknown} */
-        EnergySource: "grid" | "renewable" | "unknown" | null;
+        EnergySource: "grid" | "renewable" | "unknown";
         FactorLookup: {
             /** Format: double */
             value: number;

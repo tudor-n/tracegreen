@@ -70,6 +70,19 @@ public class HealthEndpointTests : IClassFixture<TestWebAppFactory>
     }
 
     [Fact]
+    public async Task TheLastForwardedValueWinsSoAnAppendingProxyOverridesTheClient()
+    {
+        var client = _factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/health");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Host", "spoofed.example:3000, 192.168.137.1:3000");
+        request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "javascript, http");
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+
+        Assert.Equal("http://192.168.137.1:3000", body.GetProperty("baseUrl").GetProperty("url").GetString());
+    }
+
+    [Fact]
     public async Task OpenApiDocumentListsHealth()
     {
         var client = _factory.CreateClient();
@@ -100,7 +113,40 @@ public class HealthEndpointTests : IClassFixture<TestWebAppFactory>
         Assert.True(schemas.GetProperty("HealthResponse").GetProperty("properties").TryGetProperty("baseUrl", out _));
     }
 
+    [Fact]
+    public async Task EnumComponentsHoldOnlyTheirValuesAndNullableUsesSayNullThemselves()
+    {
+        var client = _factory.CreateClient();
+        var doc = await client.GetFromJsonAsync<JsonElement>("/openapi/v1.json", TestContext.Current.CancellationToken);
+        var schemas = doc.GetProperty("components").GetProperty("schemas");
+
+        Assert.Equal(["grid", "renewable", "unknown"], schemas.GetProperty("EnergySource").GetProperty("enum").EnumerateArray().Select(e => e.GetString()));
+        var energy = schemas.GetProperty("NodeView").GetProperty("properties").GetProperty("energySource").GetRawText();
+        Assert.Contains("\"null\"", energy);
+        Assert.Contains("#/components/schemas/EnergySource", energy);
+    }
+
     private static string? Ref(JsonElement paths, string path, string method, string status, string mediaType) =>
         paths.GetProperty(path).GetProperty(method).GetProperty("responses").GetProperty(status)
             .GetProperty("content").GetProperty(mediaType).GetProperty("schema").GetProperty("$ref").GetString();
+}
+
+public class HealthAiTimeoutTests : IClassFixture<HangingAiWebAppFactory>
+{
+    private readonly HangingAiWebAppFactory _factory;
+
+    public HealthAiTimeoutTests(HangingAiWebAppFactory factory) => _factory = factory;
+
+    [Fact]
+    public async Task AnAiServiceThatNeverAnswersCostsHealthOneAndAHalfSecondsAndNothingElse()
+    {
+        var client = _factory.CreateClient();
+        var started = DateTime.UtcNow;
+
+        var body = await client.GetFromJsonAsync<JsonElement>("/api/health", TestContext.Current.CancellationToken);
+
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(3));
+        Assert.Equal("error: no answer within 1.5 s", body.GetProperty("ai").GetString());
+        Assert.True(body.GetProperty("ok").GetBoolean());
+    }
 }
