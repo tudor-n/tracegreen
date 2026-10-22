@@ -68,6 +68,15 @@ describe('events', () => {
     expect(gap.state.lastSeq).toBe(4)
   })
 
+  it('applies buffered events in sequence order', () => {
+    const fetching = run(
+      [{ kind: 'hello' }, { kind: 'event', event: event(7) }, { kind: 'event', event: event(6) }],
+      live(4),
+    )
+    const loaded = step(fetching.state, { kind: 'snapshotLoaded', snapshot: snapshot(5) })
+    expect(applied(loaded)).toEqual([6, 7])
+  })
+
   it('answers graph.reset with a fresh snapshot instead of forwarding it', () => {
     const reset = step(live(4), { kind: 'event', event: event(5, 'graph.reset') })
     expect(kinds(reset)).toEqual(['fetchSnapshot'])
@@ -105,11 +114,13 @@ describe('events', () => {
 describe('reconnect and polling', () => {
   it('switches to polling when the stream drops and back to live when it reopens', () => {
     const down = step(live(4), { kind: 'streamError', closed: false })
-    expect(kinds(down)).toEqual([])
+    expect(kinds(down)).toEqual(['fetchSnapshot'])
     expect(shouldPoll(down.state)).toBe(true)
-    expect(connection(down.state)).toBe('polling')
+    const checked = step(down.state, { kind: 'snapshotLoaded', snapshot: snapshot(5) })
+    expect(connection(checked.state)).toBe('polling')
 
-    const tick = step(down.state, { kind: 'pollTick' })
+    expect(kinds(step(checked.state, { kind: 'streamError', closed: false }))).toEqual([])
+    const tick = step(checked.state, { kind: 'pollTick' })
     expect(kinds(tick)).toEqual(['fetchSnapshot'])
     const polled = step(tick.state, { kind: 'snapshotLoaded', snapshot: snapshot(6) })
     expect(connection(polled.state)).toBe('polling')
@@ -120,7 +131,7 @@ describe('reconnect and polling', () => {
   })
 
   it('shows offline while polls fail and recovers on the next good snapshot', () => {
-    const down = run([{ kind: 'streamError', closed: false }, { kind: 'pollTick' }, { kind: 'snapshotFailed' }], live(4))
+    const down = run([{ kind: 'streamError', closed: false }, { kind: 'snapshotFailed' }], live(4))
     expect(connection(down.state)).toBe('offline')
 
     const back = run([{ kind: 'pollTick' }, { kind: 'snapshotLoaded', snapshot: snapshot(4) }], down.state)
@@ -128,7 +139,13 @@ describe('reconnect and polling', () => {
   })
 
   it('asks for a new EventSource when the browser gave up on the stream', () => {
-    expect(kinds(step(live(4), { kind: 'streamError', closed: true }))).toEqual(['reconnect'])
+    expect(kinds(step(live(4), { kind: 'streamError', closed: true }))).toEqual(['fetchSnapshot', 'reconnect'])
+  })
+
+  it('checks the API at once when the stream fails before the first snapshot', () => {
+    const failed = run([{ kind: 'streamError', closed: true }])
+    expect(kinds(failed)).toEqual(['fetchSnapshot', 'reconnect'])
+    expect(connection(step(failed.state, { kind: 'snapshotFailed' }).state)).toBe('offline')
   })
 
   it('refetches the snapshot on resync and on every hello', () => {
@@ -137,14 +154,62 @@ describe('reconnect and polling', () => {
   })
 
   it('never has two snapshot requests in flight', () => {
-    const first = run([{ kind: 'streamError', closed: false }, { kind: 'pollTick' }], live(4))
+    const first = step(live(4), { kind: 'streamError', closed: false })
     expect(kinds(first)).toEqual(['fetchSnapshot'])
     expect(kinds(step(first.state, { kind: 'pollTick' }))).toEqual([])
     expect(kinds(step(first.state, { kind: 'resync' }))).toEqual([])
   })
 
+  it('fetches once more when hello arrives while an older poll is in flight', () => {
+    const polling = run([{ kind: 'streamError', closed: true }], live(4))
+    const hello = step(polling.state, { kind: 'hello' })
+    expect(kinds(hello)).toEqual([])
+
+    const landed = step(hello.state, { kind: 'snapshotLoaded', snapshot: snapshot(4) })
+    expect(kinds(landed)).toEqual(['hydrate', 'fetchSnapshot'])
+    const fresh = step(landed.state, { kind: 'snapshotLoaded', snapshot: snapshot(5) })
+    expect(kinds(fresh)).toEqual(['hydrate'])
+    expect(connection(fresh.state)).toBe('live')
+  })
+
+  it('does not queue another request for a poll tick', () => {
+    const polling = run([{ kind: 'streamError', closed: false }], live(4))
+    const landed = run([{ kind: 'pollTick' }, { kind: 'snapshotLoaded', snapshot: snapshot(4) }], polling.state)
+    expect(kinds(landed)).toEqual(['hydrate'])
+  })
+
   it('does not poll while the stream is open and snapshots succeed', () => {
     expect(kinds(step(live(4), { kind: 'pollTick' }))).toEqual([])
+  })
+})
+
+describe('API restart', () => {
+  it('follows the snapshot when its sequence is lower than ours', () => {
+    const restarted = run([{ kind: 'hello' }, { kind: 'snapshotLoaded', snapshot: snapshot(0) }], live(40))
+    expect(kinds(restarted)).toEqual(['hydrate'])
+    expect(restarted.state.lastSeq).toBe(0)
+    expect(applied(step(restarted.state, { kind: 'event', event: event(1) }))).toEqual([1])
+  })
+
+  it('drops events buffered before a failed request instead of chasing them after the restart', () => {
+    // The old process sent 41 and 43 while a gap fetch was in flight, then died; the new one starts again at 0.
+    const gapFetch = run([{ kind: 'event', event: event(42) }, { kind: 'event', event: event(43) }], live(40))
+    expect(gapFetch.state.buffer).toHaveLength(1)
+    const failed = step(gapFetch.state, { kind: 'snapshotFailed' })
+    expect(failed.state.buffer).toEqual([])
+
+    const back = run([{ kind: 'hello' }, { kind: 'snapshotLoaded', snapshot: snapshot(0) }], failed.state)
+    expect(kinds(back)).toEqual(['hydrate'])
+    expect(connection(back.state)).toBe('live')
+  })
+
+  it('refetches at most once for stale events left in the buffer', () => {
+    const fetching = run([{ kind: 'hello' }, { kind: 'event', event: event(50) }], live(40))
+    const first = step(fetching.state, { kind: 'snapshotLoaded', snapshot: snapshot(0) })
+    expect(kinds(first)).toEqual(['hydrate', 'fetchSnapshot'])
+    expect(first.state.buffer).toEqual([])
+    const second = step(first.state, { kind: 'snapshotLoaded', snapshot: snapshot(0) })
+    expect(kinds(second)).toEqual(['hydrate'])
   })
 })
 

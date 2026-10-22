@@ -1,7 +1,11 @@
 import type { DomainEvent, DomainEventType, GraphSnapshot } from '@/api/client'
 
 // Pure decision logic behind useGraphEvents: which snapshot to fetch, which event to apply, when to poll or reconnect.
-// The hook only performs the effects this returns, so every rule here is unit-tested without a browser.
+// startGraphSync only performs the effects this returns, so every rule here is unit-tested without a browser.
+//
+// One fact carries most of it: a snapshot requested after an event arrived already contains that event (the server
+// reads its sequence before the nodes). So every new request drops the buffer, and only events that arrive while a
+// request is in flight are kept for after it lands.
 
 /** What the connection badge shows. `connecting` lasts only until the first snapshot arrives or fails. */
 export type Connection = 'connecting' | 'live' | 'polling' | 'offline'
@@ -37,11 +41,13 @@ export type SyncEffect =
 export interface SyncState {
   /** Open after `hello`; down after an error until the next `hello`. */
   stream: 'connecting' | 'open' | 'down'
-  /** Sequence number the store is current to; null until the first snapshot. */
+  /** Sequence number the store is current to; null until the first snapshot. Goes down when the API restarts. */
   lastSeq: number | null
   /** A snapshot request is in flight; events wait in `buffer` until it lands. */
   fetching: boolean
   buffer: DomainEvent[]
+  /** A (re)connection or resync arrived while a request was in flight, so that answer may be too old: fetch once more. */
+  refetch: boolean
   /** Whether the most recent snapshot request succeeded. */
   lastFetchOk: boolean
 }
@@ -56,6 +62,7 @@ export const initialSyncState: SyncState = {
   lastSeq: null,
   fetching: false,
   buffer: [],
+  refetch: false,
   lastFetchOk: true,
 }
 
@@ -72,24 +79,28 @@ export function connection(state: SyncState): Connection {
 
 const none = (state: SyncState): SyncStep => ({ state, effects: [] })
 
-function fetchSnapshot(state: SyncState): SyncStep {
-  return state.fetching ? none(state) : { state: { ...state, fetching: true }, effects: [{ kind: 'fetchSnapshot' }] }
+/**
+ * Starts a snapshot request. The buffer is dropped because the new snapshot covers it. If one is already in flight,
+ * `queue` asks for another once it lands; polls don't queue, since the next tick asks again anyway.
+ */
+function fetchSnapshot(state: SyncState, queue = false): SyncStep {
+  if (state.fetching) return queue ? none({ ...state, refetch: true }) : none(state)
+  return { state: { ...state, fetching: true, refetch: false, buffer: [] }, effects: [{ kind: 'fetchSnapshot' }] }
 }
 
 export function step(state: SyncState, input: SyncInput): SyncStep {
   switch (input.kind) {
     case 'hello':
-      // Every (re)connection refreshes the snapshot: it is cheap and covers whatever happened while the stream was down.
-      return fetchSnapshot({ ...state, stream: 'open' })
+      // Every (re)connection refreshes the snapshot: a new EventSource gets no replay, so this covers what it missed.
+      return fetchSnapshot({ ...state, stream: 'open' }, true)
     case 'resync':
-      return fetchSnapshot(state)
+      return fetchSnapshot(state, true)
     case 'streamError':
-      // CONNECTING: the browser retries by itself. CLOSED (e.g. a 502 from the proxy): only a new EventSource recovers.
-      return { state: { ...state, stream: 'down' }, effects: input.closed ? [{ kind: 'reconnect' }] : [] }
+      return streamError(state, input.closed)
     case 'pollTick':
       return shouldPoll(state) ? fetchSnapshot(state) : none(state)
     case 'snapshotFailed':
-      return none({ ...state, fetching: false, lastFetchOk: false })
+      return none({ ...state, fetching: false, refetch: false, buffer: [], lastFetchOk: false })
     case 'snapshotLoaded':
       return loaded(state, input.snapshot)
     case 'event':
@@ -97,30 +108,40 @@ export function step(state: SyncState, input: SyncInput): SyncStep {
   }
 }
 
+function streamError(state: SyncState, closed: boolean): SyncStep {
+  const down: SyncState = { ...state, stream: 'down' }
+  // On the first error, ask the API right away instead of waiting for a poll tick: the badge settles within a request.
+  const checked = state.stream === 'down' ? none(down) : fetchSnapshot(down)
+  // CONNECTING: the browser retries by itself. CLOSED (e.g. a 502 from the proxy): only a new EventSource recovers.
+  return closed ? { state: checked.state, effects: [...checked.effects, { kind: 'reconnect' }] } : checked
+}
+
 function received(state: SyncState, event: DomainEvent): SyncStep {
   if (state.fetching) return none({ ...state, buffer: [...state.buffer, event] })
-  if (state.lastSeq === null) return fetchSnapshot({ ...state, buffer: [event] })
+  if (state.lastSeq === null) return fetchSnapshot(state)
   if (event.seq <= state.lastSeq) return none(state)
   // A reset carries no nodes, and a gap means something was missed: both are answered with a fresh snapshot.
-  if (event.type === 'graph.reset' || event.seq > state.lastSeq + 1) {
-    return fetchSnapshot({ ...state, buffer: [event] })
-  }
+  if (event.type === 'graph.reset' || event.seq > state.lastSeq + 1) return fetchSnapshot(state)
   return { state: { ...state, lastSeq: event.seq }, effects: [{ kind: 'apply', event }] }
 }
 
 function loaded(state: SyncState, snapshot: GraphSnapshot): SyncStep {
   const effects: SyncEffect[] = [{ kind: 'hydrate', snapshot }]
-  const base: SyncState = { ...state, fetching: false, lastFetchOk: true, buffer: [] }
+  // The snapshot's sequence wins even when it is lower than ours: that only happens after an API restart.
   let lastSeq = snapshot.lastSeq
+  const base: SyncState = { ...state, fetching: false, refetch: false, buffer: [], lastFetchOk: true }
   const pending = state.buffer.filter((e) => e.seq > lastSeq).sort((a, b) => a.seq - b.seq)
-  for (const [i, event] of pending.entries()) {
+  for (const event of pending) {
     if (event.type === 'graph.reset' || event.seq > lastSeq + 1) {
-      // The graph moved on while the snapshot was in flight: fetch again and keep what arrived after this point.
-      const again = fetchSnapshot({ ...base, lastSeq, buffer: pending.slice(i) })
+      // The graph moved on while the snapshot was in flight: fetch again; the new answer covers the rest of the buffer.
+      const again = fetchSnapshot({ ...base, lastSeq })
       return { state: again.state, effects: [...effects, ...again.effects] }
     }
     effects.push({ kind: 'apply', event })
     lastSeq = event.seq
   }
-  return { state: { ...base, lastSeq }, effects }
+  const settled: SyncState = { ...base, lastSeq }
+  if (!state.refetch) return { state: settled, effects }
+  const again = fetchSnapshot(settled)
+  return { state: again.state, effects: [...effects, ...again.effects] }
 }

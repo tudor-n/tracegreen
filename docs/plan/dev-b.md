@@ -92,8 +92,8 @@ Kickoff prompt:
 ## B1: Store, selectors and layout (Thu–Fri 22–23 Oct)
 
 - **`web/src/store/`** (Zustand) holds domain state (buyer, nodes by id, KPIs, audit, `lastSeq`, mode) and UI state (selected node, open panels, scenario preview). Actions:
-  - `hydrate(snapshot)`;
-  - `applyEvent(event)`, which ignores any `seq <= lastSeq` and triggers a refetch on `graph.reset`;
+  - `hydrate(snapshot)`, which replaces everything, `lastSeq` included, even when the new `lastSeq` is lower: the event sequence restarts at 0 when the API restarts;
+  - `applyEvent(event)`, which ignores any `seq <= lastSeq` and applies idempotently (upsert nodes by id, skip audit entries whose id is already listed), because an event can repeat what a snapshot already holds. It never receives `graph.reset`: A's sync refetches the snapshot instead (`web/src/hooks/startGraphSync.ts` documents the seam);
   - `select(nodeId)`.
 
   Merge this interface first, on its own, because A's hook (A3) calls it.
@@ -150,8 +150,8 @@ Integrate with A and run the M1 checklist in README §8 in both modes. C records
   - the expiry countdown (C9, for example "expires in 6d 23h");
   - a loopback warning when `request-link` reports `loopback`, plus ruling 6's note that only phones on the laptop's hotspot can open the link.
 - **Audit panel.** It lists entries (actor, action, time) from the snapshot and from `audit.appended`. "Verify chain" calls `POST /api/audit/verify` and shows "Chain valid ✓" or "Broken at entry n ✗". It says "tamper-evident audit log", never "blockchain".
-- **Connection badge** showing `live`, `polling` or `offline`, from A's hook.
-- **Flip animation** from amber to green on `node.verified`.
+- **Connection badge** showing `connecting` (first load only), `live`, `polling` or `offline`, from A's hook.
+- **Flip animation** from amber to green whenever a node's status changes to VERIFIED, whether the change arrives as `node.verified` or in a fresh snapshot (after polling or a reconnect there is no event to hang it on).
 
 Done when: with A6 and C5 merged, a phone on the hotspot turns the node green in under 2 s.
 
