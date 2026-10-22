@@ -86,7 +86,9 @@ public abstract class RepositoryContract
             Now);
         var node = TestNodes.Simple("Vendor", NodeStatus.Estimated, 40m, null) with { Id = nodeId, InvoiceId = invoiceId };
 
-        var entry = await repo.InsertInvoiceWithNodeAsync(Ctx, invoice, node, Audit("invoice.imported"), CancellationToken.None);
+        var result = await repo.InsertInvoiceWithNodeAsync(Ctx, invoice, node, Audit("invoice.imported"), CancellationToken.None);
+        Assert.Equal(InsertInvoiceStatus.Ok, result.Status);
+        var entry = result.Entry!;
 
         Assert.NotNull(await repo.GetInvoiceAsync(Ctx, invoiceId, CancellationToken.None));
         Assert.NotNull(await repo.GetInvoiceByRawHashAsync(Ctx, invoice.RawXmlHash, CancellationToken.None));
@@ -96,6 +98,49 @@ public abstract class RepositoryContract
         var after = await AllAudit(repo);
         Assert.Equal(before.Count + 1, after.Count);
         Assert.True(AuditChain.Verify(after).Valid);
+    }
+
+    private static (Invoice Invoice, SupplierNode Node) NewImport(string rawHash)
+    {
+        var invoiceId = Ids.NewId();
+        var invoice = new Invoice(invoiceId, Ids.DemoWorkspace, "Vendor", "RO1", "RO99999999", new DateOnly(2026, 10, 1), "EUR", 100m,
+            rawHash, "inv" + invoiceId.ToString("N"),
+            new ExtractedInvoice("X-1", new DateOnly(2026, 10, 1), "EUR", 100m, new Party("Vendor", "RO1", "RO"), new Party("Buyer", "RO99999999", "RO"),
+                [new ExtractedLine("1", "Thing", 1m, "KGM", 100m, null, null, null)]),
+            Now);
+        return (invoice, TestNodes.Simple("Vendor", NodeStatus.Estimated, 40m, null) with { Id = Ids.NewId(), InvoiceId = invoiceId });
+    }
+
+    [Fact]
+    public async Task InsertRefusesTheSameRawHashAndNamesTheNodeThatHasIt()
+    {
+        var repo = await MakeAsync();
+        var rawHash = "raw" + Ids.NewId().ToString("N");
+        var (first, firstNode) = NewImport(rawHash);
+        var (second, secondNode) = NewImport(rawHash);
+        await repo.InsertInvoiceWithNodeAsync(Ctx, first, firstNode, Audit("invoice.imported"), CancellationToken.None);
+        var auditBefore = (await AllAudit(repo)).Count;
+
+        var result = await repo.InsertInvoiceWithNodeAsync(Ctx, second, secondNode, Audit("invoice.imported"), CancellationToken.None);
+
+        Assert.Equal(InsertInvoiceStatus.Duplicate, result.Status);
+        Assert.Equal(firstNode.Id, result.ExistingNodeId);
+        Assert.Null(result.Entry);
+        Assert.Null(await repo.GetNodeAsync(Ctx, secondNode.Id, CancellationToken.None));
+        Assert.Equal(auditBefore, (await AllAudit(repo)).Count);
+    }
+
+    [Fact]
+    public async Task InsertRefusesANodeIdThatIsAlreadyTaken()
+    {
+        var repo = await MakeAsync();
+        var (invoice, node) = NewImport("raw" + Ids.NewId().ToString("N"));
+
+        var result = await repo.InsertInvoiceWithNodeAsync(Ctx, invoice, node with { Id = N2 }, Audit("invoice.imported"), CancellationToken.None);
+
+        Assert.Equal(InsertInvoiceStatus.Duplicate, result.Status);
+        Assert.Equal(N2, result.ExistingNodeId);
+        Assert.Null(await repo.GetInvoiceAsync(Ctx, invoice.Id, CancellationToken.None));
     }
 
     [Fact]

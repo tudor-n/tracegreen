@@ -11,7 +11,8 @@ public sealed record NodeClassification(string CategoryId, double? Confidence, C
 
 /// <summary>
 /// Builds an invoice and its supplier node the same way for the seed and for imports: spend estimate from the total,
-/// mass from the unit codes, cost and lead time from the lane leg, and an activity estimate once a mode is known.
+/// mass from the unit codes, cost and lead time from the lane leg, and an activity estimate once the supplier answered
+/// and a mass is known.
 /// </summary>
 public static class NodeFactory
 {
@@ -36,7 +37,8 @@ public static class NodeFactory
         var mode = transportMode ?? lane.ModeDefault;
         var massT = InvoiceFacts.MassTFromLines(extracted.Lines);
         var spend = Estimate.SpendBasedKg(extracted.Total, category.SectorKey, table);
-        decimal? activity = status == NodeStatus.Estimated
+        // No activity figure without a mass: the activity estimate would read 0 kg, so the node stays on the spend figure.
+        decimal? activity = status == NodeStatus.Estimated || massT is null
             ? null
             : Estimate.ActivityBasedKg(
                 new ActivityInput(massT, lane.DistanceKm.GetValueOrDefault(mode) ?? 0m, mode, category.MaterialKey, energySource), table).TotalKg;

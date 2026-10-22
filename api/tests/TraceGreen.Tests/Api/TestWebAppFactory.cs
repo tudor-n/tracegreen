@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using TraceGreen.Api;
+using TraceGreen.Domain.Ai;
+using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Ports;
 
 namespace TraceGreen.Tests.Api;
 
@@ -34,4 +37,23 @@ public sealed class NoDemoToolsWebAppFactory : TestWebAppFactory
 {
     protected override void ConfigureServices(IServiceCollection services) =>
         services.AddSingleton(sp => AppConfig.FromProcessEnvironment() with { DemoTools = false });
+}
+
+/// <summary>Same host with an AI client that never answers and ignores cancellation, to pin the health probe's own timeout.</summary>
+public sealed class HangingAiWebAppFactory : TestWebAppFactory
+{
+    protected override void ConfigureServices(IServiceCollection services) => services.AddSingleton<IAiClient, HangingAiClient>();
+
+    private sealed class HangingAiClient : IAiClient
+    {
+        public string Name => "hanging";
+
+        public Task<IReadOnlyList<Classification>> ClassifyAsync(IReadOnlyList<ClassificationInput> lines, CancellationToken ct) =>
+            new TaskCompletionSource<IReadOnlyList<Classification>>().Task;
+
+        public Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct) =>
+            new TaskCompletionSource<IReadOnlyList<Suggestion>>().Task;
+
+        public Task<HealthStatus> HealthAsync(CancellationToken ct) => new TaskCompletionSource<HealthStatus>().Task;
+    }
 }

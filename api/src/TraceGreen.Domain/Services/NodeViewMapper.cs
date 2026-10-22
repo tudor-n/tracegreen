@@ -8,6 +8,8 @@ namespace TraceGreen.Domain.Services;
 /// <summary>
 /// Turns a stored node into the <see cref="NodeView"/> every client receives. The factor rows come from the seed's
 /// factor table, the one the estimates are computed with, so each number is shown with the rows behind it.
+/// Stored kilograms are not recomputed: after a <c>factors.json</c> change, nodes created before it show today's rows
+/// until the demo is reset, and a row that no longer exists is left out rather than failing the whole graph.
 /// </summary>
 public sealed class NodeViewMapper
 {
@@ -29,9 +31,11 @@ public sealed class NodeViewMapper
         var lane = _lanes.GetValueOrDefault(node.LaneId) ?? throw new InvalidOperationException($"Node {node.Id} has unknown lane {node.LaneId}.");
         var mode = node.TransportMode ?? lane.ModeDefault;
 
-        var spend = new CarbonFigure(node.SpendKg, [Factors.Lookup(FactorKind.Spend, node.SectorId)]);
+        var spend = new CarbonFigure(node.SpendKg, Rows((FactorKind.Spend, node.SectorId)));
         var activity = node.ActivityKg is { } activityKg
-            ? new CarbonFigure(activityKg, [Factors.Transport(mode), Factors.Lookup(FactorKind.Material, category.MaterialKey)])
+            ? new CarbonFigure(activityKg, Rows(
+                (FactorKind.Transport, FactorTable.TransportKey(mode)),
+                (FactorKind.Material, category.MaterialKey)))
             : null;
         var basis = node.Status == NodeStatus.Verified && activity is not null ? CarbonBasis.Activity : CarbonBasis.Spend;
 
@@ -76,4 +80,7 @@ public sealed class NodeViewMapper
             LeadDays: node.LeadDays,
             CreatedAt: node.CreatedAt);
     }
+
+    private List<FactorLookup> Rows(params (FactorKind Kind, string Key)[] keys) =>
+        keys.Select(k => Factors.TryLookup(k.Kind, k.Key)).OfType<FactorLookup>().ToList();
 }

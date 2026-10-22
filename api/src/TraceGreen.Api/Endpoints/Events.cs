@@ -143,6 +143,19 @@ public static class EventsEndpoints
         }
     }
 
-    private static SseItem<string> Item(DomainEvent e) =>
-        new(Serialize(e), e.Type) { EventId = e.Seq.ToString() };
+    /// <summary>
+    /// An event that cannot be serialised (a null where the contract promises a value) becomes a <c>resync</c>, so the
+    /// client refetches the snapshot instead of the stream dying on it now and on every later replay.
+    /// </summary>
+    public static SseItem<string> Item(DomainEvent e)
+    {
+        try
+        {
+            return new SseItem<string>(Serialize(e), e.Type) { EventId = e.Seq.ToString() };
+        }
+        catch (JsonException)
+        {
+            return new SseItem<string>("{\"reason\":\"unserializable\"}", "resync") { EventId = e.Seq.ToString() };
+        }
+    }
 }

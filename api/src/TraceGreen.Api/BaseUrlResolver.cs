@@ -12,6 +12,9 @@ public sealed record BaseUrlInfo(string Url, bool Loopback, BaseUrlSource Source
 /// The origin verification links are built on: <c>PUBLIC_BASE_URL</c> when set, else the proxy's
 /// <c>X-Forwarded-Proto</c>/<c>X-Forwarded-Host</c> (Vite and nginx set them to the browser-facing host), else the
 /// request's own origin. A loopback result is flagged so the QR card can warn before anyone scans it.
+/// For a header with several values the last one wins: an appending proxy (Vite's <c>xfwd</c>) adds its own value
+/// after whatever the client sent. A direct caller can still choose these headers, so the result is a display hint,
+/// never something to trust (for example in audit payloads).
 /// </summary>
 public static class BaseUrlResolver
 {
@@ -23,10 +26,10 @@ public static class BaseUrlResolver
             return new BaseUrlInfo(configured, IsLoopback(configured), BaseUrlSource.Configured);
         }
 
-        var forwardedHost = First(request.Headers["X-Forwarded-Host"]);
+        var forwardedHost = Last(request.Headers["X-Forwarded-Host"]);
         if (forwardedHost is not null)
         {
-            var proto = First(request.Headers["X-Forwarded-Proto"]) is { } p && p is "http" or "https" ? p : request.Scheme;
+            var proto = Last(request.Headers["X-Forwarded-Proto"]) is { } p && p is "http" or "https" ? p : request.Scheme;
             if (Origin($"{proto}://{forwardedHost}") is { } forwarded)
             {
                 return new BaseUrlInfo(forwarded, IsLoopback(forwarded), BaseUrlSource.Forwarded);
@@ -52,10 +55,10 @@ public static class BaseUrlResolver
             && (IPAddress.IsLoopback(ip) || ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any));
     }
 
-    private static string? First(Microsoft.Extensions.Primitives.StringValues values)
+    private static string? Last(Microsoft.Extensions.Primitives.StringValues values)
     {
-        var first = values.FirstOrDefault()?.Split(',')[0].Trim();
-        return string.IsNullOrEmpty(first) ? null : first;
+        var last = values.LastOrDefault()?.Split(',')[^1].Trim();
+        return string.IsNullOrEmpty(last) ? null : last;
     }
 
     /// <summary>Accepts a bare scheme://host[:port] only, so a forged header cannot smuggle a path or credentials into links.</summary>
