@@ -4,9 +4,7 @@ using TraceGreen.Domain.Model;
 
 namespace TraceGreen.Api.Endpoints;
 
-/// <summary>Multipart form of <c>POST /api/ingest/ubl</c>: one UBL 2.1 XML file in the field <c>file</c>.</summary>
-public sealed record IngestUblForm(IFormFile File);
-
+/// <summary><c>POST /api/ingest/ubl</c> takes one UBL 2.1 XML file in the multipart field <c>file</c>, or the XML as the body.</summary>
 public static class IngestEndpoints
 {
     public static IEndpointRouteBuilder MapIngest(this IEndpointRouteBuilder app)
@@ -15,8 +13,7 @@ public static class IngestEndpoints
             .WithName("IngestUbl")
             .WithTags("Ingest")
             .WithSummary("Import a UBL 2.1 invoice (multipart field 'file', or the XML as a text/xml body) as an ESTIMATED node")
-            .Accepts<IngestUblForm>("multipart/form-data")
-            .AddOpenApiOperationTransformer(AddXmlBody)
+            .AddOpenApiOperationTransformer(DescribeBody)
             .Produces<IngestResult>(StatusCodes.Status201Created)
             .ProducesApiProblem(
                 StatusCodes.Status400BadRequest,
@@ -34,16 +31,35 @@ public static class IngestEndpoints
         return app;
     }
 
-    /// <summary>A second <c>Accepts</c> would replace the multipart one, so the raw XML body is added to the description here.</summary>
-    private static Task AddXmlBody(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken ct)
+    /// <summary>
+    /// Describes the two accepted bodies. <c>Accepts</c> metadata is not used: the endpoint matcher would then answer other
+    /// content types with an empty 415 before the handler could return an <see cref="ApiProblem"/>.
+    /// </summary>
+    private static Task DescribeBody(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken ct)
     {
-        if (operation.RequestBody?.Content is { } content)
+        var xml = new OpenApiMediaType { Schema = new OpenApiSchema { Type = JsonSchemaType.String } };
+        var form = new OpenApiMediaType
         {
-            foreach (var mediaType in new[] { "text/xml", "application/xml" })
+            Schema = new OpenApiSchema
             {
-                content[mediaType] = new OpenApiMediaType { Schema = new OpenApiSchema { Type = JsonSchemaType.String } };
-            }
-        }
+                Type = JsonSchemaType.Object,
+                Required = new HashSet<string> { "file" },
+                Properties = new Dictionary<string, IOpenApiSchema>
+                {
+                    ["file"] = new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary" },
+                },
+            },
+        };
+        operation.RequestBody = new OpenApiRequestBody
+        {
+            Required = true,
+            Content = new Dictionary<string, OpenApiMediaType>
+            {
+                ["multipart/form-data"] = form,
+                ["text/xml"] = xml,
+                ["application/xml"] = xml,
+            },
+        };
         return Task.CompletedTask;
     }
 }

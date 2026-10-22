@@ -266,14 +266,9 @@ export interface components {
             ai: string;
             baseUrl: components["schemas"]["BaseUrlInfo"];
         };
-        /** Format: binary */
-        IFormFile: string;
         IngestResult: {
             node: components["schemas"]["NodeView"];
             kpis: components["schemas"]["Kpis"];
-        };
-        IngestUblForm: {
-            file: components["schemas"]["IFormFile"];
         };
         InvoiceSummary: {
             /** Format: uuid */
@@ -498,7 +493,10 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["IngestUblForm"];
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
                 "text/xml": string;
                 "application/xml": string;
             };
