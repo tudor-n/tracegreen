@@ -44,7 +44,11 @@ builder.Services.AddSingleton<NodeViewMapper>();
 builder.Services.AddSingleton<GraphService>();
 builder.Services.AddSingleton<DemoService>();
 
-builder.Services.AddOpenApi(options => options.AddSchemaTransformer(EventsEndpoints.RequireEventType));
+builder.Services.AddOpenApi(options =>
+{
+    options.AddSchemaTransformer(EventsEndpoints.RequireEventType);
+    options.AddSchemaTransformer(OpenApiSchemas.EnumWithoutNull);
+});
 builder.Services.ConfigureHttpJsonOptions(options => ApiJson.Configure(options.SerializerOptions));
 
 var app = builder.Build();
