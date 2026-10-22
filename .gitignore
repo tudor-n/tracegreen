@@ -1,5 +1,7 @@
 # Planning document stays local (contains non-technical strategy)
 TRACEGREEN_ROADMAP ala bun.md
+# Shared privately until it is folded into NEXT.md and DECISIONS.md (docs/plan/dev-a.md A0, A10)
+docs/PRIORITY-CHANGES.md
 
 # Secrets and local env (NOT .env.demo, which is committed on purpose)
 .env
