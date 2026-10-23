@@ -134,3 +134,37 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Supplier nodes (F2): the tone follows data-status, the red ring data-hotspot (an overlay, never a status).
+ * Tints mix in oklab: in oklch the white card's hue of 0 would pull every tint towards pink.
+ */
+@layer components {
+  .supplier-node {
+    --tone: var(--status-estimated);
+    border: 2px solid var(--tone);
+    background-color: color-mix(in oklab, var(--tone) 14%, var(--card));
+    box-shadow: var(--hotspot-ring, 0 0 #0000), 0 1px 2px rgb(0 0 0 / 0.08);
+  }
+  .supplier-node[data-status='PARTIAL'] {
+    --tone: var(--status-partial-a);
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--status-partial-a) 22%, var(--card)) 0 8px,
+      color-mix(in oklab, var(--status-partial-b) 22%, var(--card)) 8px 16px
+    );
+  }
+  .supplier-node[data-status='VERIFIED'] {
+    --tone: var(--status-verified);
+  }
+  .supplier-node[data-hotspot='true'] {
+    --hotspot-ring: 0 0 0 3px var(--background), 0 0 0 6px var(--hotspot);
+  }
+  .supplier-node[data-selected='true'] {
+    outline: 2px solid var(--foreground);
+    outline-offset: 3px;
+  }
+  .supplier-node[data-selected='true'][data-hotspot='true'] {
+    outline-offset: 9px;
+  }
+}

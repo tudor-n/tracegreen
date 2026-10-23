@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { Buyer, NodeView } from '@/api/client'
 import type { GraphState } from './graphStore'
-import { BUYER_NODE_ID, createLayoutMemo, type XY } from './layout'
+import { BUYER_NODE_ID, createLayoutMemo, NODE_SIZE, type XY } from './layout'
 
 // React Flow gets arrays derived from the store and never writes back (roadmap §8.4): the canvas is controlled,
 // clicks go to `select`, and nothing React Flow creates is stored.
@@ -40,7 +40,14 @@ export function edgeWidth(carbonKg: number): number {
   return Math.min(EDGE_WIDTH.max, Math.max(EDGE_WIDTH.min, scaled))
 }
 
-/** The buyer node (when the snapshot has one) and every supplier node, at the given positions. */
+/**
+ * A node's fixed size, as React Flow's `width`, `height` and `measured`. The canvas is controlled and never feeds React
+ * Flow's measurements back, so without `measured` every new node object would count as unmeasured: React Flow would
+ * drop its handle positions and measure it again, and the edges would blink on every event.
+ */
+const sized = ({ width, height }: { width: number; height: number }) => ({ width, height, measured: { width, height } })
+
+/** The buyer node (when the snapshot has one) and every supplier node, at the given positions and their fixed sizes. */
 export function toRfNodes(
   buyer: Buyer | null,
   nodes: readonly NodeView[],
@@ -53,6 +60,7 @@ export function toRfNodes(
     id: node.id,
     type: 'supplier',
     position: positions.get(node.id) ?? origin,
+    ...sized(NODE_SIZE.supplier),
     data: { node, hotspot: hotspots.has(node.id) },
     selected: node.id === selectedId,
   }))
@@ -61,6 +69,7 @@ export function toRfNodes(
     id: BUYER_NODE_ID,
     type: 'buyer',
     position: positions.get(BUYER_NODE_ID) ?? origin,
+    ...sized(NODE_SIZE.buyer),
     data: { buyer },
     selectable: false,
   }
