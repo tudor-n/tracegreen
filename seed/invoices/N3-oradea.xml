@@ -18,7 +18,7 @@
         <cac:Country><cbc:IdentificationCode>RO</cbc:IdentificationCode></cac:Country>
       </cac:PostalAddress>
       <cac:PartyTaxScheme>
-        <cbc:CompanyID>RO12345678</cbc:CompanyID>
+        <cbc:CompanyID>RO99999984</cbc:CompanyID>
         <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
       </cac:PartyTaxScheme>
       <cac:PartyLegalEntity>
