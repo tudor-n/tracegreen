@@ -2,11 +2,14 @@
 // Shared by the copy-guard hook (.claude/hooks/copy-guard.mjs) and the preflight (C6),
 // so both always agree on what is banned and which files are exempt.
 //
-// Company names and the retired product name are stored only as SHA-256 hashes of the
-// exact word: the repository is public and must not list them, not even as banned names.
-// To add one, run `node scripts/lib/banned-terms.mjs --hash <word> [<word> ...]` and paste
-// the printed hashes below. Names with an everyday lower-case twin store the exact case
-// only; the others also store their lower-case, upper-case and capitalised forms.
+// Company names and the retired product name are stored only as SHA-256 hashes: the
+// repository is public and must not list them, not even as banned names. Two kinds:
+// - `contains`: the hash of the lower-case name and its length. It matches anywhere inside a
+//   word, in any case, so identifiers like useNameStore are caught too.
+// - `exact`: the hash of the exact word, matched as a whole word in that case only. For names
+//   with an everyday lower-case twin, so ordinary words don't trip the check.
+// To add one, run `node scripts/lib/banned-terms.mjs --hash <name> ...` (contains) or
+// `--exact <name> ...` and paste the printed lines into the right list below.
 
 import { createHash } from 'node:crypto';
 import { relative, sep } from 'node:path';
@@ -23,17 +26,19 @@ export const PLAIN_TERMS = [
   },
 ];
 
-/** Hashed names: `hashes` are SHA-256 hex digests of the exact word. */
+/** Hashed names: `contains` holds `{ length, sha256 }` of the lower-case name, `exact` the SHA-256 of the exact word. */
 export const HASHED_TERMS = [
   {
     kind: 'company name',
     instead: 'leave it out; the seed stays fictional (Transilvania Electro-Assembly SRL and its five suppliers)',
-    hashes: [],
+    contains: [],
+    exact: [],
   },
   {
     kind: 'retired product name',
     instead: 'say "TraceGreen"',
-    hashes: [],
+    contains: [],
+    exact: [],
   },
 ];
 
@@ -50,7 +55,23 @@ export function sha256(word) {
   return createHash('sha256').update(word, 'utf8').digest('hex');
 }
 
-const hashIndex = new Map(HASHED_TERMS.flatMap((entry) => entry.hashes.map((h) => [h, entry])));
+const exactIndex = new Map(HASHED_TERMS.flatMap((entry) => entry.exact.map((h) => [h, entry])));
+const containsIndex = new Map(HASHED_TERMS.flatMap((entry) => entry.contains.map((c) => [c.sha256, entry])));
+const containsLengths = [...new Set(HASHED_TERMS.flatMap((entry) => entry.contains.map((c) => c.length)))];
+
+/** The hashed entry a word is or contains, if any. */
+function hashedMatch(word) {
+  const exact = exactIndex.get(sha256(word));
+  if (exact) return exact;
+  const lower = word.toLowerCase();
+  for (const length of containsLengths) {
+    for (let i = 0; i + length <= lower.length; i++) {
+      const entry = containsIndex.get(sha256(lower.slice(i, i + length)));
+      if (entry) return entry;
+    }
+  }
+  return undefined;
+}
 
 /**
  * Finds banned terms in `text`. Returns `{ term, instead }` per distinct match; for hashed
@@ -61,9 +82,9 @@ export function findBannedTerms(text) {
   for (const { term, pattern, instead } of PLAIN_TERMS) {
     if (pattern.test(text)) found.set(term, { term, instead });
   }
-  for (const [word] of text.matchAll(/[\p{L}\p{N}]+/gu)) {
-    const entry = hashIndex.get(sha256(word));
-    if (entry && !found.has(word)) found.set(word, { term: `${word} (${entry.kind})`, instead: entry.instead });
+  for (const word of new Set(Array.from(text.matchAll(/[\p{L}\p{N}]+/gu), (m) => m[0]))) {
+    const entry = hashedMatch(word);
+    if (entry) found.set(word, { term: `${word} (${entry.kind})`, instead: entry.instead });
   }
   return [...found.values()];
 }
@@ -83,6 +104,10 @@ export function isExempt(repoPath) {
   return EXEMPT_PATHS.some((p) => (p.endsWith('/') ? repoPath.startsWith(p) : repoPath === p));
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && process.argv[2] === '--hash') {
-  for (const word of process.argv.slice(3)) console.log(`'${sha256(word)}',`);
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  const [flag, ...words] = process.argv.slice(2);
+  for (const word of words) {
+    if (flag === '--hash') console.log(`{ length: ${word.length}, sha256: '${sha256(word.toLowerCase())}' },`);
+    if (flag === '--exact') console.log(`'${sha256(word)}',`);
+  }
 }
