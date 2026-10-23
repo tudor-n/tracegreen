@@ -1,0 +1,47 @@
+// Presentation only: the API sends kilograms, euros and days; these turn them into what the UI shows
+// (CLAUDE.md: tonnes with one decimal, euros without decimals, days as integers). No carbon is computed here.
+
+const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
+const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
+
+const MISSING = '–'
+
+/** Rounding can give -0, which Intl prints as "-0". */
+const noNegativeZero = (n: number) => (Object.is(n, -0) ? 0 : n)
+
+/**
+ * Kilograms as tonnes with one decimal, without a unit: 48 000 → "48.0". A positive amount below 0.05 t shows as
+ * "<0.1" rather than "0.0", so a small supplier never reads as carbon-free.
+ */
+export function formatTonnes(kg: number): string {
+  if (!Number.isFinite(kg)) return MISSING
+  const t = kg / 1000
+  if (t > 0 && t < 0.05) return '<0.1'
+  return tonnes.format(noNegativeZero(Math.round(t * 10) / 10))
+}
+
+/** "48.0 tCO₂e". */
+export function formatTonnesCo2e(kg: number): string {
+  return `${formatTonnes(kg)} tCO₂e`
+}
+
+/** Whole euros: 12 345.6 → "€12,346". */
+export function formatEuros(eur: number): string {
+  if (!Number.isFinite(eur)) return MISSING
+  return euros.format(noNegativeZero(Math.round(eur)))
+}
+
+/** Whole days: "1 day", "35 days". */
+export function formatDays(days: number): string {
+  if (!Number.isFinite(days)) return MISSING
+  const n = noNegativeZero(Math.round(days))
+  return `${integer.format(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`
+}
+
+/** A 0–1 share as a whole percentage: 0.374 → "37%". */
+export function formatShare(fraction: number): string {
+  if (!Number.isFinite(fraction)) return MISSING
+  return percent.format(noNegativeZero(Math.round(fraction * 100) / 100))
+}
