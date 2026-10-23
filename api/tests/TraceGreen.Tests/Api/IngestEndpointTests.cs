@@ -304,7 +304,7 @@ public class IngestEndpointTests : IClassFixture<TestWebAppFactory>
     {
         await Reset();
         var xml = N1Xml
-            .Replace("<cac:CommodityClassification><cbc:ItemClassificationCode listID=\"CPV\">44410000</cbc:ItemClassificationCode></cac:CommodityClassification>", "")
+            .Replace("<cac:CommodityClassification><cbc:ItemClassificationCode listID=\"STI\">44410000</cbc:ItemClassificationCode></cac:CommodityClassification>", "")
             .Replace("Zinc die-cast sensor housings, type ZH-220", "Assorted spare parts lot 7");
         var started = DateTime.UtcNow;
 

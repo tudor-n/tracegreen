@@ -143,8 +143,13 @@ public sealed class UblInvoiceParser : IInvoiceParser
             Amount: Decimal(Text(Child(line, "LineExtensionAmount")) ?? throw new SchemaException($"line {index + 1}: missing cbc:LineExtensionAmount"), "LineExtensionAmount"),
             OriginCountry: Text(Path(item, "OriginCountry", "IdentificationCode")),
             ClassificationCode: Text(classification),
-            ClassificationListId: classification?.Attribute("listID")?.Value.Trim());
+            ClassificationListId: ListId(classification?.Attribute("listID")?.Value.Trim()));
     }
+
+    /// <summary>ANAF accepts CPV codes only under the UNTDID 7143 scheme identifier STI (it rejects "CPV" by BR-CL-13);
+    /// the rest of the system knows them as CPV.</summary>
+    private static string? ListId(string? listId) =>
+        string.Equals(listId, "STI", StringComparison.OrdinalIgnoreCase) ? "CPV" : listId;
 
     private static XElement? Child(XElement? element, string localName) =>
         element?.Elements().FirstOrDefault(e => e.Name.LocalName == localName);
