@@ -153,9 +153,13 @@ public sealed record Kpis(
     int NodeCount,
     int VerifiedCount);
 
+/// <summary>
+/// Everything the dashboard renders. <see cref="LastSeq"/> is read before the nodes, so an event published while the
+/// snapshot is built has a higher sequence number and is applied on top rather than lost.
+/// </summary>
 public sealed record GraphSnapshot(
     Buyer Buyer,
-    IReadOnlyList<SupplierNode> Nodes,
+    IReadOnlyList<NodeView> Nodes,
     Kpis Kpis,
     IReadOnlyList<AuditEntry> Audit,
     long LastSeq,

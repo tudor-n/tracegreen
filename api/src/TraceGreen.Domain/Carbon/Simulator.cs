@@ -28,6 +28,14 @@ public static class Simulator
         return Build(node, activity, costEur, leadDays, etsPriceEurPerT);
     }
 
+    /// <summary>Modes the lane has a distance, a lead time and a cost for: the ones a scenario or a supplier may pick.</summary>
+    public static IReadOnlyList<TransportMode> AvailableModes(Lane lane) =>
+        Enum.GetValues<TransportMode>()
+            .Where(m => lane.DistanceKm.GetValueOrDefault(m) is not null
+                && lane.LeadDaysByMode.GetValueOrDefault(m) is not null
+                && lane.CostPerKgByMode.GetValueOrDefault(m) is not null)
+            .ToList();
+
     private static (decimal DistanceKm, int LeadDays, decimal CostPerKg) Leg(Lane lane, TransportMode mode)
     {
         var distance = lane.DistanceKm.GetValueOrDefault(mode) ?? throw new ModeNotAvailableException(lane.Id, mode);

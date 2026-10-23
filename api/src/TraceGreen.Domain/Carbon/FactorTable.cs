@@ -34,4 +34,8 @@ public sealed class FactorTable
     }
 
     public FactorLookup Transport(TransportMode mode) => Lookup(FactorKind.Transport, TransportKey(mode));
+
+    /// <summary>For display only: null when the row is gone, e.g. after <c>factors.json</c> changed under stored nodes.</summary>
+    public FactorLookup? TryLookup(FactorKind kind, string key) =>
+        _rows.TryGetValue((kind, key), out var row) ? new FactorLookup(row.Value, row.Unit, row.Source, row.Year, row.RowLabel) : null;
 }

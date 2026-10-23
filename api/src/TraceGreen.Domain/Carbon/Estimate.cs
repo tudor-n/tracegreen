@@ -47,4 +47,15 @@ public static class Estimate
         (null, null) => NodeStatus.Estimated,
         _ => NodeStatus.Partial,
     };
+
+    /// <summary>
+    /// Ruling 4: high while the number is spend-based (ESTIMATED, PARTIAL); medium for VERIFIED when the energy answer
+    /// was "don't know" or no mass is known; low otherwise.
+    /// </summary>
+    public static Uncertainty DeriveUncertainty(NodeStatus status, EnergySource? energy, decimal? massT) => status switch
+    {
+        NodeStatus.Verified when energy == EnergySource.Unknown || massT is null => Uncertainty.Medium,
+        NodeStatus.Verified => Uncertainty.Low,
+        _ => Uncertainty.High,
+    };
 }
