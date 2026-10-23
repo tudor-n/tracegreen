@@ -54,7 +54,7 @@ public abstract class RepositoryContract
         Assert.True((await repo.ListFactorsAsync(CancellationToken.None)).Count > 10);
         Assert.Equal(7, (await repo.ListLanesAsync(CancellationToken.None)).Count);
         Assert.Equal(2, (await repo.ListAlternativesAsync(CancellationToken.None)).Count);
-        Assert.Equal("RO99999999", (await repo.GetBuyerAsync(Ctx, CancellationToken.None)).Cui);
+        Assert.Equal("RO99999992", (await repo.GetBuyerAsync(Ctx, CancellationToken.None)).Cui);
         Assert.Single(await repo.ListVerificationsAsync(Ctx, N2, CancellationToken.None));
     }
 
@@ -79,9 +79,9 @@ public abstract class RepositoryContract
         var before = await AllAudit(repo);
         var invoiceId = Ids.NewId();
         var nodeId = Ids.NewId();
-        var invoice = new Invoice(invoiceId, Ids.DemoWorkspace, "Vendor", "RO1", "RO99999999", new DateOnly(2026, 10, 1), "EUR", 100m,
+        var invoice = new Invoice(invoiceId, Ids.DemoWorkspace, "Vendor", "RO1", "RO99999992", new DateOnly(2026, 10, 1), "EUR", 100m,
             "raw" + invoiceId.ToString("N"), "inv" + invoiceId.ToString("N"),
-            new ExtractedInvoice("X-1", new DateOnly(2026, 10, 1), "EUR", 100m, new Party("Vendor", "RO1", "RO"), new Party("Buyer", "RO99999999", "RO"),
+            new ExtractedInvoice("X-1", new DateOnly(2026, 10, 1), "EUR", 100m, new Party("Vendor", "RO1", "RO"), new Party("Buyer", "RO99999992", "RO"),
                 [new ExtractedLine("1", "Thing", 1m, "KGM", 100m, null, null, null)]),
             Now);
         var node = TestNodes.Simple("Vendor", NodeStatus.Estimated, 40m, null) with { Id = nodeId, InvoiceId = invoiceId };
@@ -103,9 +103,9 @@ public abstract class RepositoryContract
     private static (Invoice Invoice, SupplierNode Node) NewImport(string rawHash)
     {
         var invoiceId = Ids.NewId();
-        var invoice = new Invoice(invoiceId, Ids.DemoWorkspace, "Vendor", "RO1", "RO99999999", new DateOnly(2026, 10, 1), "EUR", 100m,
+        var invoice = new Invoice(invoiceId, Ids.DemoWorkspace, "Vendor", "RO1", "RO99999992", new DateOnly(2026, 10, 1), "EUR", 100m,
             rawHash, "inv" + invoiceId.ToString("N"),
-            new ExtractedInvoice("X-1", new DateOnly(2026, 10, 1), "EUR", 100m, new Party("Vendor", "RO1", "RO"), new Party("Buyer", "RO99999999", "RO"),
+            new ExtractedInvoice("X-1", new DateOnly(2026, 10, 1), "EUR", 100m, new Party("Vendor", "RO1", "RO"), new Party("Buyer", "RO99999992", "RO"),
                 [new ExtractedLine("1", "Thing", 1m, "KGM", 100m, null, null, null)]),
             Now);
         return (invoice, TestNodes.Simple("Vendor", NodeStatus.Estimated, 40m, null) with { Id = Ids.NewId(), InvoiceId = invoiceId });

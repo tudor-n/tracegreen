@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-10-22 (slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: `docs/PRIORITY-CHANGES.md` (private) and `docs/plan/`.
+Last updated: 2026-10-23 (slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; before that, 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: `docs/PRIORITY-CHANGES.md` (private) and `docs/plan/`.
 
 ## What exists
 
@@ -19,6 +19,8 @@ Monorepo with three services behind one browser origin, brought up by `docker co
 Test counts at hand-off: 125 .NET tests (109 before Task 8 plus the event bus, AI client, classification and SSE tests), 1 Python test, web typecheck/lint/build.
 
 Test counts after A3: 30 web unit tests (`pnpm test`: the sync reducer and the driver with a fake EventSource and fake timers); 193 .NET tests; in memory mode 180 run and the 13 Postgres contract tests are skipped, with `DATABASE_URL` all 193 run.
+
+Test counts after C2: 197 .NET tests; in memory mode 184 run and the 13 Postgres contract tests are skipped, with `DATABASE_URL` all 197 run.
 
 ## Wire contract (slice 1)
 
@@ -51,6 +53,45 @@ Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
 - **Non-EUR invoices are rejected with `UnsupportedCurrency`** until a spend-factor source with FX conversion is chosen (D1), and **a supplier country without a lane is rejected with `NoLane`** instead of inventing a lane (CN → `CN-RO`, TW → `TW-RO`, DE → `DE-HH-SB`, RO → `RO-SB-SB`).
 - **Ingest refuses input it cannot estimate safely, with 422 `Schema` and a detail:** elements nested deeper than 64 levels (checked by a streaming pass before any tree is built), a total that is not positive or above 10¹² EUR, a line amount above 10¹², a negative quantity (returns are not supported yet) or one above 10⁹. The bounds keep every later sum inside `decimal`'s range, so one hostile invoice cannot make `/api/graph` fail for everyone.
 
+## Seed XML validation (2026-10-23)
+
+`node scripts/validate-seed-anaf.mjs` (Node 24 or later, no dependencies) posts every file in `seed/invoices/` to ANAF's public validator (`POST https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`, the XML as `text/plain`, no authentication). For each file it prints OK, or ANAF's exact messages and raw answer, and it exits 1 if any file fails. Pass file paths to check single files. Final output:
+
+```
+OK    N1-shenzhen.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N2-taiwan.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N3-oradea.xml
+OK    N4-sibiu.xml
+OK    N5-hamburg.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    adversarial.xml
+
+6/6 passed (3 with the expected seller-identification error)
+```
+
+What changed, by ANAF rule. Amounts, quantities, unit codes, origin countries, classification codes and line descriptions are unchanged, except the adversarial line (last row):
+
+| Rule | Files | Fix |
+|---|---|---|
+| UBL-CR-600: no exemption reason on a line's tax category | N1, N2, N5 | `TaxExemptionReasonCode` removed from `cac:ClassifiedTaxCategory`; the document-level one stays |
+| BR-RO-030: an invoice not in RON declares RON as its VAT accounting currency | all six | `cbc:TaxCurrencyCode` RON, plus a second `cac:TaxTotal` with the VAT in RON (BR-53): 0.00 for N1, N2 and N5; 4620.00 EUR × 5.3306 = 24627.37 for N3 and adversarial; 1260.00 EUR × 5.3373 = 6725.00 for N4 |
+| BR-CL-13: the classification scheme comes from UNTDID 7143 | N1, N2 | `listID="CPV"` → `listID="STI"` (code values unchanged); the parser reads STI as CPV |
+| ERRIdentif: buyer CUI check digit | all six | `RO99999999` → `RO99999992`, also in `seed/buyer.json` |
+| ERRIdentif: Romanian seller CUI check digit | N3, N4, adversarial | `RO12345678` → `RO99999984`, `RO23456789` → `RO99999976` |
+| BR-RO-L100: item name at most 100 characters | adversarial | The injected instruction moved from `cbc:Name` to `cbc:Description`. The parser joins the two as "Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …", so the `seed/ai-cache.json` entry carries that description and its new key |
+
+The new CUIs have a valid check digit and are not registered at ANAF (ANAF's public VAT-payer lookup, 2026-10-23), so none identifies a real company. The exchange rates are the BNR reference rates published on the invoices' issue dates (2026-10-05: 5.3306; 2026-10-12: 5.3373), from `https://curs.bnr.ro/files/xml/years/nbrfxrates2026.xml`.
+
+Decisions (A, 2026-10-23; fold into `docs/DECISIONS.md` when it exists):
+
+- **The three imports (N1 Shenzhen, N2 Taiwan, N5 Hamburg) are expected to fail one rule** — reason: ANAF identifies the seller by a Romanian CUI ("Nu a fost identificat cui vanzator") and these suppliers have none; marking the invoice self-billed (type 389) does not help — cost if wrong: the three files get Romanian VAT registrations and leave the list. The script lists them in `EXPECTED_FAILURES` and passes them only when that message is ANAF's only one. It fails them on any other message, and when ANAF accepts them, so the list can neither hide an error nor go stale. Checked on scratch copies: with a Romanian seller ID substituted, ANAF accepts all three, so the seller is the only rule they miss; a schema error or a bad buyer CUI in a listed file still fails the script.
+- **The parser reads the classification scheme STI as CPV** (`UblInvoiceParser.ListId`) — reason: ANAF accepts CPV codes only under STI, while the classification map, the AI contract and the "Item classification code … (CPV)" rationale use CPV — cost if wrong: one line.
+- **RON VAT totals use the BNR rate published on the invoice's issue date** — reason: BR-RO-030 and BR-53 require the figure; nothing in TraceGreen reads it — cost if wrong: two numbers in three files.
+
+The API reads `seed/` once at startup. After pulling these changes, restart it (`docker compose restart api`) and press "Reset demo", or run `docker compose down -v && docker compose up`, so the stored buyer and seed invoices match the files.
+
 ## What remains (in order)
 
 The implementation plan lives outside the repo (Claude plan file `read-the-tracegreen-roadmap-ala-validated-thunder.md`); the summary below is enough to continue without it.
@@ -70,7 +111,7 @@ The implementation plan lives outside the repo (Claude plan file `read-the-trace
 - The audit hash covers `{ts, actor, action, payload}` with timestamps normalised to UTC milliseconds; `audit_log` has an append-only trigger, so the demo reset uses TRUNCATE (single-tenant for now).
 - `dotnet watch` is not used in Docker (its polling watcher crashes on Windows bind mounts); the API container runs `dotnet run` and C# edits need `docker compose restart api`. Web and AI services hot-reload.
 - A `workspace_id` column and a `Ctx(WorkspaceId, Actor)` argument exist from day one so authentication later is a policy, not a refactor.
-- Seed factor values are placeholders (`source` says so); replace them with sourced rows and update `docs/factor-sources.md` when it exists. Seed XMLs have not been run through the ANAF validator yet.
+- Seed factor values are placeholders (`source` says so); replace them with sourced rows and update `docs/factor-sources.md` when it exists. The seed XMLs pass ANAF's validator, three of them with one expected exception (see "Seed XML validation (2026-10-23)").
 
 ## Caveats to know before continuing
 

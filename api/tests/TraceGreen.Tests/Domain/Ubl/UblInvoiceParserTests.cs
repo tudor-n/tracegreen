@@ -28,7 +28,7 @@ public class UblInvoiceParserTests
         Assert.Equal("Shenzhen Diecast Co.", invoice.Supplier.Name);
         Assert.Equal("CN91440300MA5K7XQ2", invoice.Supplier.TaxId);
         Assert.Equal("CN", invoice.Supplier.Country);
-        Assert.Equal("RO99999999", invoice.Customer.TaxId);
+        Assert.Equal("RO99999992", invoice.Customer.TaxId);
 
         var line = Assert.Single(invoice.Lines);
         Assert.Equal("1", line.Id);
@@ -40,6 +40,20 @@ public class UblInvoiceParserTests
         Assert.Equal("44410000", line.ClassificationCode);
         Assert.Equal("CPV", line.ClassificationListId);
         Assert.Equal(2.3m, InvoiceFacts.MassTFromLines(invoice.Lines));
+    }
+
+    [Theory]
+    [InlineData("STI", "CPV")]
+    [InlineData("sti", "CPV")]
+    [InlineData("CPV", "CPV")]
+    [InlineData("HS", "HS")]
+    public void ReadsTheStiClassificationSchemeAsCpv(string listId, string expected)
+    {
+        Assert.Contains("listID=\"STI\"", N1);
+
+        var invoice = ParseOk(N1.Replace("listID=\"STI\"", $"listID=\"{listId}\""));
+
+        Assert.Equal(expected, invoice.Lines[0].ClassificationListId);
     }
 
     [Fact]
