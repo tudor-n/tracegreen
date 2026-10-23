@@ -3,42 +3,42 @@
     "id": "zinc_diecast",
     "label": "Zinc die-cast parts",
     "materialKey": "zinc_diecast",
-    "sectorKey": "metals"
+    "sectorKey": "diecast_nonferrous"
   },
   {
     "id": "pcb",
     "label": "Printed circuit boards",
     "materialKey": "pcb",
-    "sectorKey": "electronics"
+    "sectorKey": "pcb_bare"
   },
   {
     "id": "wire_harness",
     "label": "Wire harnesses",
     "materialKey": "wire_harness",
-    "sectorKey": "electronics"
+    "sectorKey": "vehicle_electrical"
   },
   {
     "id": "packaging_paper",
     "label": "Paper and cardboard packaging",
     "materialKey": "packaging_paper",
-    "sectorKey": "packaging"
+    "sectorKey": "corrugated_boxes"
   },
   {
     "id": "connectors",
     "label": "Connectors",
     "materialKey": "connectors",
-    "sectorKey": "electronics"
+    "sectorKey": "electronic_connectors"
   },
   {
     "id": "plastics",
     "label": "Plastic parts",
     "materialKey": "plastics",
-    "sectorKey": "other"
+    "sectorKey": "plastics_other"
   },
   {
     "id": "UNCLASSIFIED",
     "label": "Unclassified",
     "materialKey": "generic",
-    "sectorKey": "other"
+    "sectorKey": "misc_manufacturing"
   }
 ]

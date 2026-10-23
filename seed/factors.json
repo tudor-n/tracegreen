@@ -110,43 +110,73 @@
     "rowLabel": "Generic manufactured goods (placeholder)"
   },
   {
-    "id": "spend.metals",
+    "id": "spend.diecast_nonferrous",
     "kind": "spend",
-    "key": "metals",
-    "value": 0.45,
-    "unit": "kgCO2e/EUR",
-    "source": "PLACEHOLDER - replace with a row from the D1 spend-factor source at T4",
-    "year": 2026,
-    "rowLabel": "Fabricated metal products (placeholder)"
+    "key": "diecast_nonferrous",
+    "value": 0.462,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "331523 Nonferrous Metal Die-Casting Foundries"
   },
   {
-    "id": "spend.electronics",
+    "id": "spend.pcb_bare",
     "kind": "spend",
-    "key": "electronics",
-    "value": 0.35,
-    "unit": "kgCO2e/EUR",
-    "source": "PLACEHOLDER - replace with a row from the D1 spend-factor source at T4",
-    "year": 2026,
-    "rowLabel": "Electronic components (placeholder)"
+    "key": "pcb_bare",
+    "value": 0.098,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "334412 Bare Printed Circuit Board Manufacturing"
   },
   {
-    "id": "spend.packaging",
+    "id": "spend.vehicle_electrical",
     "kind": "spend",
-    "key": "packaging",
-    "value": 0.3,
-    "unit": "kgCO2e/EUR",
-    "source": "PLACEHOLDER - replace with a row from the D1 spend-factor source at T4",
-    "year": 2026,
-    "rowLabel": "Paper packaging (placeholder)"
+    "key": "vehicle_electrical",
+    "value": 0.218,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "336320 Motor Vehicle Electrical and Electronic Equipment Manufacturing"
   },
   {
-    "id": "spend.other",
+    "id": "spend.corrugated_boxes",
     "kind": "spend",
-    "key": "other",
-    "value": 0.4,
-    "unit": "kgCO2e/EUR",
-    "source": "PLACEHOLDER - replace with a row from the D1 spend-factor source at T4",
-    "year": 2026,
-    "rowLabel": "Other manufactured goods (placeholder)"
+    "key": "corrugated_boxes",
+    "value": 0.479,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "322211 Corrugated and Solid Fiber Box Manufacturing"
+  },
+  {
+    "id": "spend.electronic_connectors",
+    "kind": "spend",
+    "key": "electronic_connectors",
+    "value": 0.098,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "334417 Electronic Connector Manufacturing"
+  },
+  {
+    "id": "spend.plastics_other",
+    "kind": "spend",
+    "key": "plastics_other",
+    "value": 0.371,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "326199 All Other Plastics Product Manufacturing"
+  },
+  {
+    "id": "spend.misc_manufacturing",
+    "kind": "spend",
+    "key": "misc_manufacturing",
+    "value": 0.182,
+    "unit": "kgCO2e/USD",
+    "source": "US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (kg CO2e per 2022 USD, purchaser price, with margins)",
+    "year": 2024,
+    "rowLabel": "339999 All Other Miscellaneous Manufacturing"
   }
 ]

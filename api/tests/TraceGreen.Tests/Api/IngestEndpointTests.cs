@@ -15,6 +15,10 @@ public class IngestEndpointTests : IClassFixture<TestWebAppFactory>
 {
     private static readonly string N1Xml = File.ReadAllText(TestPaths.Invoice("N1-shenzhen.xml"));
 
+    // EUR 48,000 dated 2026-10-28: the last ECB rate in the seed (2026-10-23, 1.1193 USD/EUR), CPI-U 2022 / 2025 (0.9090),
+    // US EPA 331523 (0.462 kgCO2e/USD). Refreshing seed/spend-conversion.json changes this number.
+    private const decimal N1SpendKg = 48000m * 1.1193m * 0.9090m * 0.462m;
+
     private readonly TestWebAppFactory _factory;
     private readonly HttpClient _client;
 
@@ -71,14 +75,14 @@ public class IngestEndpointTests : IClassFixture<TestWebAppFactory>
         Assert.Equal("ESTIMATED", node.GetProperty("status").GetString());
         Assert.Equal("Shenzhen Diecast Co.", node.GetProperty("label").GetString());
         Assert.Equal("spend", node.GetProperty("basis").GetString());
-        Assert.Equal(21600m, node.GetProperty("carbonKg").GetDecimal());
+        Assert.Equal(N1SpendKg, node.GetProperty("carbonKg").GetDecimal());
         Assert.Equal("CN-RO", node.GetProperty("lane").GetProperty("id").GetString());
         Assert.Equal("air", node.GetProperty("lane").GetProperty("mode").GetString());
         Assert.Equal("invoice", node.GetProperty("classification").GetProperty("source").GetString());
         var kpis = body.GetProperty("kpis");
         Assert.Equal(5, kpis.GetProperty("nodeCount").GetInt32());
-        Assert.Equal(before + 21600m, kpis.GetProperty("totalKg").GetDecimal());
-        Assert.Equal(before + 21600m, await TotalKg());
+        Assert.Equal(before + N1SpendKg, kpis.GetProperty("totalKg").GetDecimal());
+        Assert.Equal(before + N1SpendKg, await TotalKg());
     }
 
     [Fact]

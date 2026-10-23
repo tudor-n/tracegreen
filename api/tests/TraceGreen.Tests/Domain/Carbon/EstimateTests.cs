@@ -11,13 +11,25 @@ public class EstimateTests
     private static readonly ActivityInput N1Air = new(MassT: 2.3m, DistanceKm: 7500m, Mode: TransportMode.Air, MaterialKey: "zinc_diecast", Energy: EnergySource.Grid);
 
     [Fact]
-    public void SpendBasedIsAmountTimesSectorFactor()
+    public void SpendBasedConvertsTheEurAmountAtTheInvoiceDateThenAppliesTheSectorFactor()
     {
-        var result = Estimate.SpendBasedKg(48000m, "metals", Table);
+        // 2026-10-01: ECB 1.1298 USD/EUR; CPI-U 2022 / 2025 = 292.655 / 321.943 → 0.9090 (2026 has no annual average yet).
+        var result = Estimate.SpendBasedKg(48000m, new DateOnly(2026, 10, 1), "diecast_nonferrous", Table);
+
+        Assert.Equal(48000m * 1.1298m * 0.9090m * 0.462m, result.Kg);
+        Assert.Equal(["kgCO2e/USD", "USD/EUR", "USD 2022 per USD 2025"], result.Inputs.Select(i => i.Unit));
+        Assert.Equal("331523 Nonferrous Metal Die-Casting Foundries", result.Inputs[0].RowLabel);
+    }
+
+    [Fact]
+    public void SpendBasedWithoutAConversionIsAmountTimesSectorFactor()
+    {
+        var table = new FactorTable([new Factor("spend.x", FactorKind.Spend, "x", 0.45m, "kgCO2e/EUR", "test", 2026, "row")]);
+
+        var result = Estimate.SpendBasedKg(48000m, new DateOnly(2026, 10, 1), "x", table);
 
         Assert.Equal(21600m, result.Kg);
-        var input = Assert.Single(result.Inputs);
-        Assert.Equal("kgCO2e/EUR", input.Unit);
+        Assert.Equal("kgCO2e/EUR", Assert.Single(result.Inputs).Unit);
     }
 
     [Fact]

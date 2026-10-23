@@ -36,7 +36,7 @@ public static class NodeFactory
         var category = bundle.CategoryOf(classification.CategoryId);
         var mode = transportMode ?? lane.ModeDefault;
         var massT = InvoiceFacts.MassTFromLines(extracted.Lines);
-        var spend = Estimate.SpendBasedKg(extracted.Total, category.SectorKey, table);
+        var spend = Estimate.SpendBasedKg(extracted.Total, extracted.IssueDate, category.SectorKey, table);
         // No activity figure without a mass: the activity estimate would read 0 kg, so the node stays on the spend figure.
         decimal? activity = status == NodeStatus.Estimated || massT is null
             ? null

@@ -31,7 +31,7 @@ public sealed class NodeViewMapper
         var lane = _lanes.GetValueOrDefault(node.LaneId) ?? throw new InvalidOperationException($"Node {node.Id} has unknown lane {node.LaneId}.");
         var mode = node.TransportMode ?? lane.ModeDefault;
 
-        var spend = new CarbonFigure(node.SpendKg, Rows((FactorKind.Spend, node.SectorId)));
+        var spend = new CarbonFigure(node.SpendKg, Factors.SpendInputs(node.SectorId, invoice.IssueDate).ToList());
         var activity = node.ActivityKg is { } activityKg
             ? new CarbonFigure(activityKg, Rows(
                 (FactorKind.Transport, FactorTable.TransportKey(mode)),
