@@ -22,7 +22,7 @@ The host SDK for the API is .NET 10 (`api/global.json`). On Windows it is instal
 
 ## Map
 
-- `api/src/TraceGreen.Domain` — pure C#: model records, carbon math (`Carbon/`), UBL parser (`Ubl/`), canonical JSON + hashing + HMAC tokens (`Security/`), audit chain (`Audit/`), plausibility rules (planned), ports (`Ports/IRepository`, `IEventBus`; `Ai/IAiClient`; `Security/ILinkSigner`), use-case services (`Services/`, configured through `ServiceOptions`; graph and demo reset so far). No package references.
+- `api/src/TraceGreen.Domain` — pure C#: model records, carbon math (`Carbon/`), UBL parser (`Ubl/`), canonical JSON + hashing + HMAC tokens (`Security/`), audit chain (`Audit/`), plausibility rules (planned), ports (`Ports/IRepository`, `IEventBus`; `Ai/IAiClient`; `Security/ILinkSigner`), use-case services (`Services/`, configured through `ServiceOptions`; graph, ingest and demo so far; `NodeFactory` builds nodes for the seed and for imports alike). No package references.
 - `api/src/TraceGreen.Infrastructure` — adapters: `Memory/` (in-memory repository + event bus), `Postgres/` (EF Core + Npgsql, migrations), `Ai/` (HTTP client to the Python service, stub).
 - `api/src/TraceGreen.Api` — host: `Program.cs`, `AppConfig.cs` (env → config, fails fast), `Endpoints/*.cs` (thin: parse → service → status), `ApiJson.cs` (the one JSON shape, also the OpenAPI source), `Problems.cs` (`ApiProblem` with a stable `code`), `OpenApiSchemas.cs`, `BaseUrlResolver.cs`, `StartupTasks.cs` (`--migrate --seed --exit`).
 - `ai/app` — FastAPI with `GET /health` and its pydantic model; classify/suggest routes and their schemas (planned), provider chain cached → anthropic-if-configured → stub (planned), prompts (planned).

@@ -3,7 +3,7 @@ using TraceGreen.Domain.Ai;
 using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
-using TraceGreen.Domain.Security;
+using TraceGreen.Domain.Services;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Seed;
@@ -82,45 +82,11 @@ public static class DemoState
     private static (Invoice Invoice, SupplierNode Node) Materialize(
         DemoNodeSpec spec, ExtractedInvoice extracted, string xml, SeedBundle bundle, FactorTable table, Lane lane, DateTimeOffset createdAt)
     {
-        var workspaceId = bundle.DemoState.WorkspaceId;
-        var invoice = new Invoice(
-            spec.InvoiceId, workspaceId, extracted.Supplier.Name, extracted.Supplier.TaxId, extracted.Customer.TaxId,
-            extracted.IssueDate, extracted.Currency, extracted.Total, Hashing.RawXmlHash(xml), Hashing.InvoiceHash(extracted), extracted, createdAt);
-
-        var dominant = InvoiceFacts.DominantLine(extracted.Lines);
-        var (categoryId, confidence, source, _) = InvoiceClassification.Offline(dominant, bundle);
-        var category = bundle.CategoryOf(categoryId);
-        var mode = spec.TransportMode ?? lane.ModeDefault;
-        var massT = InvoiceFacts.MassTFromLines(extracted.Lines);
-        var spend = Estimate.SpendBasedKg(extracted.Total, category.SectorKey, table);
-        decimal? activity = spec.Status == NodeStatus.Estimated
-            ? null
-            : Estimate.ActivityBasedKg(
-                new ActivityInput(massT, lane.DistanceKm.GetValueOrDefault(mode) ?? 0m, mode, category.MaterialKey, spec.EnergySource), table).TotalKg;
-        var costPerKg = lane.CostPerKgByMode.GetValueOrDefault(mode) ?? 0m;
-        var leadDays = lane.LeadDaysByMode.GetValueOrDefault(mode) ?? 0;
-
-        var node = new SupplierNode(
-            Id: spec.NodeId,
-            WorkspaceId: workspaceId,
-            InvoiceId: spec.InvoiceId,
-            Label: extracted.Supplier.Name,
-            Country: extracted.Supplier.Country,
-            CategoryId: categoryId,
-            SectorId: category.SectorKey,
-            AiConfidence: confidence,
-            ClassificationSource: source,
-            MassT: massT,
-            LaneId: spec.LaneId,
-            Status: spec.Status,
-            SpendKg: spend.Kg,
-            ActivityKg: activity,
-            SpendEur: extracted.Total,
-            CostEur: extracted.Total + (massT ?? 0m) * 1000m * costPerKg,
-            LeadDays: leadDays,
-            TransportMode: spec.TransportMode,
-            EnergySource: spec.EnergySource,
-            CreatedAt: createdAt);
+        var invoice = NodeFactory.NewInvoice(spec.InvoiceId, bundle.DemoState.WorkspaceId, extracted, xml, createdAt);
+        var (categoryId, confidence, source, _) = InvoiceClassification.Offline(InvoiceFacts.DominantLine(extracted.Lines), bundle);
+        var node = NodeFactory.NewNode(
+            spec.NodeId, invoice, new NodeClassification(categoryId, confidence, source), lane, spec.Status,
+            spec.TransportMode, spec.EnergySource, bundle, table, createdAt);
         return (invoice, node);
     }
 }

@@ -73,17 +73,30 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         return rows.Select(Mapping.ToDomain).ToList();
     }
 
-    public async Task<AuditEntry> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct)
+    public async Task<InsertInvoiceResult> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LockWorkspaceAsync(db, ctx.WorkspaceId, ct);
+
+        var existing = await db.Invoices.AsNoTracking()
+            .Where(i => (i.WorkspaceId == ctx.WorkspaceId && i.RawXmlHash == invoice.RawXmlHash) || i.Id == invoice.Id)
+            .Select(i => (Guid?)i.Id)
+            .FirstOrDefaultAsync(ct);
+        if (existing is not null || await db.Nodes.AnyAsync(n => n.Id == node.Id, ct))
+        {
+            var existingNodeId = existing is { } invoiceId
+                ? await db.Nodes.Where(n => n.InvoiceId == invoiceId).Select(n => (Guid?)n.Id).FirstOrDefaultAsync(ct)
+                : node.Id;
+            return new InsertInvoiceResult(InsertInvoiceStatus.Duplicate, null, existingNodeId);
+        }
+
         db.Invoices.Add(Mapping.ToRow(invoice));
         db.Nodes.Add(Mapping.ToRow(node));
         var row = await StageAuditAsync(db, ctx.WorkspaceId, audit, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Mapping.ToDomain(row);
+        return new InsertInvoiceResult(InsertInvoiceStatus.Ok, Mapping.ToDomain(row), null);
     }
 
     public async Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct)
