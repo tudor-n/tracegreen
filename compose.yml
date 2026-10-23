@@ -56,6 +56,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
       DATABASE_URL: postgres://tracegreen:tracegreen@db:5432/tracegreen
+      DATA_MODE: ${DATA_MODE:-}
       LINK_SECRET: dev-only-secret-change-me-0123456789
       DEMO_TOOLS: "1"
       AI_BASE_URL: http://ai:8000
