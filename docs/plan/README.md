@@ -49,7 +49,7 @@ Priority follows `PRIORITY-CHANGES.md` §1. With three people the slices overlap
 There are three seams. Each has one person who changes it and tells the others when it changes.
 
 1. **HTTP contract (Dev A).** For slices 1, 3 and 5, A first opens a small contract PR: request and response records, routes, status codes and `Produces<>` metadata, with endpoints returning 501 until they are implemented. The same PR runs `pnpm gen:api` and commits `web/src/api/schema.d.ts`. From then on, B and C build against the generated types, and nobody hand-writes API types. A change after merge needs a new contract PR and a message in the team chat. The author of a contract PR settles questions about it. Anything that changes another track's work goes to the daily sync.
-2. **Store interface (Dev B).** `hydrate(snapshot)` and `applyEvent(event)` live in `web/src/store/`. A's `useGraphEvents` hook calls them, and the store ignores events whose `seq` is not newer than its `lastSeq`.
+2. **Store interface (Dev B).** `hydrate(snapshot)` and `applyEvent(event)` live in `web/src/store/`. A's `useGraphEvents` hook calls them. The store ignores events whose `seq` is not newer than its `lastSeq` and applies the rest idempotently; `hydrate` replaces `lastSeq` even when it goes down (the sequence restarts with the API); `graph.reset` never reaches the store, because the hook refetches the snapshot.
 3. **Copy (Dev C).** `web/src/copy/` holds every label a juror reads: rulings 2–4, the AI labels, the MAC badge names and the RO/EN strings for `/verify`. B and C import from it instead of writing strings inline.
 
 | When | From → to | Handoff |
