@@ -30,6 +30,10 @@ web/test-results/
 web/playwright-report/
 web/.vite/
 
+# Claude Code: personal settings and `claude -w` worktrees (.claude/settings.json is shared)
+.claude/settings.local.json
+.claude/worktrees/
+
 # OS / editors
 .DS_Store
 Thumbs.db

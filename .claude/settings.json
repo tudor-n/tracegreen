@@ -1,0 +1,46 @@
+{
+  "attribution": { "commit": "", "pr": "", "sessionUrl": false },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test)",
+      "Bash(dotnet test *)",
+      "Bash(uv run pytest)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm e2e)",
+      "Bash(pnpm e2e *)",
+      "Bash(pnpm gen:api)",
+      "Bash(docker compose ps)",
+      "Bash(docker compose logs *)",
+      "Bash(docker compose exec api dotnet test *)",
+      "Bash(docker compose exec ai uv run *)",
+      "Bash(docker compose exec web pnpm *)",
+      "Bash(node scripts/*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*.local)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/copy-guard.mjs"]
+          }
+        ]
+      }
+    ]
+  }
+}
