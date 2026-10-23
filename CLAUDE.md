@@ -4,6 +4,10 @@ TraceGreen turns a UBL 2.1 e-invoice into a supplier graph with a spend-based CO
 
 Current status, remaining work and decisions: `docs/NEXT.md`. How to run: `docs/RUNBOOK.md`. (`docs/ROADMAP.md` and `docs/ARCHITECTURE.md` are still to be written; until then `docs/NEXT.md` is the entry point.)
 
+Slice order and rulings (private, git-ignored; loaded when present): @docs/PRIORITY-CHANGES.md
+
+Team plan and briefs: docs/plan/
+
 ## Commands
 
 Everything: `docker compose build && docker compose up` (Postgres, API on :8080, AI on :8000, web on :3000 with `/api` proxied). Demo image: `docker compose -f compose.yml -f compose.demo.yml up --build`.
@@ -14,15 +18,15 @@ Everything: `docker compose build && docker compose up` (Postgres, API on :8080,
 | `ai/` | `uv run uvicorn app.main:app --reload --port 8000` | `uv run pytest` (one: `uv run pytest -k name`) | `uv run ruff check . && uv run ruff format --check .` |
 | `web/` | `pnpm dev` | `pnpm test` (vitest), `pnpm e2e` (Playwright against Compose) | `pnpm typecheck && pnpm lint` |
 
-The host SDK for the API is .NET 10 (`api/global.json`); on this machine it is installed under `%LOCALAPPDATA%\Microsoft\dotnet` — put that directory first on `PATH` or run the commands inside `docker compose exec api`.
+The host SDK for the API is .NET 10 (`api/global.json`). On Windows it is installed under `%LOCALAPPDATA%\Microsoft\dotnet` — put that directory first on `PATH` or run the commands inside `docker compose exec api`. On Linux install a .NET 10 SDK at 10.0.100 or later (e.g. `sudo apt install dotnet-sdk-10.0`; check with `dotnet --list-sdks`); worktree sessions need it on the host because the container only sees the main checkout.
 
 ## Map
 
-- `api/src/TraceGreen.Domain` — pure C#: model records, carbon math (`Carbon/`), UBL parser (`Ubl/`), canonical JSON + hashing + HMAC tokens (`Security/`), audit chain (`Audit/`), plausibility rules, ports (`Ports/IRepository`, `IEventBus`; `Ai/IAiClient`; `Security/ILinkSigner`), use-case services (`Services/`). No package references.
+- `api/src/TraceGreen.Domain` — pure C#: model records, carbon math (`Carbon/`), UBL parser (`Ubl/`), canonical JSON + hashing + HMAC tokens (`Security/`), audit chain (`Audit/`), plausibility rules (planned), ports (`Ports/IRepository`, `IEventBus`; `Ai/IAiClient`; `Security/ILinkSigner`), use-case services in `Services/` (planned). No package references.
 - `api/src/TraceGreen.Infrastructure` — adapters: `Memory/` (in-memory repository + event bus), `Postgres/` (EF Core + Npgsql, migrations), `Ai/` (HTTP client to the Python service, stub).
 - `api/src/TraceGreen.Api` — host: `Program.cs`, `AppConfig.cs` (env → config, fails fast), `Endpoints/*.cs` (thin: parse → service → status), `StartupTasks.cs` (`--migrate --seed --exit`).
-- `ai/app` — FastAPI routes, pydantic schemas, provider chain (cached → anthropic-if-configured → stub), prompts.
-- `web/src` — `api/` (generated OpenAPI types + openapi-fetch client), `store/` (Zustand, presentation-only selectors), `pages/`, `components/`, `hooks/`.
+- `ai/app` — FastAPI with `GET /health` and its pydantic model; classify/suggest routes and their schemas (planned), provider chain cached → anthropic-if-configured → stub (planned), prompts (planned).
+- `web/src` — `api/` generated OpenAPI types and openapi-fetch client (planned), `store/` Zustand with presentation-only selectors (planned), `pages/`, `components/`, `hooks/` (planned).
 - `seed/` — shared fixtures with fixed UUIDs: invoices (UBL XML), factors, lanes, alternatives, categories (the AI allow-list), ai-cache, demo-state.
 
 Demo-critical path: F1 import → F2 graph → F3 verify loop → F4 simulator. After touching services, events, carbon math or the store, run the Playwright smoke (`cd web && pnpm e2e`) against a running Compose stack.
