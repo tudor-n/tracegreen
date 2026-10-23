@@ -19,10 +19,19 @@ public static class Estimate
 
     public static decimal RenewableShare(EnergySource? energy) => energy == EnergySource.Renewable ? 0.8m : 0m;
 
-    public static SpendResult SpendBasedKg(decimal amountEur, string sectorKey, FactorTable table)
+    /// <summary>
+    /// Amount × sector factor, after converting the EUR amount into the factors' currency and price year at the
+    /// invoice date (<see cref="SpendConversion"/>). The inputs are the factor row followed by the conversion rows.
+    /// </summary>
+    public static SpendResult SpendBasedKg(decimal amountEur, DateOnly issueDate, string sectorKey, FactorTable table)
     {
         var factor = table.Lookup(FactorKind.Spend, sectorKey);
-        return new SpendResult(amountEur * factor.Value, [factor]);
+        if (table.SpendConversion is not { } conversion)
+        {
+            return new SpendResult(amountEur * factor.Value, [factor]);
+        }
+        var converted = conversion.FromEur(amountEur, issueDate);
+        return new SpendResult(converted.Amount * factor.Value, [factor, .. converted.Steps]);
     }
 
     public static ActivityResult ActivityBasedKg(ActivityInput input, FactorTable table)

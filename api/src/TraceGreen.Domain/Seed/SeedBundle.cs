@@ -21,6 +21,13 @@ public sealed record DemoNodeSpec(
 
 public sealed record DemoStateSpec(Guid WorkspaceId, IReadOnlyList<DemoNodeSpec> Nodes);
 
+public sealed record ExchangeRateSpec(string Source, string Unit, string Url, string Retrieved, IReadOnlyDictionary<string, decimal> Rates);
+
+public sealed record PriceIndexSpec(string Source, string Url, string Retrieved, IReadOnlyDictionary<string, decimal> AnnualAverages);
+
+/// <summary><c>spend-conversion.json</c>: the currency and price year of the spend factors, and the rates to reach them.</summary>
+public sealed record SpendConversionSpec(string FactorCurrency, int FactorPriceYear, ExchangeRateSpec ExchangeRate, PriceIndexSpec PriceIndex);
+
 /// <summary>Everything under <c>seed/</c>, validated. Shared by both repositories and by the demo endpoints.</summary>
 public sealed record SeedBundle(
     string Directory,
@@ -31,7 +38,8 @@ public sealed record SeedBundle(
     IReadOnlyList<Alternative> Alternatives,
     IReadOnlyList<ClassificationMapEntry> ClassificationMap,
     IReadOnlyDictionary<string, CachedClassification> AiCache,
-    DemoStateSpec DemoState)
+    DemoStateSpec DemoState,
+    SpendConversionSpec SpendConversion)
 {
     private IReadOnlySet<string>? _allowList;
 

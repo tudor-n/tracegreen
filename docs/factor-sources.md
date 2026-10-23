@@ -41,14 +41,30 @@ Where every emission factor in `seed/factors.json`, and the carbon price behind 
 
 ## Spend
 
+Source (D1): US EPA, Supply Chain Greenhouse Gas Emission Factors v1.3 by NAICS-6 (published July 2024), file `SupplyChainGHGEmissionFactors_v1.3.0_NAICS_CO2e_USD2022.csv` from https://pasteur.epa.gov/uploads/10.23719/1531143/ (SHA-256 `6025a14c4fe16675735efba1683030e4d36011e3973f3c4261f8231aa69c002f`). Column used: "Supply Chain Emission Factors with Margins", because invoice amounts are purchaser prices. GWP: IPCC AR5, 100 years. Rows chosen and checked against the file by a person on 2026-10-23.
+
 | id | key | value | unit | source | year | currency | price year | row label | match |
 |---|---|---|---|---|---|---|---|---|---|
-| `spend.metals` | metals | 0.45 | kgCO2e/EUR | PLACEHOLDER - replace with a row from the D1 spend-factor source at T4 | 2026 (placeholder) |  |  | Fabricated metal products (placeholder) |  |
-| `spend.electronics` | electronics | 0.35 | kgCO2e/EUR | PLACEHOLDER - replace with a row from the D1 spend-factor source at T4 | 2026 (placeholder) |  |  | Electronic components (placeholder) |  |
-| `spend.packaging` | packaging | 0.3 | kgCO2e/EUR | PLACEHOLDER - replace with a row from the D1 spend-factor source at T4 | 2026 (placeholder) |  |  | Paper packaging (placeholder) |  |
-| `spend.other` | other | 0.4 | kgCO2e/EUR | PLACEHOLDER - replace with a row from the D1 spend-factor source at T4 | 2026 (placeholder) |  |  | Other manufactured goods (placeholder) |  |
+| `spend.diecast_nonferrous` | diecast_nonferrous | 0.462 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 331523 Nonferrous Metal Die-Casting Foundries | Zinc die-cast parts (N1). Zinc is not named; die-casting is grouped by process. 331524 and 331529 share the value (USEEIO 331520). |
+| `spend.pcb_bare` | pcb_bare | 0.098 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 334412 Bare Printed Circuit Board Manufacturing | Bare FR4 boards (N2). Shares the value with 334417 (USEEIO 33441A). |
+| `spend.vehicle_electrical` | vehicle_electrical | 0.218 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 336320 Motor Vehicle Electrical and Electronic Equipment Manufacturing | Wire harnesses (N3). The NAICS index lists automotive harness sets under 336320. Fallback if that does not hold: 335929 (0.235). |
+| `spend.corrugated_boxes` | corrugated_boxes | 0.479 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 322211 Corrugated and Solid Fiber Box Manufacturing | Corrugated shipping boxes (N4). |
+| `spend.electronic_connectors` | electronic_connectors | 0.098 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 334417 Electronic Connector Manufacturing | Automotive connectors (N5). |
+| `spend.plastics_other` | plastics_other | 0.371 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 326199 All Other Plastics Product Manufacturing | Plastic parts; no seed invoice uses it. |
+| `spend.misc_manufacturing` | misc_manufacturing | 0.182 | kgCO2e/USD | US EPA v1.3, with margins | 2024 | USD | 2022 | 339999 All Other Miscellaneous Manufacturing | UNCLASSIFIED lines. |
 
-"currency" and "price year" are those of the source's factors (for example, US dollars at 2022 purchaser prices). See D1.
+Each category has its own spend row (`sectorKey` in `seed/categories.json`); the four placeholder buckets are gone.
+
+### Converting an invoice amount
+
+The API converts on every import (`api/src/TraceGreen.Domain/Carbon/SpendConversion.cs`), with the tables in `seed/spend-conversion.json`:
+
+`kg = invoice EUR × USD/EUR on the invoice date × CPI-U(2022) / CPI-U(invoice year) × factor`
+
+- Exchange rate: ECB euro reference rate, US dollar/Euro (`EXR.D.USD.EUR.SP00.A`), daily from 2024-01-02, retrieved 2026-10-23. A weekend, holiday or date after the table uses the last published rate before it; a date before the table uses the first rate. The row label names the date used.
+- Price adjustment: US BLS CPI-U, U.S. city average, all items, not seasonally adjusted (`CUUR0000SA0`), annual averages 2022 292.655, 2023 304.702, 2024 313.689, 2025 321.943, retrieved 2026-10-23. A year without an annual average yet (2026) uses the latest full year, and the label says so. The ratio is rounded to 4 decimals (2022/2025 = 0.9090) and used as shown.
+- The node's spend figure lists three rows behind the "i" icon: the EPA row, the exchange rate and the price adjustment.
+- Refreshing `spend-conversion.json` (for example before tagging `v0.9-prehack`) changes the spend kg of invoices whose date has a new rate, and the pinned N1 number in `IngestEndpointTests`. N1 is dated 2026-10-28, after the last rate in the table, so it uses the 2026-10-23 rate for now.
 
 ## Carbon price
 
@@ -60,7 +76,7 @@ The MAC badge compares an option's abatement cost with this price: below it the 
 
 ## Decisions
 
-- **D1, spend-factor source** (open; C with A and B, due Fri 23 Oct): US EPA v1.3, Defra, or EXIOBASE (roadmap §6.1.1). The choice fixes a currency and a price year; US EPA v1.3, for example, is in 2022 US dollars at purchaser prices. Whichever source wins, an invoice amount has to be converted into that currency at a stated exchange rate and adjusted to that price year before the factor applies. Today the code multiplies the EUR amount by a factor in kgCO2e/EUR. Separately, invoices in other currencies than EUR are refused with `UnsupportedCurrency`.
+- **D1, spend-factor source** (decided 2026-10-23): US EPA Supply Chain GHG Emission Factors v1.3, with margins, converted on every import at the ECB rate of the invoice date and CPI-U annual averages (see Spend). EXIOBASE was ruled out: its licence is non-commercial and forbids publishing coefficients derived from it, and it ships no ready multipliers. Defra's spend factors are UK, in GBP and older. v1.4 (2025, CC BY 4.0, 2024 USD) exists but is published by Cornerstone rather than EPA. US factors describe the US economy, so they likely understate imports from more carbon-intensive grids; the node already reads "Spend-based estimate". Invoices in other currencies than EUR are still refused with `UnsupportedCurrency`.
 - **D6, grid rows** (decided 2026-10-23): the four `grid.*` rows are deleted from `factors.json`. No formula read them, and EEA and ANRE cover Europe and Romania, which left Ember as the single listed option for China and Taiwan. If a formula ever needs grid intensity, the rows come back with an EEA, Ember or ANRE source.
 - **Well-to-tank** (decided 2026-10-23): excluded, as stated in the rules.
 - **Carbon price benchmark** (decided 2026-10-23): the front-December EUA futures settlement on ICE Endex.

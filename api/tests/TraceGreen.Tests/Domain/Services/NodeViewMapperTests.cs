@@ -39,8 +39,9 @@ public class NodeViewMapperTests
         Assert.Equal(n3.Spend.Kg, n3.CarbonKg);
         Assert.Null(n3.Activity);
         Assert.Equal(Uncertainty.High, n3.Uncertainty);
-        var factor = Assert.Single(n3.Spend.Factors);
-        Assert.Equal("kgCO2e/EUR", factor.Unit);
+        // The sector row, then the EUR → USD rate and the price adjustment of the invoice date.
+        Assert.Equal(["kgCO2e/USD", "USD/EUR", "USD 2022 per USD 2025"], n3.Spend.Factors.Select(f => f.Unit));
+        Assert.Contains("US EPA", n3.Spend.Factors[0].Source);
     }
 
     [Fact]
@@ -57,9 +58,9 @@ public class NodeViewMapperTests
     [Fact]
     public void PlaceholderSourcesReachTheView()
     {
-        var n3 = View("N3");
+        var n2 = View("N2");
 
-        Assert.Contains("PLACEHOLDER", n3.Spend.Factors[0].Source);
+        Assert.Contains("PLACEHOLDER", n2.Activity!.Factors[0].Source);
     }
 
     [Fact]
@@ -114,7 +115,7 @@ public class NodeViewMapperTests
     [Fact]
     public void AFactorRowThatNoLongerExistsIsLeftOutInsteadOfFailingTheGraph()
     {
-        var mapper = new NodeViewMapper(Seed with { Factors = Seed.Factors.Where(f => f.Key != "electronics").ToList() });
+        var mapper = new NodeViewMapper(Seed with { Factors = Seed.Factors.Where(f => f.Key != "pcb_bare").ToList() });
         var spec = Seed.DemoState.Nodes.Single(n => n.Key == "N2");
         var node = State.Nodes.Single(n => n.Id == spec.NodeId);
 

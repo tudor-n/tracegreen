@@ -44,7 +44,8 @@ public class GraphEndpointTests : IClassFixture<TestWebAppFactory>
         Assert.Equal("low", n2.GetProperty("uncertainty").GetString());
         Assert.Equal(n2.GetProperty("activity").GetProperty("kg").GetDecimal(), n2.GetProperty("carbonKg").GetDecimal());
         Assert.Equal(2, n2.GetProperty("activity").GetProperty("factors").GetArrayLength());
-        Assert.Contains("PLACEHOLDER", n2.GetProperty("spend").GetProperty("factors")[0].GetProperty("source").GetString());
+        Assert.Contains("PLACEHOLDER", n2.GetProperty("activity").GetProperty("factors")[0].GetProperty("source").GetString());
+        Assert.Equal(3, n2.GetProperty("spend").GetProperty("factors").GetArrayLength());
         Assert.True(n2.GetProperty("lane").GetProperty("illustrative").GetBoolean());
         Assert.Equal(JsonValueKind.Number, n2.GetProperty("costEur").ValueKind);
     }

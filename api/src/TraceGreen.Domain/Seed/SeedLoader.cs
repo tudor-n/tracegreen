@@ -34,9 +34,10 @@ public static class SeedLoader
         var classificationMap = Read<List<ClassificationMapEntry>>(directory, "classification-map.json");
         var aiCache = Read<Dictionary<string, CachedClassification>>(directory, "ai-cache.json");
         var demoState = Read<DemoStateSpec>(directory, "demo-state.json");
+        var spendConversion = Read<SpendConversionSpec>(directory, "spend-conversion.json");
 
         var bundle = new SeedBundle(
-            Path.GetFullPath(directory), buyer, categories, factors, lanes, alternatives, classificationMap, aiCache, demoState);
+            Path.GetFullPath(directory), buyer, categories, factors, lanes, alternatives, classificationMap, aiCache, demoState, spendConversion);
 
         var violations = Validate(bundle);
         if (violations.Count > 0)
@@ -90,6 +91,11 @@ public static class SeedLoader
         foreach (var mode in Enum.GetValues<TransportMode>())
         {
             if (!transportKeys.Contains(mode.ToString().ToLowerInvariant())) v.Add($"factors.json: no transport factor for {mode}");
+        }
+        var spendUnit = $"kgCO2e/{b.SpendConversion.FactorCurrency}";
+        foreach (var f in b.Factors.Where(f => f.Kind == FactorKind.Spend && f.Unit != spendUnit))
+        {
+            v.Add($"factor {f.Id}: unit {f.Unit}, but spend-conversion.json converts invoices to {spendUnit}");
         }
         foreach (var f in b.Factors)
         {

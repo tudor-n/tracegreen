@@ -15,12 +15,16 @@ public sealed class FactorTable
 {
     private readonly Dictionary<(FactorKind Kind, string Key), Factor> _rows;
 
-    public FactorTable(IEnumerable<Factor> rows)
+    /// <param name="spendConversion">Null when the spend rows are already per EUR at invoice prices (some tests).</param>
+    public FactorTable(IEnumerable<Factor> rows, SpendConversion? spendConversion = null)
     {
         _rows = rows.ToDictionary(r => (r.Kind, r.Key));
+        SpendConversion = spendConversion;
     }
 
-    public static FactorTable FromSeed(SeedBundle bundle) => new(bundle.Factors);
+    public static FactorTable FromSeed(SeedBundle bundle) => new(bundle.Factors, new SpendConversion(bundle.SpendConversion));
+
+    public SpendConversion? SpendConversion { get; }
 
     public static string TransportKey(TransportMode mode) => mode.ToString().ToLowerInvariant();
 
@@ -34,6 +38,15 @@ public sealed class FactorTable
     }
 
     public FactorLookup Transport(TransportMode mode) => Lookup(FactorKind.Transport, TransportKey(mode));
+
+    /// <summary>
+    /// For display only: the spend row and the conversion rows for an invoice of that date, without the rows that are
+    /// gone (see <see cref="TryLookup"/>).
+    /// </summary>
+    public IReadOnlyList<FactorLookup> SpendInputs(string sectorKey, DateOnly issueDate) =>
+        TryLookup(FactorKind.Spend, sectorKey) is not { } factor ? []
+        : SpendConversion is null ? [factor]
+        : [factor, SpendConversion.ExchangeRate(issueDate), SpendConversion.PriceAdjustment(issueDate.Year)];
 
     /// <summary>For display only: null when the row is gone, e.g. after <c>factors.json</c> changed under stored nodes.</summary>
     public FactorLookup? TryLookup(FactorKind kind, string key) =>
