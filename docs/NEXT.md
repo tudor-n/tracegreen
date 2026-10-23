@@ -90,6 +90,10 @@ Decisions (A, 2026-10-23; fold into `docs/DECISIONS.md` when it exists):
 - **The parser reads the classification scheme STI as CPV** (`UblInvoiceParser.ListId`) — reason: ANAF accepts CPV codes only under STI, while the classification map, the AI contract and the "Item classification code … (CPV)" rationale use CPV — cost if wrong: one line.
 - **RON VAT totals use the BNR rate published on the invoice's issue date** — reason: BR-RO-030 and BR-53 require the figure; nothing in TraceGreen reads it — cost if wrong: two numbers in three files.
 
+Open for A's confirmation in review (task C2 says to ask A before changing a line description):
+
+- **The adversarial line's parsed description gains " - "** ("Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …") — reason: BR-RO-L100 caps `cbc:Name` at 100 characters, so the injected instruction moved to `cbc:Description` and the parser joins the two; the injection itself is kept (roadmap A3) and `seed/ai-cache.json` is re-keyed to match; nothing else in the repo uses the old string — cost if wrong: shorten the injected text to fit in `cbc:Name` instead, and restore the old cache key.
+
 The API reads `seed/` once at startup. After pulling these changes, restart it (`docker compose restart api`) and press "Reset demo", or run `docker compose down -v && docker compose up`, so the stored buyer and seed invoices match the files.
 
 ## What remains (in order)
