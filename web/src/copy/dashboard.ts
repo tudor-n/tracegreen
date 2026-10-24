@@ -1,23 +1,9 @@
 import type { NodeStatus, ProblemCode } from '@/api/client'
 
-// Dashboard text a juror can read. Components import it from here instead of writing strings inline.
-//
-// `supplierConfirmedShare` and `AI_MAPPED` stand in for web/src/copy/labels.ts (C3) until it lands; then import them
-// from there and delete them here (docs/plan/README.md §3). The share tooltip below is a factual placeholder: it must
-// become ruling 2's tooltip, word for word.
+// Dashboard text a juror can read. Components import it from here instead of writing strings inline. The labels that
+// rulings 2–4 and CLAUDE.md fix word for word (the supplier-confirmed share, the AI labels) live in ./labels.ts.
 
 export const dashboardTitle = 'TraceGreen'
-
-/** Ruling 2. `primaryShare` on the wire. */
-export const supplierConfirmedShare = {
-  label: 'Supplier-confirmed share',
-  subtitle: 'by emissions, not by node count',
-  tooltip:
-    'Share of total tCO₂e from suppliers who confirmed both questions (transport and energy). Weighted by emissions, not by node count.',
-} as const
-
-/** CLAUDE.md: the label on every value an AI classification produced (cache or model). */
-export const AI_MAPPED = 'AI-mapped'
 
 export const kpiCopy = {
   region: 'Key figures',

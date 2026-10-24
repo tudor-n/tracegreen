@@ -1,5 +1,5 @@
 import type { CarbonFigure, ClassificationView, FactorLookup, NodeView } from '@/api/client'
-import { AI_MAPPED } from '@/copy/dashboard'
+import { AI_MAPPED } from '@/copy/labels'
 
 // What a supplier node shows, decided from the read model alone. Nothing here computes carbon.
 

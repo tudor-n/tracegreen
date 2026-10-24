@@ -18,7 +18,12 @@ import { fileURLToPath } from 'node:url';
 /** Generic terms, stored in plain text. */
 export const PLAIN_TERMS = [
   { term: 'blockchain', pattern: /\bblock-?chains?\b/i, instead: 'say "tamper-evident audit log"' },
-  { term: 'verified PCF', pattern: /\bverified\s+PCFs?\b/i, instead: 'say "supplier-confirmed" (ruling 2 and 3)' },
+  // Ruling 2's tooltip disclaims the term ("…, not externally verified PCFs"), so that exact negation is allowed.
+  {
+    term: 'verified PCF',
+    pattern: /(?<!\bnot\s+externally\s+)\bverified\s+PCFs?\b/i,
+    instead: 'say "supplier-confirmed" (ruling 2 and 3)',
+  },
   {
     term: 'primary data',
     pattern: /\bprimary\s+data\b/i,
@@ -49,6 +54,7 @@ export const EXEMPT_PATHS = [
   'docs/plan/',
   '.claude/hooks/',
   'scripts/lib/banned-terms.mjs',
+  'scripts/lib/banned-terms.test.mjs',
 ];
 
 export function sha256(word) {
