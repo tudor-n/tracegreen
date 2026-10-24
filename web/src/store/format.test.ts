@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatDate,
+  formatDateTime,
   formatDays,
   formatEuros,
   formatFactorValue,
@@ -85,6 +86,21 @@ describe('formatDate', () => {
 
   it('shows the dash for something that is not a date', () => {
     expect(formatDate('soon')).toBe('–')
+  })
+})
+
+describe('formatDateTime', () => {
+  it('shows the instant with seconds on a 24-hour clock', () => {
+    expect(formatDateTime('2026-11-01T09:03:00+00:00', 'UTC')).toBe('1 Nov 2026, 09:03:00')
+    expect(formatDateTime('2026-10-24T13:05:09.123Z', 'UTC')).toBe('24 Oct 2026, 13:05:09')
+  })
+
+  it('converts to the given time zone', () => {
+    expect(formatDateTime('2026-10-24T21:30:00Z', 'Europe/Bucharest')).toBe('25 Oct 2026, 00:30:00')
+  })
+
+  it('shows the dash for something that is not an instant', () => {
+    expect(formatDateTime('later')).toBe('–')
   })
 })
 

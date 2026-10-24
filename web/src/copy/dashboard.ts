@@ -104,6 +104,33 @@ export const drawerCopy = {
   simulate: 'Simulate',
 } as const
 
+/**
+ * The audit panel. It is a tamper-evident audit log and is never called anything else (PRIORITY-CHANGES.md §4).
+ * Actions and actors the API adds later show as their raw names until they get a label here.
+ */
+export const auditCopy = {
+  open: 'Audit log',
+  title: 'Tamper-evident audit log',
+  description:
+    'Each entry is hashed together with the hash of the entry before it, so changing any entry breaks the chain from there on.',
+  loading: 'Loading the audit log…',
+  offline: "Can't reach the API. Trying again every 5 seconds.",
+  empty: 'No entries yet.',
+  hash: 'hash',
+  verify: 'Verify chain',
+  actions: {
+    'seed.loaded': 'Demo data loaded',
+    'invoice.imported': 'Invoice imported',
+    'verification.submitted': 'Supplier answered',
+  } as Readonly<Partial<Record<string, string>>>,
+  actors: {
+    seed: 'Seed data',
+    buyer: 'Buyer',
+    demo: 'Demo',
+    supplier: 'Supplier',
+  } as Readonly<Partial<Record<string, string>>>,
+} as const
+
 /** The live-updates badge: one label per state of useGraphEvents, and what it means as the tooltip. */
 export const connectionCopy = {
   state: {

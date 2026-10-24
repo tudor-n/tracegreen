@@ -64,6 +64,28 @@ export function formatKm(km: number | null): string {
   return `${integer.format(noNegativeZero(Math.round(km)))} km`
 }
 
+const dateTimeOptions: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+}
+const localDateTime = new Intl.DateTimeFormat('en-GB', dateTimeOptions)
+
+/**
+ * An instant from the API ("2026-11-01T09:03:00+00:00") as "1 Nov 2026, 09:03:00", in the viewer's time zone unless
+ * one is given (the tests pass "UTC").
+ */
+export function formatDateTime(iso: string, timeZone?: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return MISSING
+  const format = timeZone === undefined ? localDateTime : new Intl.DateTimeFormat('en-GB', { ...dateTimeOptions, timeZone })
+  return format.format(date)
+}
+
 /** A calendar date from the API ("2026-10-28") as "28 Oct 2026", read in UTC so no time zone moves it a day. */
 export function formatDate(isoDate: string): string {
   const date = new Date(`${isoDate.slice(0, 10)}T00:00:00Z`)

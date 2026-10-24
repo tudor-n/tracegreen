@@ -1,5 +1,6 @@
 import { Loader2Icon } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
+import { AuditPanel, AuditToggle } from '@/components/dashboard/AuditPanel'
 import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { KpiBar } from '@/components/dashboard/KpiBar'
 import { NodeDrawer } from '@/components/dashboard/NodeDrawer'
@@ -53,7 +54,10 @@ export default function Dashboard() {
             </div>
             {buyer !== null && <p className="text-sm text-muted-foreground">{buyer.name}</p>}
           </div>
-          <Toolbar connection={connection} />
+          <div className="flex items-start gap-2">
+            <AuditToggle />
+            <Toolbar connection={connection} />
+          </div>
         </header>
         <div className="border-b px-4 py-3">
           <KpiBar kpis={kpis} connection={connection} />
@@ -62,7 +66,12 @@ export default function Dashboard() {
           {graph}
         </main>
       </div>
-      {graphArea !== null && <NodeDrawer container={graphArea} />}
+      {graphArea !== null && (
+        <>
+          <AuditPanel container={graphArea} connection={connection} />
+          <NodeDrawer container={graphArea} />
+        </>
+      )}
     </TooltipProvider>
   )
 }
