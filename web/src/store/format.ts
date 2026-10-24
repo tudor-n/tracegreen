@@ -1,3 +1,5 @@
+import type { Kpis } from '@/api/client'
+
 // Presentation only: the API sends kilograms, euros and days; these turn them into what the UI shows
 // (CLAUDE.md: tonnes with one decimal, euros without decimals, days as integers). No carbon is computed here.
 
@@ -5,8 +7,11 @@ const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximu
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
+const factorValue = new Intl.NumberFormat('en-GB', { maximumSignificantDigits: 6 })
 
 const MISSING = '–'
+
+export const CO2E_UNIT = 'tCO₂e'
 
 /** Rounding can give -0, which Intl prints as "-0". */
 const noNegativeZero = (n: number) => (Object.is(n, -0) ? 0 : n)
@@ -24,7 +29,7 @@ export function formatTonnes(kg: number): string {
 
 /** "48.0 tCO₂e". */
 export function formatTonnesCo2e(kg: number): string {
-  return `${formatTonnes(kg)} tCO₂e`
+  return `${formatTonnes(kg)} ${CO2E_UNIT}`
 }
 
 /** Whole euros: 12 345.6 → "€12,346". */
@@ -44,4 +49,29 @@ export function formatDays(days: number): string {
 export function formatShare(fraction: number): string {
   if (!Number.isFinite(fraction)) return MISSING
   return percent.format(noNegativeZero(Math.round(fraction * 100) / 100))
+}
+
+/** A factor row's value as the API sent it, to six significant digits: 0.462 → "0.462", 5000 → "5,000". */
+export function formatFactorValue(value: number): string {
+  if (!Number.isFinite(value)) return MISSING
+  return factorValue.format(noNegativeZero(value))
+}
+
+export interface KpiFigures {
+  /** Tonnes with one decimal, without the unit. */
+  total: string
+  share: string
+  spend: string
+  nodes: string
+}
+
+/** The KPI bar's figures, straight from the API's KPIs. */
+export function formatKpis(kpis: Kpis): KpiFigures {
+  return {
+    total: formatTonnes(kpis.totalKg),
+    // With no emissions there is nothing to share out, and "0%" would read as "none confirmed".
+    share: kpis.totalKg > 0 ? formatShare(kpis.primaryShare) : MISSING,
+    spend: formatEuros(kpis.spendEur),
+    nodes: Number.isFinite(kpis.nodeCount) ? integer.format(kpis.nodeCount) : MISSING,
+  }
 }

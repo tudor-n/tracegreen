@@ -37,7 +37,7 @@ export const HASHED_TERMS = [
   {
     kind: 'retired product name',
     instead: 'say "TraceGreen"',
-    contains: [],
+    contains: [{ length: 11, sha256: '91f44966f6e3520fac9f4c663847cad71c8da45c5f5ea1d0cf33b591ba1155de' }],
     exact: [],
   },
 ];

@@ -71,6 +71,12 @@ describe('toRfNodes and toRfEdges', () => {
     expect(rf.find((n) => n.id === 'b')?.selected).toBe(false)
   })
 
+  it('gives every node its fixed size as already measured, so React Flow keeps its handles between updates', () => {
+    const [buyerNode, supplier] = toRfNodes(buyer, nodes, positions, new Set(), null)
+    expect(buyerNode).toMatchObject({ ...NODE_SIZE.buyer, measured: NODE_SIZE.buyer })
+    expect(supplier).toMatchObject({ ...NODE_SIZE.supplier, measured: NODE_SIZE.supplier })
+  })
+
   it('leaves the buyer out until a snapshot names one', () => {
     expect(toRfNodes(null, nodes, positions, new Set(), null).map((n) => n.id)).toEqual(['a', 'b'])
   })
