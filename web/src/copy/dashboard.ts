@@ -1,4 +1,4 @@
-import type { NodeStatus, ProblemCode } from '@/api/client'
+import type { CarbonBasis, EnergySource, NodeStatus, ProblemCode, TransportMode, Uncertainty } from '@/api/client'
 import type { Connection } from '@/hooks/graphSync'
 
 // Dashboard text a juror can read. Components import it from here instead of writing strings inline.
@@ -48,6 +48,60 @@ export const canvasCopy = {
   loading: 'Loading the supplier graph…',
   offline: "Can't reach the API. Trying again every 5 seconds.",
   empty: 'No suppliers yet. Import a UBL invoice or load the demo invoice.',
+} as const
+
+/**
+ * Ruling 3: which figure a node's number is. The provenance line adds the factor source (and, once supplier-confirmed,
+ * the year). Stands in for web/src/copy/labels.ts (C3) until it lands.
+ */
+export const provenanceCopy = {
+  activity: 'Supplier-confirmed',
+  spend: 'Spend-based estimate',
+} satisfies Record<CarbonBasis, string>
+
+/** Ruling 4: the uncertainty is a word, never a ±%. Stands in for web/src/copy/labels.ts (C3) until it lands. */
+export const uncertaintyCopy = {
+  low: 'Low uncertainty',
+  medium: 'Medium uncertainty',
+  high: 'High uncertainty',
+} satisfies Record<Uncertainty, string>
+
+export const transportModeCopy = {
+  road: 'Road',
+  rail: 'Rail',
+  sea: 'Sea',
+  air: 'Air',
+} satisfies Record<TransportMode, string>
+
+export const energySourceCopy = {
+  grid: 'Grid electricity',
+  renewable: 'Renewable electricity',
+  unknown: 'Not known',
+} satisfies Record<EnergySource, string>
+
+/** The node drawer. Lane cost and lead time always carry `illustrative` (CLAUDE.md). */
+export const drawerCopy = {
+  emissions: 'Emissions',
+  spendBefore: 'Spend-based estimate before confirmation',
+  answers: 'Supplier answers',
+  transport: 'Transport',
+  energy: 'Energy',
+  skipped: 'Skipped',
+  classification: 'Classification',
+  invoiceLine: 'Invoice line',
+  invoice: 'Invoice',
+  invoiceNumber: 'Number',
+  issued: 'Issued',
+  spend: 'Spend',
+  lane: 'Lane',
+  route: 'Route',
+  mode: 'Mode',
+  distance: 'Distance',
+  cost: 'Cost',
+  leadTime: 'Lead time',
+  illustrative: 'illustrative',
+  requestData: 'Request data',
+  simulate: 'Simulate',
 } as const
 
 /** The live-updates badge: one label per state of useGraphEvents, and what it means as the tooltip. */

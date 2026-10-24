@@ -8,6 +8,7 @@ const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
 const factorValue = new Intl.NumberFormat('en-GB', { maximumSignificantDigits: 6 })
+const calendarDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 const MISSING = '–'
 
@@ -55,6 +56,18 @@ export function formatShare(fraction: number): string {
 export function formatFactorValue(value: number): string {
   if (!Number.isFinite(value)) return MISSING
   return factorValue.format(noNegativeZero(value))
+}
+
+/** Whole kilometres: 7500 → "7,500 km". A lane without a distance shows the dash. */
+export function formatKm(km: number | null): string {
+  if (km === null || !Number.isFinite(km)) return MISSING
+  return `${integer.format(noNegativeZero(Math.round(km)))} km`
+}
+
+/** A calendar date from the API ("2026-10-28") as "28 Oct 2026", read in UTC so no time zone moves it a day. */
+export function formatDate(isoDate: string): string {
+  const date = new Date(`${isoDate.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? MISSING : calendarDate.format(date)
 }
 
 export interface KpiFigures {

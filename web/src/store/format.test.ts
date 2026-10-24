@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatDate,
   formatDays,
   formatEuros,
   formatFactorValue,
+  formatKm,
   formatKpis,
   formatShare,
   formatTonnes,
@@ -63,6 +65,26 @@ describe('formatFactorValue', () => {
     expect(formatFactorValue(5000)).toBe('5,000')
     expect(formatFactorValue(0.123456789)).toBe('0.123457')
     expect(formatFactorValue(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatKm', () => {
+  it('shows whole kilometres, and the dash for a lane without a distance', () => {
+    expect(formatKm(7500)).toBe('7,500 km')
+    expect(formatKm(412.6)).toBe('413 km')
+    expect(formatKm(null)).toBe('–')
+    expect(formatKm(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatDate', () => {
+  it('shows a calendar date without shifting it by a time zone', () => {
+    expect(formatDate('2026-10-28')).toBe('28 Oct 2026')
+    expect(formatDate('2026-01-01')).toBe('1 Jan 2026')
+  })
+
+  it('shows the dash for something that is not a date', () => {
+    expect(formatDate('soon')).toBe('–')
   })
 })
 

@@ -1,7 +1,8 @@
 import { Loader2Icon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { KpiBar } from '@/components/dashboard/KpiBar'
+import { NodeDrawer } from '@/components/dashboard/NodeDrawer'
 import { Toolbar } from '@/components/dashboard/Toolbar'
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -24,6 +25,8 @@ export default function Dashboard() {
   const kpis = useGraphStore((s) => s.kpis)
   const buyer = useGraphStore((s) => s.buyer)
   const supplierCount = useGraphStore((s) => Object.keys(s.nodes).length)
+  // The drawer mounts inside the graph area, so it never covers the toolbar or the KPI bar.
+  const [graphArea, setGraphArea] = useState<HTMLElement | null>(null)
 
   let graph: ReactNode
   if (!loaded) {
@@ -55,10 +58,11 @@ export default function Dashboard() {
         <div className="border-b px-4 py-3">
           <KpiBar kpis={kpis} connection={connection} />
         </div>
-        <main className="relative min-h-0 flex-1" data-testid="graph">
+        <main ref={setGraphArea} className="relative min-h-0 flex-1 overflow-hidden" data-testid="graph">
           {graph}
         </main>
       </div>
+      {graphArea !== null && <NodeDrawer container={graphArea} />}
     </TooltipProvider>
   )
 }

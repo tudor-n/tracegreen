@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FactorLookup } from '@/api/client'
 import { node } from '@/store/testFixtures'
-import { aiMappedLabel, isPlaceholder, shownFigure } from './node-display'
+import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from './node-display'
 
 const row = (source: string): FactorLookup => ({ value: 1, unit: 'kgCO2e/t', source, year: 2026, rowLabel: 'row' })
 
@@ -44,5 +44,45 @@ describe('aiMappedLabel', () => {
 
   it('shows nothing when the invoice itself classified the line', () => {
     expect(aiMappedLabel({ ...classification, source: 'invoice', aiMapped: false, confidence: 1 })).toBeNull()
+  })
+})
+
+describe('provenanceLine', () => {
+  const epa = { ...row('US EPA Supply Chain GHG Emission Factors v1.3'), year: 2024 }
+  const ecb = { ...row('ECB euro foreign exchange reference rates'), unit: 'USD/EUR' }
+  const sea = { ...row('PLACEHOLDER - DESNZ Freighting goods'), year: 2026 }
+  const pcb = { ...row('PLACEHOLDER - DESNZ Material use'), year: 2026 }
+
+  it('names the emission factor of a spend estimate, not the conversion rows after it', () => {
+    const n = node('a', 22_563, { spend: { kg: 22_563, factors: [epa, ecb] } })
+    expect(provenanceLine(n)).toBe('Spend-based estimate · US EPA Supply Chain GHG Emission Factors v1.3')
+  })
+
+  it('stays on the spend estimate while a partial node keeps the spend basis', () => {
+    const n = node('a', 2000, {
+      status: 'PARTIAL',
+      spend: { kg: 2000, factors: [epa] },
+      activity: { kg: 900, factors: [sea] },
+    })
+    expect(provenanceLine(n)).toBe('Spend-based estimate · US EPA Supply Chain GHG Emission Factors v1.3')
+  })
+
+  it('names each distinct source and year of a supplier-confirmed figure', () => {
+    const n = node('a', 4716, {
+      status: 'VERIFIED',
+      basis: 'activity',
+      spend: { kg: 4700, factors: [epa] },
+      activity: { kg: 4716, factors: [sea, pcb, sea] },
+    })
+    expect(provenanceLine(n)).toBe(
+      'Supplier-confirmed · PLACEHOLDER - DESNZ Freighting goods 2026; PLACEHOLDER - DESNZ Material use 2026',
+    )
+  })
+
+  it('falls back to the bare label when the figure has no factor rows', () => {
+    expect(provenanceLine(node('a', 1))).toBe('Spend-based estimate')
+    expect(provenanceLine(node('a', 1, { basis: 'activity', activity: { kg: 1, factors: [] } }))).toBe(
+      'Supplier-confirmed',
+    )
   })
 })
