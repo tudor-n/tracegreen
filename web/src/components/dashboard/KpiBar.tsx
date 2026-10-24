@@ -1,7 +1,8 @@
 import { InfoIcon } from 'lucide-react'
 import type { Kpis } from '@/api/client'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { kpiCopy, supplierConfirmedShare } from '@/copy/dashboard'
+import { kpiCopy } from '@/copy/dashboard'
+import { supplierConfirmedShare } from '@/copy/labels'
 import type { Connection } from '@/hooks/useGraphEvents'
 import { CO2E_UNIT, formatKpis } from '@/store'
 
