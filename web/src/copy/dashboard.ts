@@ -1,4 +1,5 @@
 import type { NodeStatus, ProblemCode } from '@/api/client'
+import type { Connection } from '@/hooks/graphSync'
 
 // Dashboard text a juror can read. Components import it from here instead of writing strings inline.
 //
@@ -47,6 +48,22 @@ export const canvasCopy = {
   loading: 'Loading the supplier graph…',
   offline: "Can't reach the API. Trying again every 5 seconds.",
   empty: 'No suppliers yet. Import a UBL invoice or load the demo invoice.',
+} as const
+
+/** The live-updates badge: one label per state of useGraphEvents, and what it means as the tooltip. */
+export const connectionCopy = {
+  state: {
+    connecting: 'Connecting…',
+    live: 'Live',
+    polling: 'Polling',
+    offline: 'Offline',
+  } satisfies Record<Connection, string>,
+  detail: {
+    connecting: 'Loading the supplier graph.',
+    live: 'Changes appear as they happen.',
+    polling: 'Live updates are interrupted. Checking for changes every 5 seconds.',
+    offline: "Can't reach the API. Trying again every 5 seconds.",
+  } satisfies Record<Connection, string>,
 } as const
 
 export const toolbarCopy = {

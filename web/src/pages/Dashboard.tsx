@@ -1,5 +1,6 @@
 import { Loader2Icon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { KpiBar } from '@/components/dashboard/KpiBar'
 import { Toolbar } from '@/components/dashboard/Toolbar'
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
@@ -43,7 +44,10 @@ export default function Dashboard() {
       <div className="flex h-dvh flex-col">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h1 className="text-lg font-semibold">{dashboardTitle}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">{dashboardTitle}</h1>
+              <ConnectionBadge connection={connection} />
+            </div>
             {buyer !== null && <p className="text-sm text-muted-foreground">{buyer.name}</p>}
           </div>
           <Toolbar connection={connection} />
