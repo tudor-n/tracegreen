@@ -1,4 +1,4 @@
-import type { CarbonFigure, ClassificationView, FactorLookup, NodeView } from '@/api/client'
+import type { CarbonFigure, ClassificationView, FactorLookup, NodeStatus, NodeView } from '@/api/client'
 import { AI_MAPPED, provenanceCopy } from '@/copy/dashboard'
 
 // What a supplier node shows, decided from the read model alone. Nothing here computes carbon.
@@ -20,6 +20,14 @@ export function provenanceLine(node: NodeView): string {
   }
   const factor = node.spend.factors[0]
   return factor === undefined ? provenanceCopy.spend : `${provenanceCopy.spend} · ${factor.source}`
+}
+
+/**
+ * Whether a status change is the one the flip animation marks: anything else turning VERIFIED. The same node rendered
+ * again, a first render, or a reset taking a node back to ESTIMATED never flips.
+ */
+export function justVerified(previous: NodeStatus, next: NodeStatus): boolean {
+  return previous !== 'VERIFIED' && next === 'VERIFIED'
 }
 
 /** A factor row the seed still marks as a placeholder. It stays visible on screen (PRIORITY-CHANGES.md §2). */

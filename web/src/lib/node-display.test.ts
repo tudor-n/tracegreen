@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FactorLookup } from '@/api/client'
 import { node } from '@/store/testFixtures'
-import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from './node-display'
+import { aiMappedLabel, isPlaceholder, justVerified, provenanceLine, shownFigure } from './node-display'
 
 const row = (source: string): FactorLookup => ({ value: 1, unit: 'kgCO2e/t', source, year: 2026, rowLabel: 'row' })
 
@@ -84,5 +84,19 @@ describe('provenanceLine', () => {
     expect(provenanceLine(node('a', 1, { basis: 'activity', activity: { kg: 1, factors: [] } }))).toBe(
       'Supplier-confirmed',
     )
+  })
+})
+
+describe('justVerified', () => {
+  it('flips when an estimated or partial node turns verified', () => {
+    expect(justVerified('ESTIMATED', 'VERIFIED')).toBe(true)
+    expect(justVerified('PARTIAL', 'VERIFIED')).toBe(true)
+  })
+
+  it('does not flip a node that was already verified, or one that is not verified now', () => {
+    expect(justVerified('VERIFIED', 'VERIFIED')).toBe(false)
+    expect(justVerified('VERIFIED', 'ESTIMATED')).toBe(false)
+    expect(justVerified('ESTIMATED', 'PARTIAL')).toBe(false)
+    expect(justVerified('ESTIMATED', 'ESTIMATED')).toBe(false)
   })
 })

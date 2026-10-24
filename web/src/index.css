@@ -139,6 +139,37 @@
  * Supplier nodes (F2): the tone follows data-status, the red ring data-hotspot (an overlay, never a status).
  * Tints mix in oklab: in oklch the white card's hue of 0 would pull every tint towards pink.
  */
+
+/*
+ * The flip (F3): when a node turns VERIFIED, SupplierNode sets data-flip for FLIP_MS (700 ms). The box turns edge-on,
+ * changes from amber to green while edge-on, and turns back. --tone is registered as a colour so the keyframes can
+ * hold the amber of the old status through the first half. With reduced motion there is no flip; the colour changes.
+ */
+@property --tone {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: #d97706;
+}
+
+@keyframes node-flip {
+  0% {
+    --tone: var(--status-estimated);
+    transform: perspective(600px) rotateY(0deg);
+  }
+  50% {
+    --tone: var(--status-estimated);
+    transform: perspective(600px) rotateY(90deg);
+  }
+  50.01% {
+    --tone: var(--status-verified);
+    transform: perspective(600px) rotateY(90deg);
+  }
+  100% {
+    --tone: var(--status-verified);
+    transform: perspective(600px) rotateY(0deg);
+  }
+}
+
 @layer components {
   .supplier-node {
     --tone: var(--status-estimated);
@@ -166,5 +197,10 @@
   }
   .supplier-node[data-selected='true'][data-hotspot='true'] {
     outline-offset: 9px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .supplier-node[data-flip='true'] {
+      animation: node-flip 700ms ease-in-out;
+    }
   }
 }
