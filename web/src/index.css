@@ -5,50 +5,126 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Status tokens (F2): amber = estimated, hatched = partial, green = verified, red ring = hotspot. */
+/*
+ * Design tokens from the design handoff (2026-10-27). Amber means estimated or still being traced, green means proven
+ * by a supplier, red is reserved for the hotspot ring; everything else is neutral, so the two status colours stay loud.
+ * The shadcn variables below map onto these, so the ui/ primitives pick them up unchanged.
+ */
 :root {
-  --status-estimated: #d97706;
-  --status-partial-a: #d97706;
-  --status-partial-b: #16a34a;
-  --status-verified: #16a34a;
-  --hotspot: #dc2626;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* brand */
+  --ink: #1d1d1f;
+  --brand-trace: #d06e10;
+  --brand-proof: #12814f;
+  --brand-proof-dark: #1fa866;
+  --surface-dark: #141414;
+  /* status */
+  --green: #12814f;
+  --green-hover: #0e6f43;
+  --green-ink: #0b6b42;
+  --green-tint: #e3f3ea;
+  --amber: #f08a1c;
+  --amber-edge: #f5a34f;
+  --amber-ink: #8a4708;
+  --amber-tint: #fdeedd;
+  --red: #d93a2e;
+  --red-ink: #a3271d;
+  --red-tint: #fde8e6;
+  /* neutrals */
+  --ink-2: #424245;
+  --mute: #6e6e73;
+  --bg: #f5f5f7;
+  --fill: #efeff1;
+  --hairline-color: rgb(0 0 0 / 0.08);
+  /* surfaces */
+  --backdrop-warm: #ebe8e3;
+  --backdrop-green: #e6eeea;
+  --glass: rgb(255 255 255 / 0.62);
+  --glass-dense: rgb(255 255 255 / 0.72);
+  --glass-blur: blur(30px) saturate(1.8);
+  --work-surface: #fbfbfc;
+  --hairline: 0 0 0 0.5px rgb(0 0 0 / 0.1);
+  --lift: 0 12px 30px -20px rgb(0 0 0 / 0.3);
+  --card-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.14), 0 8px 18px -10px rgb(0 0 0 / 0.28);
+  --floating-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 16px 36px -10px rgb(0 0 0 / 0.35);
+  /* glow: only ever status */
+  --glow-dot: 0 0 7px rgb(18 129 79 / 0.6);
+  --glow-meter: 0 0 10px rgb(18 129 79 / 0.55), 0 0 2px rgb(18 129 79 / 0.4);
+  --glow-chip: 0 0 16px rgb(18 129 79 / 0.5);
+  --glow-row: 0 6px 18px -6px rgb(18 129 79 / 0.65);
+  --glow-button: 0 6px 22px -4px rgb(18 129 79 / 0.6);
+  --focus-ring: rgb(18 129 79 / 0.45);
+  /* radii */
+  --r-panel: 22px;
+  --r-tile: 18px;
+  --r-card: 16px;
+  --r-group: 14px;
+  --r-nested: 12px;
+  --r-row: 10px;
+  --r-tag: 6px;
+  --r-pill: 999px;
+  /* motion: every non-looping animation uses this one curve */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* type */
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter Tight', system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter Tight', system-ui, sans-serif;
+  --font-mono-stack: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-logo: 'Geist Variable', 'Geist', sans-serif;
+
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: #fff;
+  --card-foreground: var(--ink);
+  --popover: #fff;
+  --popover-foreground: var(--ink);
+  --primary: var(--green);
+  --primary-foreground: #fff;
+  --secondary: var(--fill);
+  --secondary-foreground: var(--ink);
+  --muted: var(--fill);
+  --muted-foreground: var(--mute);
+  --accent: var(--fill);
+  --accent-foreground: var(--ink);
+  --destructive: var(--red-ink);
+  --border: var(--hairline-color);
+  --input: rgb(0 0 0 / 0.14);
+  --ring: var(--green);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.875rem;
+  --sidebar: var(--glass);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--green);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--fill);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--hairline-color);
+  --sidebar-ring: var(--green);
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-heading: var(--font-display);
+  --font-sans: var(--font);
+  --font-mono: var(--font-mono-stack);
+  --font-logo: var(--font-logo);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-mute: var(--mute);
+  --color-fill: var(--fill);
+  --color-green: var(--green);
+  --color-green-hover: var(--green-hover);
+  --color-green-ink: var(--green-ink);
+  --color-green-tint: var(--green-tint);
+  --color-amber: var(--amber);
+  --color-amber-edge: var(--amber-edge);
+  --color-amber-ink: var(--amber-ink);
+  --color-amber-tint: var(--amber-tint);
+  --color-red: var(--red);
+  --color-red-ink: var(--red-ink);
+  --color-red-tint: var(--red-tint);
+  --ease-tg: var(--ease);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -127,11 +203,35 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 13px;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: #cdeedb;
+    color: #0b2a1c;
+  }
+  /* Every interactive element, canvas nodes included, keeps a 3px green focus ring with a 2px offset. */
+  :focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion: every animation off, transitions effectively instant. Status still reads through colour and labels. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
   }
 }
 
@@ -141,24 +241,24 @@
  */
 @layer components {
   .supplier-node {
-    --tone: var(--status-estimated);
+    --tone: var(--amber);
     border: 2px solid var(--tone);
     background-color: color-mix(in oklab, var(--tone) 14%, var(--card));
     box-shadow: var(--hotspot-ring, 0 0 #0000), 0 1px 2px rgb(0 0 0 / 0.08);
   }
   .supplier-node[data-status='PARTIAL'] {
-    --tone: var(--status-partial-a);
+    --tone: var(--amber);
     background-image: repeating-linear-gradient(
       135deg,
-      color-mix(in oklab, var(--status-partial-a) 22%, var(--card)) 0 8px,
-      color-mix(in oklab, var(--status-partial-b) 22%, var(--card)) 8px 16px
+      color-mix(in oklab, var(--amber) 22%, var(--card)) 0 8px,
+      color-mix(in oklab, var(--green) 22%, var(--card)) 8px 16px
     );
   }
   .supplier-node[data-status='VERIFIED'] {
-    --tone: var(--status-verified);
+    --tone: var(--green);
   }
   .supplier-node[data-hotspot='true'] {
-    --hotspot-ring: 0 0 0 3px var(--background), 0 0 0 6px var(--hotspot);
+    --hotspot-ring: 0 0 0 3px var(--background), 0 0 0 6px var(--red);
   }
   .supplier-node[data-selected='true'] {
     outline: 2px solid var(--foreground);

@@ -44,7 +44,7 @@ function SupplierNodeView({ data, selected }: NodeProps<SupplierRfNode>) {
         <p className="flex items-center gap-1 leading-none">
           <span className="text-lg font-semibold tabular-nums">{formatTonnes(node.carbonKg)}</span>
           <span className="text-xs text-muted-foreground">{CO2E_UNIT}</span>
-          {node.status === 'VERIFIED' && <CircleCheckIcon className="size-4 text-(--status-verified)" aria-hidden />}
+          {node.status === 'VERIFIED' && <CircleCheckIcon className="size-4 text-green" aria-hidden />}
         </p>
         {ai !== null && (
           <span className="shrink-0 truncate rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">

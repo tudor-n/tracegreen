@@ -19,7 +19,7 @@ export function FactorInfo({ factors }: { factors: readonly FactorLookup[] }) {
     <Tooltip>
       <TooltipTrigger
         aria-label={nodeCopy.factorInfo}
-        className="nodrag nopan inline-flex shrink-0 rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="nodrag nopan inline-flex shrink-0 rounded-full text-muted-foreground hover:text-foreground"
         onClick={stopClick}
         onKeyDown={stopSelectKeys}
       >

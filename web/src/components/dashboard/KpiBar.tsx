@@ -58,7 +58,7 @@ function Kpi({ testId, label, value, unit, subtitle, info }: KpiProps) {
           <Tooltip>
             <TooltipTrigger
               aria-label={kpiCopy.shareInfo}
-              className="inline-flex rounded-full outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex rounded-full hover:text-foreground"
             >
               <InfoIcon className="size-3.5" aria-hidden />
             </TooltipTrigger>
