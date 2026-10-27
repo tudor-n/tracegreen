@@ -774,8 +774,8 @@ export interface operations {
     };
     GetVerifyContext: {
         parameters: {
-            query: {
-                t: string;
+            query?: {
+                t?: string;
             };
             header?: never;
             path?: never;
@@ -971,7 +971,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
             };
             /** @description Unprocessable Entity */
             422: {
