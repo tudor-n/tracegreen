@@ -1,15 +1,19 @@
-import { ScrollTextIcon } from 'lucide-react'
-import { useMemo, type ReactNode } from 'react'
+import { CheckIcon, ScrollTextIcon, XIcon } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import type { ChainVerification } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { auditCopy } from '@/copy/dashboard'
+import { auditPanelCopy } from '@/copy/dashboard'
+import { auditCopy } from '@/copy/labels'
 import type { Connection } from '@/hooks/useGraphEvents'
-import { auditActionLabel, auditActorLabel, newestFirst, shortHash } from '@/lib/audit-display'
+import { auditActionLabel, auditActorLabel, chainResultLabel, newestFirst, shortHash } from '@/lib/audit-display'
+import { type Answer, verifyAuditChain } from '@/lib/dashboard-actions'
 import { formatDateTime, selectLoaded, useGraphStore } from '@/store'
 
 // The tamper-evident audit log, newest entry first: the snapshot's chain plus every `audit.appended` since, both
 // applied by the store. Mounted inside the graph area on the left, non-modal like the node drawer, so both can be open
-// with the canvas live between them. "Verify chain" stays disabled until POST /api/audit/verify exists (A5/A6).
+// with the canvas live between them. "Verify chain" asks the API to recompute every hash; its answer is shown until the
+// log gains or loses an entry, because it no longer describes the log on screen after that.
 
 /** Opens and closes the audit panel; sits beside the toolbar. */
 export function AuditToggle() {
@@ -18,7 +22,7 @@ export function AuditToggle() {
   return (
     <Button variant="outline" aria-pressed={open} data-testid="toolbar-audit" onClick={() => setPanel('audit', !open)}>
       <ScrollTextIcon data-icon="inline-start" aria-hidden />
-      {auditCopy.open}
+      {auditPanelCopy.open}
     </Button>
   )
 }
@@ -29,17 +33,28 @@ export function AuditPanel({ container, connection }: { container: HTMLElement; 
   const loaded = useGraphStore(selectLoaded)
   const audit = useGraphStore((s) => s.audit)
   const entries = useMemo(() => newestFirst(audit), [audit])
+  const head = audit.at(-1)?.hash
+  const [check, setCheck] = useState<{ head: string | undefined; answer: Answer<ChainVerification> } | null>(null)
+  const [verifying, setVerifying] = useState(false)
+  // Keyed by the newest hash rather than the array, which every snapshot replaces even when nothing changed.
+  const answer = check !== null && check.head === head ? check.answer : null
+
+  const onVerify = async () => {
+    setVerifying(true)
+    setCheck({ head, answer: await verifyAuditChain() })
+    setVerifying(false)
+  }
 
   let body: ReactNode
   if (!loaded) {
     body =
       connection === 'offline' ? (
-        <Message tone="error">{auditCopy.offline}</Message>
+        <Message tone="error">{auditPanelCopy.offline}</Message>
       ) : (
-        <Message>{auditCopy.loading}</Message>
+        <Message>{auditPanelCopy.loading}</Message>
       )
   } else if (entries.length === 0) {
-    body = <Message>{auditCopy.empty}</Message>
+    body = <Message>{auditPanelCopy.empty}</Message>
   } else {
     body = (
       <ol className="flex flex-col divide-y">
@@ -56,7 +71,7 @@ export function AuditPanel({ container, connection }: { container: HTMLElement; 
               </time>
             </div>
             <p className="font-mono text-[11px] text-muted-foreground" title={entry.hash}>
-              {auditCopy.hash} {shortHash(entry)}…
+              {auditPanelCopy.hash} {shortHash(entry)}…
             </p>
           </li>
         ))}
@@ -82,16 +97,41 @@ export function AuditPanel({ container, connection }: { container: HTMLElement; 
       >
         <SheetHeader className="border-b pr-12">
           <SheetTitle>{auditCopy.title}</SheetTitle>
-          <SheetDescription>{auditCopy.description}</SheetDescription>
+          <SheetDescription>{auditPanelCopy.description}</SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
         <SheetFooter className="border-t">
-          <Button variant="outline" disabled data-testid="audit-verify">
-            {auditCopy.verify}
+          {answer !== null &&
+            (answer.ok ? (
+              <ChainResult result={answer.data} />
+            ) : (
+              <p role="alert" data-testid="audit-verify-error" className="text-xs text-destructive">
+                {answer.message}
+              </p>
+            ))}
+          <Button variant="outline" disabled={verifying} data-testid="audit-verify" onClick={() => void onVerify()}>
+            {verifying ? auditPanelCopy.verifying : auditPanelCopy.verify}
           </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
+  )
+}
+
+/** The API's verdict; the Playwright smoke reads `data-valid`. */
+function ChainResult({ result }: { result: ChainVerification }) {
+  const Icon = result.valid ? CheckIcon : XIcon
+  return (
+    <div role="status" data-testid="audit-chain" data-valid={result.valid} className="flex flex-col gap-0.5">
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        {chainResultLabel(result)}
+        <Icon
+          aria-hidden
+          className={result.valid ? 'size-4 text-(--status-verified)' : 'size-4 text-destructive'}
+        />
+      </p>
+      <p className="text-xs text-muted-foreground">{auditPanelCopy.checked(result.length)}</p>
+    </div>
   )
 }
 

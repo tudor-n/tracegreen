@@ -92,6 +92,23 @@ export function formatDate(isoDate: string): string {
   return Number.isNaN(date.getTime()) ? MISSING : calendarDate.format(date)
 }
 
+/**
+ * Time left in its two largest whole units, rounded down so a link never reads as lasting longer than it does:
+ * 7 days less a minute → "6d 23h", 90 s → "1m 30s", 40 s → "40s". Nothing left (or less) reads "0s".
+ */
+export function formatTimeLeft(ms: number): string {
+  if (!Number.isFinite(ms)) return MISSING
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const days = Math.floor(total / 86_400)
+  const hours = Math.floor(total / 3600) % 24
+  const minutes = Math.floor(total / 60) % 60
+  const seconds = total % 60
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
 export interface KpiFigures {
   /** Tonnes with one decimal, without the unit. */
   total: string

@@ -1,4 +1,4 @@
-import type { CarbonBasis, EnergySource, NodeStatus, ProblemCode, TransportMode, Uncertainty } from '@/api/client'
+import type { EnergySource, NodeStatus, ProblemCode, TransportMode } from '@/api/client'
 import type { Connection } from '@/hooks/graphSync'
 
 // Dashboard text a juror can read. Components import it from here instead of writing strings inline. The labels that
@@ -36,22 +36,6 @@ export const canvasCopy = {
   empty: 'No suppliers yet. Import a UBL invoice or load the demo invoice.',
 } as const
 
-/**
- * Ruling 3: which figure a node's number is. The provenance line adds the factor source (and, once supplier-confirmed,
- * the year). Stands in for web/src/copy/labels.ts (C3) until it lands.
- */
-export const provenanceCopy = {
-  activity: 'Supplier-confirmed',
-  spend: 'Spend-based estimate',
-} satisfies Record<CarbonBasis, string>
-
-/** Ruling 4: the uncertainty is a word, never a ±%. Stands in for web/src/copy/labels.ts (C3) until it lands. */
-export const uncertaintyCopy = {
-  low: 'Low uncertainty',
-  medium: 'Medium uncertainty',
-  high: 'High uncertainty',
-} satisfies Record<Uncertainty, string>
-
 export const transportModeCopy = {
   road: 'Road',
   rail: 'Rail',
@@ -65,7 +49,7 @@ export const energySourceCopy = {
   unknown: 'Not known',
 } satisfies Record<EnergySource, string>
 
-/** The node drawer. Lane cost and lead time always carry `illustrative` (CLAUDE.md). */
+/** The node drawer. Lane cost and lead time always carry ILLUSTRATIVE from ./labels.ts (CLAUDE.md). */
 export const drawerCopy = {
   emissions: 'Emissions',
   spendBefore: 'Spend-based estimate before confirmation',
@@ -85,18 +69,33 @@ export const drawerCopy = {
   distance: 'Distance',
   cost: 'Cost',
   leadTime: 'Lead time',
-  illustrative: 'illustrative',
   requestData: 'Request data',
+  requesting: 'Requesting…',
   simulate: 'Simulate',
 } as const
 
 /**
- * The audit panel. It is a tamper-evident audit log and is never called anything else (PRIORITY-CHANGES.md §4).
- * Actions and actors the API adds later show as their raw names until they get a label here.
+ * The QR card in the node drawer. Ruling 6: a link opens only on a phone on the laptop's hotspot, so the card always
+ * says so; `loopback` means the API built the link from a localhost address, which no phone can reach.
  */
-export const auditCopy = {
+export const linkCopy = {
+  title: 'Verification link',
+  qr: 'QR code of the verification link',
+  scan: "Scan it with the supplier's phone. The link works once.",
+  expiresIn: (left: string) => `expires in ${left}`,
+  expired: 'Expired. Request a new link.',
+  hotspot: "Only a phone on this laptop's hotspot can open this link.",
+  loopback:
+    "This link points to this computer (localhost), so no phone can open it. Set PUBLIC_BASE_URL to the laptop's hotspot address and request a new link.",
+} as const
+
+/**
+ * The audit panel around the words of ./labels.ts (its title and the chain results). It is a tamper-evident audit log
+ * and is never called anything else (PRIORITY-CHANGES.md §4). Actions and actors the API adds later show as their raw
+ * names until they get a label here.
+ */
+export const auditPanelCopy = {
   open: 'Audit log',
-  title: 'Tamper-evident audit log',
   description:
     'Each entry is hashed together with the hash of the entry before it, so changing any entry breaks the chain from there on.',
   loading: 'Loading the audit log…',
@@ -104,9 +103,12 @@ export const auditCopy = {
   empty: 'No entries yet.',
   hash: 'hash',
   verify: 'Verify chain',
+  verifying: 'Verifying…',
+  checked: (entries: number) => `${entries} ${entries === 1 ? 'entry' : 'entries'} checked`,
   actions: {
     'seed.loaded': 'Demo data loaded',
     'invoice.imported': 'Invoice imported',
+    'link.requested': 'Verification link requested',
     'verification.submitted': 'Supplier answered',
   } as Readonly<Partial<Record<string, string>>>,
   actors: {

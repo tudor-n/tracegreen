@@ -8,6 +8,7 @@ import {
   formatKm,
   formatKpis,
   formatShare,
+  formatTimeLeft,
   formatTonnes,
   formatTonnesCo2e,
 } from './format'
@@ -101,6 +102,27 @@ describe('formatDateTime', () => {
 
   it('shows the dash for something that is not an instant', () => {
     expect(formatDateTime('later')).toBe('–')
+  })
+})
+
+describe('formatTimeLeft', () => {
+  const s = 1000
+  const min = 60 * s
+  const h = 60 * min
+  const d = 24 * h
+
+  it('shows the two largest units, rounded down', () => {
+    expect(formatTimeLeft(7 * d - s)).toBe('6d 23h')
+    expect(formatTimeLeft(7 * d)).toBe('7d 0h')
+    expect(formatTimeLeft(5 * h + 12 * min + 59 * s)).toBe('5h 12m')
+    expect(formatTimeLeft(90 * s)).toBe('1m 30s')
+    expect(formatTimeLeft(40 * s + 999)).toBe('40s')
+  })
+
+  it('reads 0s when nothing is left, and the dash for no time at all', () => {
+    expect(formatTimeLeft(999)).toBe('0s')
+    expect(formatTimeLeft(-5 * min)).toBe('0s')
+    expect(formatTimeLeft(Number.NaN)).toBe('–')
   })
 })
 

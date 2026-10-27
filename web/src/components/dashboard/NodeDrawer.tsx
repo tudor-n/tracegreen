@@ -1,15 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import type { NodeStatus, NodeView } from '@/api/client'
+import type { NodeStatus, NodeView, RequestLinkResponse } from '@/api/client'
+import { LinkCard } from '@/components/dashboard/LinkCard'
 import { FactorInfo } from '@/components/graph/FactorInfo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import {
-  drawerCopy,
-  energySourceCopy,
-  nodeCopy,
-  transportModeCopy,
-  uncertaintyCopy,
-} from '@/copy/dashboard'
+import { drawerCopy, energySourceCopy, nodeCopy, transportModeCopy } from '@/copy/dashboard'
+import { ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
+import { requestLink } from '@/lib/dashboard-actions'
 import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
 import { cn } from '@/lib/utils'
 import {
@@ -27,7 +24,8 @@ import {
 // the KPI bar stay visible and usable above it. Non-modal and without an overlay, so the canvas stays live beside it:
 // clicking another node shows that one, clicking the pane, the close button or Escape closes it, and a reset that
 // removes the node closes it too (hydrateState). Every number comes from the API as it is; nothing is computed here.
-// "Request data" (A5/A6) and "Simulate" (B5) stay disabled until their endpoints exist.
+// "Request data" asks for a verification link and shows it in the QR card at the top; the link belongs to the node it
+// was asked for, so another node starts without one. "Simulate" (B5) stays disabled until its endpoint exists.
 
 const statusDot: Record<NodeStatus, string> = {
   ESTIMATED: 'bg-(--status-estimated)',
@@ -53,7 +51,7 @@ export function NodeDrawer({ container }: { container: HTMLElement }) {
       }}
     >
       <SheetContent container={container} showOverlay={false} data-testid="node-drawer" className="absolute gap-0">
-        {shown !== null && <DrawerBody node={shown} />}
+        {shown !== null && <DrawerBody key={shown.id} node={shown} />}
       </SheetContent>
     </Sheet>
   )
@@ -61,8 +59,22 @@ export function NodeDrawer({ container }: { container: HTMLElement }) {
 
 function DrawerBody({ node }: { node: NodeView }) {
   const figure = shownFigure(node)
+  const provenance = provenanceLine(node)
   const ai = aiMappedLabel(node.classification)
   const answered = node.transportMode !== null || node.energySource !== null
+  const [link, setLink] = useState<RequestLinkResponse | null>(null)
+  const [requesting, setRequesting] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+
+  const onRequest = async () => {
+    setRequesting(true)
+    setLinkError(null)
+    const answer = await requestLink(node.id)
+    if (answer.ok) setLink(answer.data)
+    else setLinkError(answer.message)
+    setRequesting(false)
+  }
+
   return (
     <>
       <SheetHeader className="border-b pr-12">
@@ -77,17 +89,21 @@ function DrawerBody({ node }: { node: NodeView }) {
       </SheetHeader>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
+        {link !== null && <LinkCard link={link} />}
+
         <Section title={drawerCopy.emissions}>
           <p className="flex items-center gap-1.5">
             <span className="text-2xl font-semibold tabular-nums">{formatTonnesCo2e(node.carbonKg)}</span>
             <FactorInfo factors={figure.factors} />
             {figure.factors.some(isPlaceholder) && <Tag tone="warning">{nodeCopy.placeholder}</Tag>}
           </p>
-          <p data-testid="drawer-provenance" className="text-xs break-words text-muted-foreground">
-            {provenanceLine(node)}
-          </p>
+          {provenance !== null && (
+            <p data-testid="drawer-provenance" className="text-xs break-words text-muted-foreground">
+              {provenance}
+            </p>
+          )}
           <p data-testid="drawer-uncertainty" data-uncertainty={node.uncertainty} className="text-xs font-medium">
-            {uncertaintyCopy[node.uncertainty]}
+            {uncertaintyLabel[node.uncertainty]}
           </p>
           {figure !== node.spend && (
             <Rows>
@@ -134,30 +150,37 @@ function DrawerBody({ node }: { node: NodeView }) {
           </Rows>
         </Section>
 
-        <Section title={drawerCopy.lane} tag={drawerCopy.illustrative}>
+        <Section title={drawerCopy.lane} tag={ILLUSTRATIVE}>
           <Rows>
             <Row label={drawerCopy.route}>
               {node.lane.origin} → {node.lane.dest}
             </Row>
             <Row label={drawerCopy.mode}>{transportModeCopy[node.lane.mode]}</Row>
             <Row label={drawerCopy.distance}>{formatKm(node.lane.distanceKm)}</Row>
-            <Row label={drawerCopy.cost} tag={drawerCopy.illustrative}>
+            <Row label={drawerCopy.cost} tag={ILLUSTRATIVE}>
               <span data-testid="drawer-cost">{formatEuros(node.costEur)}</span>
             </Row>
-            <Row label={drawerCopy.leadTime} tag={drawerCopy.illustrative}>
+            <Row label={drawerCopy.leadTime} tag={ILLUSTRATIVE}>
               <span data-testid="drawer-lead-time">{formatDays(node.leadDays)}</span>
             </Row>
           </Rows>
         </Section>
       </div>
 
-      <SheetFooter className="flex-row border-t">
-        <Button className="flex-1" disabled data-testid="drawer-request">
-          {drawerCopy.requestData}
-        </Button>
-        <Button className="flex-1" variant="outline" disabled data-testid="drawer-simulate">
-          {drawerCopy.simulate}
-        </Button>
+      <SheetFooter className="border-t">
+        {linkError !== null && (
+          <p role="alert" data-testid="drawer-request-error" className="text-xs text-destructive">
+            {linkError}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={requesting} data-testid="drawer-request" onClick={() => void onRequest()}>
+            {requesting ? drawerCopy.requesting : drawerCopy.requestData}
+          </Button>
+          <Button className="flex-1" variant="outline" disabled data-testid="drawer-simulate">
+            {drawerCopy.simulate}
+          </Button>
+        </div>
       </SheetFooter>
     </>
   )
