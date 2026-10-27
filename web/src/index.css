@@ -268,3 +268,104 @@
     outline-offset: 9px;
   }
 }
+/*
+ * Logo 5 wordmark (design handoff, "Logo 5 · construction"). The line centre sits 0.42em below the baseline, 0.075em
+ * thick with round caps. Trace dots: dash 0.07em, gap 0.2em, from 0.04em in. Amber from 0.17em into the G to the r→e
+ * boundary, green from there to the n, joined by a 45° cut. Glow belongs to the product UI, never the logo.
+ */
+@layer components {
+  .wordmark {
+    display: inline-flex;
+    font: 600 1em/1 var(--font-logo);
+    letter-spacing: -0.035em;
+    font-kerning: normal;
+    white-space: nowrap;
+    color: var(--ink);
+    font-variant-numeric: normal;
+  }
+  .wordmark[data-variant='intro'] {
+    cursor: pointer;
+  }
+  .wm-trace,
+  .wm-seg {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.34em;
+  }
+  .wm-green {
+    position: relative;
+    display: inline-flex;
+  }
+  .wm-dots {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 0.14em;
+    overflow: visible;
+  }
+  .wm-dots line {
+    stroke: var(--brand-trace);
+    stroke-width: 0.075em;
+    stroke-linecap: round;
+    stroke-dasharray: 0.07em 0.2em;
+  }
+  .wm-gr {
+    color: var(--brand-trace);
+  }
+  .wm-een {
+    color: var(--brand-proof);
+  }
+  .wm-bar {
+    position: absolute;
+    bottom: 0.0325em;
+    height: 0.075em;
+    border-radius: 99px;
+    transform-origin: left center;
+  }
+  .wm-gr .wm-bar {
+    left: 0.17em;
+    right: -0.0375em;
+    background: var(--brand-trace);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 0.075em) 100%, 0 100%);
+  }
+  .wm-een .wm-bar {
+    left: -0.0075em;
+    right: 0;
+    background: var(--brand-proof);
+    clip-path: polygon(0.075em 0, 100% 0, 100% 100%, 0 100%);
+  }
+
+  /* Intro: the dots march (three repeats, so they come to rest where they started), then amber, then green draw in. */
+  .wordmark[data-variant='intro'] .wm-dots line {
+    animation: wm-march 700ms linear 3;
+  }
+  .wordmark[data-variant='intro'] .wm-gr .wm-bar {
+    animation: wm-draw 400ms var(--ease) 1600ms backwards;
+  }
+  .wordmark[data-variant='intro'] .wm-een .wm-bar {
+    animation: wm-draw 600ms var(--ease) 1900ms backwards;
+  }
+
+  /* Loader: the tracing beat on loop; the line under "Green" waits as grey dots. */
+  .wordmark[data-variant='loader'] .wm-dots line {
+    animation: wm-march 700ms linear infinite;
+  }
+  .wordmark[data-variant='loader'] .wm-bar {
+    display: none;
+  }
+  .wordmark[data-variant='loader'] .wm-pending line {
+    stroke: #d1d1d6;
+  }
+}
+
+@keyframes wm-march {
+  to {
+    stroke-dashoffset: -0.27em;
+  }
+}
+@keyframes wm-draw {
+  from {
+    transform: scaleX(0);
+  }
+}

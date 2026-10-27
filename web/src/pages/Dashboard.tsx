@@ -1,5 +1,5 @@
-import { Loader2Icon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { KpiBar } from '@/components/dashboard/KpiBar'
 import { Toolbar } from '@/components/dashboard/Toolbar'
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
@@ -43,7 +43,9 @@ export default function Dashboard() {
       <div className="flex h-dvh flex-col">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h1 className="text-lg font-semibold">{dashboardTitle}</h1>
+            <h1>
+              <Wordmark size={22} variant="intro" label={dashboardTitle} />
+            </h1>
             {buyer !== null && <p className="text-sm text-muted-foreground">{buyer.name}</p>}
           </div>
           <Toolbar connection={connection} />
@@ -64,11 +66,12 @@ function GraphMessage({ children, tone, busy = false }: { children: ReactNode; t
     <div
       role={tone === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex h-full items-center justify-center gap-2 p-6 text-center text-sm',
+        'flex h-full items-center justify-center p-6 text-center text-sm',
+        busy ? 'flex-col gap-4' : 'gap-2',
         tone === 'error' ? 'text-destructive' : 'text-muted-foreground',
       )}
     >
-      {busy && <Loader2Icon className="size-4 motion-safe:animate-spin" aria-hidden />}
+      {busy && <Wordmark size={28} variant="loader" label={null} />}
       {children}
     </div>
   )
