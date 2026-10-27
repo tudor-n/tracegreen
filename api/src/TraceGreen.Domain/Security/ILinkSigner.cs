@@ -16,4 +16,10 @@ public interface ILinkSigner
     string Sign(LinkClaims claims);
 
     Result<LinkClaims, TokenError> Verify(string token, string expectedInvoiceHash, DateTimeOffset now);
+
+    /// <summary>
+    /// Reads the node id from a token without checking anything else, so the caller can load the invoice hash that
+    /// <see cref="Verify"/> needs. The id is untrusted until <see cref="Verify"/> succeeds.
+    /// </summary>
+    bool TryReadNodeId(string token, out Guid nodeId);
 }
