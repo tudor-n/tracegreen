@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import type { NodeStatus, NodeView, RequestLinkResponse } from '@/api/client'
+import { Row, Rows, Section, Tag } from '@/components/dashboard/DrawerParts'
 import { LinkCard } from '@/components/dashboard/LinkCard'
+import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
 import { FactorInfo } from '@/components/graph/FactorInfo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -25,7 +27,8 @@ import {
 // clicking another node shows that one, clicking the pane, the close button or Escape closes it, and a reset that
 // removes the node closes it too (hydrateState). Every number comes from the API as it is; nothing is computed here.
 // "Request data" asks for a verification link and shows it in the QR card at the top; the link belongs to the node it
-// was asked for, so another node starts without one. "Simulate" (B5) stays disabled until its endpoint exists.
+// was asked for, so another node starts without one. "Simulate" opens and closes the simulator panel (B5) at the top,
+// and closing it takes its ghost node off the canvas.
 
 const statusDot: Record<NodeStatus, string> = {
   ESTIMATED: 'bg-(--status-estimated)',
@@ -65,6 +68,8 @@ function DrawerBody({ node }: { node: NodeView }) {
   const [link, setLink] = useState<RequestLinkResponse | null>(null)
   const [requesting, setRequesting] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
+  const simulating = useGraphStore((s) => s.openPanels.simulator)
+  const setPanel = useGraphStore((s) => s.setPanel)
 
   const onRequest = async () => {
     setRequesting(true)
@@ -90,6 +95,7 @@ function DrawerBody({ node }: { node: NodeView }) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
         {link !== null && <LinkCard link={link} />}
+        {simulating && <SimulatorPanel node={node} />}
 
         <Section title={drawerCopy.emissions}>
           <p className="flex items-center gap-1.5">
@@ -177,52 +183,17 @@ function DrawerBody({ node }: { node: NodeView }) {
           <Button className="flex-1" disabled={requesting} data-testid="drawer-request" onClick={() => void onRequest()}>
             {requesting ? drawerCopy.requesting : drawerCopy.requestData}
           </Button>
-          <Button className="flex-1" variant="outline" disabled data-testid="drawer-simulate">
+          <Button
+            className="flex-1"
+            variant={simulating ? 'secondary' : 'outline'}
+            aria-pressed={simulating}
+            data-testid="drawer-simulate"
+            onClick={() => setPanel('simulator', !simulating)}
+          >
             {drawerCopy.simulate}
           </Button>
         </div>
       </SheetFooter>
     </>
-  )
-}
-
-function Section({ title, tag, children }: { title: string; tag?: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-1.5">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        {title}
-        {tag !== undefined && <Tag>{tag}</Tag>}
-      </h3>
-      {children}
-    </section>
-  )
-}
-
-function Rows({ children }: { children: ReactNode }) {
-  return <dl className="flex flex-col divide-y">{children}</dl>
-}
-
-function Row({ label, tag, children }: { label: string; tag?: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-1.5">
-      <dt className="flex items-center gap-1.5 text-muted-foreground">
-        {label}
-        {tag !== undefined && <Tag>{tag}</Tag>}
-      </dt>
-      <dd className="text-right tabular-nums">{children}</dd>
-    </div>
-  )
-}
-
-function Tag({ tone, children }: { tone?: 'warning'; children: ReactNode }) {
-  return (
-    <span
-      className={cn(
-        'shrink-0 rounded px-1 text-[10px] font-medium tracking-normal normal-case',
-        tone === 'warning' ? 'bg-destructive/10 font-semibold text-destructive' : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {children}
-    </span>
   )
 }

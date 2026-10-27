@@ -10,6 +10,13 @@ const tonnesDelta = new Intl.NumberFormat('en-GB', {
   signDisplay: 'exceptZero',
 })
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+const eurosDelta = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+  signDisplay: 'exceptZero',
+})
+const integerDelta = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0, signDisplay: 'exceptZero' })
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
 const factorValue = new Intl.NumberFormat('en-GB', { maximumSignificantDigits: 6 })
@@ -53,11 +60,24 @@ export function formatEuros(eur: number): string {
   return euros.format(noNegativeZero(Math.round(eur)))
 }
 
+/** A change in euros, signed and whole: −3 910 → "-€3,910", 8 350 → "+€8,350", 0.4 → "€0". */
+export function formatEurosDelta(eur: number): string {
+  if (!Number.isFinite(eur)) return MISSING
+  return eurosDelta.format(noNegativeZero(Math.round(eur)))
+}
+
 /** Whole days: "1 day", "35 days". */
 export function formatDays(days: number): string {
   if (!Number.isFinite(days)) return MISSING
   const n = noNegativeZero(Math.round(days))
   return `${integer.format(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`
+}
+
+/** A change in days, signed and whole: 33 → "+33 days", −1 → "-1 day", 0 → "0 days". */
+export function formatDaysDelta(days: number): string {
+  if (!Number.isFinite(days)) return MISSING
+  const n = noNegativeZero(Math.round(days))
+  return `${integerDelta.format(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`
 }
 
 /** A 0–1 share as a whole percentage: 0.374 → "37%". */

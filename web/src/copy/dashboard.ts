@@ -74,12 +74,33 @@ export const drawerCopy = {
   simulate: 'Simulate',
 } as const
 
-/** A simulated change (B5), shown as a ghost node beside its supplier. The MAC badge names come from ./labels.ts. */
+/**
+ * A simulated change (B5): the ghost node beside its supplier and the simulator panel in the drawer. The MAC badge
+ * names come from ./labels.ts; cost, lead time and the MAC rest on illustrative lane figures and say so.
+ */
 export const scenarioCopy = {
   whatIf: 'What if',
   modeChange: (mode: string) => `Switch to ${mode}`,
   supplierSwap: 'Switch supplier',
   versusNow: (delta: string) => `${delta} vs now`,
+  massUnknownShort: 'Mass unknown',
+  massUnknown: 'The invoice gives no mass for this item, so this change cannot be estimated.',
+} as const
+
+export const simulatorCopy = {
+  title: 'Simulate a change',
+  modes: 'Transport mode',
+  current: 'now',
+  noLeg: 'Greyed-out modes have no leg on this lane.',
+  pick: 'Pick a mode to see the change in emissions, cost and lead time.',
+  onlyMode: 'This lane has a leg for one mode only, so there is no other mode to try.',
+  simulating: 'Simulating…',
+  emissions: 'Emissions',
+  cost: 'Cost',
+  leadTime: 'Lead time',
+  mac: 'Abatement cost',
+  perTonne: (eur: string, unit: string) => `${eur} per ${unit}`,
+  unavailable: 'The simulator is not on this server yet.',
 } as const
 
 /**

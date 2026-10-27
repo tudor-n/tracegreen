@@ -1,5 +1,12 @@
-import { api, type ChainVerification, type ProblemCode, type RequestLinkResponse } from '@/api/client'
-import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
+import {
+  api,
+  type ChainVerification,
+  type ProblemCode,
+  type RequestLinkResponse,
+  type ScenarioChange,
+  type ScenarioResult,
+} from '@/api/client'
+import { problemHeadlines, simulatorCopy, toolbarCopy } from '@/copy/dashboard'
 
 // The dashboard's requests. Each resolves to what to show; none touches the store, because the API publishes the
 // result on the event stream (node.created, graph.reset, audit.appended) and the sync applies it.
@@ -110,6 +117,14 @@ export function requestLink(nodeId: string): Promise<Answer<RequestLinkResponse>
 /** POST /api/audit/verify: the API recomputes every hash of the audit log and names the first entry that fails. */
 export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
   return fetchBody(() => api.POST('/api/audit/verify'))
+}
+
+/**
+ * A simulated change for a node: the API's result against the node as it is now. The route is not in the contract yet
+ * (A7, slice 5), so until it is this answers that the simulator is not available; the panel shows that as its error.
+ */
+export function simulateChange(_nodeId: string, _change: ScenarioChange): Promise<Answer<ScenarioResult>> {
+  return Promise.resolve({ ok: false, message: simulatorCopy.unavailable })
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

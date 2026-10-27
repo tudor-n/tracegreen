@@ -167,8 +167,13 @@ export function createGraphStore(): GraphStore {
           scenarioPreview: s.scenarioPreview?.nodeId === nodeId ? s.scenarioPreview : null,
         }
       }),
+    // Closing the simulator takes its ghost off the canvas.
     setPanel: (panel, open) =>
-      set((s) => (s.openPanels[panel] === open ? s : { openPanels: { ...s.openPanels, [panel]: open } })),
+      set((s) => {
+        if (s.openPanels[panel] === open) return s
+        const preview = panel === 'simulator' && !open ? null : s.scenarioPreview
+        return { openPanels: { ...s.openPanels, [panel]: open }, scenarioPreview: preview }
+      }),
     setScenarioPreview: (preview) => set({ scenarioPreview: preview }),
   }))
 }

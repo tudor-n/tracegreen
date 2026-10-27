@@ -162,6 +162,17 @@ describe('scenario preview', () => {
     expect(store.getState().scenarioPreview).toBeNull()
   })
 
+  it('is dropped when the simulator closes, and kept while other panels open and close', () => {
+    const { store } = setup()
+    store.getState().setPanel('simulator', true)
+    store.getState().setPanel('audit', true)
+    store.getState().setPanel('audit', false)
+    expect(store.getState().scenarioPreview).not.toBeNull()
+
+    store.getState().setPanel('simulator', false)
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
   it('is dropped with its node, and when another node is selected', () => {
     const { store, a } = setup()
     store.getState().hydrate(snapshot(0, [node('b', 10)]))

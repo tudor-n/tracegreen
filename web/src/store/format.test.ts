@@ -12,6 +12,8 @@ import {
   formatTonnes,
   formatTonnesCo2e,
   formatTonnesDelta,
+  formatEurosDelta,
+  formatDaysDelta,
 } from './format'
 import { kpis } from './testFixtures'
 
@@ -48,6 +50,25 @@ describe('formatTonnesDelta', () => {
     expect(formatTonnesDelta(20)).toBe('0.0')
     expect(formatTonnesDelta(-20)).toBe('0.0')
     expect(formatTonnesDelta(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatEurosDelta and formatDaysDelta', () => {
+  it('sign a change in whole euros and whole days', () => {
+    expect(formatEurosDelta(-3910)).toBe('-€3,910')
+    expect(formatEurosDelta(8350.4)).toBe('+€8,350')
+    expect(formatDaysDelta(33)).toBe('+33 days')
+    expect(formatDaysDelta(-5)).toBe('-5 days')
+    expect(formatDaysDelta(-1)).toBe('-1 day')
+  })
+
+  it('read a change that rounds to nothing without a sign, and the dash for no number', () => {
+    expect(formatEurosDelta(0.4)).toBe('€0')
+    expect(formatEurosDelta(-0.4)).toBe('€0')
+    expect(formatDaysDelta(0)).toBe('0 days')
+    expect(formatDaysDelta(-0.2)).toBe('0 days')
+    expect(formatEurosDelta(Number.NaN)).toBe('–')
+    expect(formatDaysDelta(Number.POSITIVE_INFINITY)).toBe('–')
   })
 })
 
