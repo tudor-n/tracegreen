@@ -1,6 +1,7 @@
 import { Handle, type NodeProps, Position } from '@xyflow/react'
 import { memo } from 'react'
 import { nodeCopy } from '@/copy/dashboard'
+import { useChangeCount } from '@/hooks/useChangeCount'
 import { aiMappedLabel, isPlaceholder, shownFigure } from '@/lib/node-display'
 import { CO2E_UNIT, formatTonnes, type SupplierRfNode } from '@/store'
 import { FactorInfo } from './FactorInfo'
@@ -8,7 +9,8 @@ import { StatusChip } from './StatusChip'
 
 // One supplier on the canvas, a white card drawn to fill NODE_SIZE.supplier. The status chip, the selection ring and its
 // glow follow `data-status`, the red outline follows `data-hotspot` (index.css); the Playwright smoke reads the same
-// attributes. It enters from the left on mount,
+// attributes. When the supplier verifies, the ring opens to a halo and a green-tint sweep crosses the card. It enters
+// from the left on mount,
 // which for an existing id happens only once: React Flow keeps the component across updates. A number that rests on a
 // PLACEHOLDER factor says so on the node itself, not only in the "i" (PRIORITY-CHANGES.md §2).
 
@@ -17,6 +19,7 @@ function SupplierNodeView({ data, selected }: NodeProps<SupplierRfNode>) {
   const { factors } = shownFigure(node)
   const ai = aiMappedLabel(node.classification)
   const where = `${node.country} · ${node.classification.categoryLabel}`
+  const statusChanges = useChangeCount(node.status)
   return (
     <div
       data-testid={`node-${node.id}`}
@@ -25,6 +28,7 @@ function SupplierNodeView({ data, selected }: NodeProps<SupplierRfNode>) {
       data-selected={selected}
       className="supplier-node flex size-full flex-col justify-between rounded-[var(--r-card)] px-3.5 py-2.5"
     >
+      {statusChanges > 0 && node.status === 'VERIFIED' && <span key={statusChanges} className="verify-fx" aria-hidden />}
       <div className="flex items-center gap-1.5">
         <p className="min-w-0 flex-1 truncate text-[13px] font-semibold" title={node.label}>
           {node.label}

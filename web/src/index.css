@@ -301,6 +301,7 @@
     --tone: var(--amber);
     --tone-rgb: 240 138 28;
     position: relative;
+    isolation: isolate;
     background: var(--card);
     box-shadow: var(--card-shadow);
     transition: box-shadow 250ms var(--ease);
@@ -346,6 +347,46 @@
     opacity: 0.85;
     animation: none;
   }
+  /* Supplier verifies: the ring opens to a 10px halo and a 40px glow, then settles; a green-tint sweep crosses the card. */
+  .verify-fx {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+    animation: tg-verify-ring 1.6s var(--ease) both;
+  }
+  .verify-fx::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--green-tint) 35%, var(--green-tint) 65%, transparent);
+    transform: translateX(-100%);
+    animation: tg-sweep 1.4s var(--ease) both;
+  }
+  /* Number updates: the value flashes green with a 22px glow, then fades back to ink. */
+  .number-flash {
+    animation: tg-number-flash 1.4s var(--ease);
+  }
+  /* The supplier-confirmed share meter fills from the left. */
+  .meter {
+    height: 4px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: var(--r-pill);
+    background: var(--fill);
+  }
+  .meter-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--green);
+    box-shadow: var(--glow-meter);
+    transform-origin: left center;
+    transition: transform 1.2s var(--ease);
+  }
+
   /* Canvas nodes keep the green focus ring, drawn on the card rather than React Flow's square wrapper. */
   .react-flow__node:focus-visible {
     outline: none;
@@ -391,6 +432,28 @@
   from {
     opacity: 0;
     transform: translateX(-28px) scale(0.96);
+  }
+}
+@keyframes tg-verify-ring {
+  0% {
+    box-shadow: 0 0 0 2px var(--green), 0 0 0 2px rgb(18 129 79 / 0.2), 0 0 0 rgb(18 129 79 / 0);
+  }
+  35% {
+    box-shadow: 0 0 0 2px var(--green), 0 0 0 12px rgb(18 129 79 / 0.18), 0 0 40px rgb(18 129 79 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(18 129 79 / 0), 0 0 0 0 rgb(18 129 79 / 0), 0 0 0 rgb(18 129 79 / 0);
+  }
+}
+@keyframes tg-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes tg-number-flash {
+  from {
+    color: var(--green);
+    text-shadow: 0 0 22px rgb(18 129 79 / 0.6);
   }
 }
 @keyframes tg-breathe {

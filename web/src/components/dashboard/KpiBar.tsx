@@ -2,8 +2,10 @@ import { InfoIcon } from 'lucide-react'
 import type { Kpis } from '@/api/client'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { kpiCopy } from '@/copy/dashboard'
+import { useChangeCount } from '@/hooks/useChangeCount'
 import { supplierConfirmedShare } from '@/copy/labels'
 import type { Connection } from '@/hooks/useGraphEvents'
+import { cn } from '@/lib/utils'
 import { CO2E_UNIT, formatKpis } from '@/store'
 
 // The four KPIs exactly as the API last sent them, in the snapshot or on a node event. Nothing is computed here.
@@ -33,6 +35,7 @@ export function KpiBar({ kpis, connection }: { kpis: Kpis | null; connection: Co
         value={figures.share}
         subtitle={supplierConfirmedShare.subtitle}
         info={supplierConfirmedShare.tooltip}
+        meter={kpis.totalKg > 0 ? kpis.primaryShare : undefined}
       />
       <Kpi testId="kpi-spend" label={kpiCopy.spend} value={figures.spend} />
       <Kpi testId="kpi-nodes" label={kpiCopy.nodes} value={figures.nodes} />
@@ -47,9 +50,13 @@ interface KpiProps {
   unit?: string
   subtitle?: string
   info?: string
+  /** A 0–1 share drawn as the glowing progress meter, straight from the API. */
+  meter?: number
 }
 
-function Kpi({ testId, label, value, unit, subtitle, info }: KpiProps) {
+function Kpi({ testId, label, value, unit, subtitle, info, meter }: KpiProps) {
+  const changes = useChangeCount(value)
+  const fill = meter !== undefined && Number.isFinite(meter) ? Math.min(1, Math.max(0, meter)) : null
   return (
     <div data-testid={testId} className="glass flex min-h-[5.5rem] flex-col gap-1 rounded-[var(--r-tile)] px-4 py-3">
       <dt className="flex items-center gap-1 text-xs font-medium text-ink-2">
@@ -67,10 +74,20 @@ function Kpi({ testId, label, value, unit, subtitle, info }: KpiProps) {
         )}
       </dt>
       <dd className="flex items-baseline gap-1">
-        <span className="font-heading text-[28px] leading-none font-semibold tracking-[-0.025em]">{value}</span>
+        <span
+          key={changes}
+          className={cn('font-heading text-[28px] leading-none font-semibold tracking-[-0.025em]', changes > 0 && 'number-flash')}
+        >
+          {value}
+        </span>
         {unit !== undefined && <span className="text-[13px] font-medium text-mute">{unit}</span>}
       </dd>
       {subtitle !== undefined && <dd className="text-xs text-mute">{subtitle}</dd>}
+      {fill !== null && (
+        <dd aria-hidden className="meter mt-auto">
+          <span className="meter-fill" style={{ transform: `scaleX(${fill})` }} />
+        </dd>
+      )}
     </div>
   )
 }
