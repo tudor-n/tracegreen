@@ -203,4 +203,29 @@
       animation: node-flip 700ms ease-in-out;
     }
   }
+
+  /* A simulated change (B5): dashed, so it never reads as a supplier on the graph, and its edge dashed too. */
+  .ghost-node {
+    border: 2px dashed var(--muted-foreground);
+    background-color: color-mix(in oklab, var(--card) 85%, transparent);
+  }
+  .react-flow__edge.ghost-edge .react-flow__edge-path {
+    stroke-dasharray: 5 4;
+    stroke-width: 1.5;
+  }
+
+  /* MAC badge tones: green when the change saves carbon at or below the carbon price, amber above it. */
+  .scenario-badge {
+    --badge-tone: var(--muted-foreground);
+    color: var(--foreground);
+    border: 1px solid var(--badge-tone);
+    background-color: color-mix(in oklab, var(--badge-tone) 16%, var(--card));
+  }
+  .scenario-badge[data-badge='win-win'],
+  .scenario-badge[data-badge='below-ets'] {
+    --badge-tone: var(--status-verified);
+  }
+  .scenario-badge[data-badge='premium'] {
+    --badge-tone: var(--status-estimated);
+  }
 }

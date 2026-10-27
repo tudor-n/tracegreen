@@ -11,6 +11,7 @@ import {
   formatTimeLeft,
   formatTonnes,
   formatTonnesCo2e,
+  formatTonnesDelta,
 } from './format'
 import { kpis } from './testFixtures'
 
@@ -32,6 +33,21 @@ describe('formatTonnes', () => {
 
   it('prints a dash for a missing number', () => {
     expect(formatTonnes(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatTonnesDelta', () => {
+  it('signs a change in tonnes with one decimal', () => {
+    expect(formatTonnesDelta(-15_074)).toBe('-15.1')
+    expect(formatTonnesDelta(400)).toBe('+0.4')
+    expect(formatTonnesDelta(1_234_567)).toBe('+1,234.6')
+  })
+
+  it('reads 0.0 without a sign when the change rounds to nothing, and the dash for no number', () => {
+    expect(formatTonnesDelta(0)).toBe('0.0')
+    expect(formatTonnesDelta(20)).toBe('0.0')
+    expect(formatTonnesDelta(-20)).toBe('0.0')
+    expect(formatTonnesDelta(Number.NaN)).toBe('–')
   })
 })
 

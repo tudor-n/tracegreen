@@ -27,11 +27,37 @@ export interface GraphDomain {
 
 export type Panel = 'drawer' | 'audit' | 'simulator'
 
+/** The figures of the base node that a scenario's deltas are taken against. */
+export type ScenarioBaseline = Pick<NodeView, 'carbonKg' | 'costEur' | 'leadDays'>
+
 /** A simulated change shown as a ghost node (B5). The base node never changes. */
 export interface ScenarioPreview {
   nodeId: string
   change: ScenarioChange
   result: ScenarioResult
+  /** The base node's figures when the simulation was asked for. */
+  baseline: ScenarioBaseline
+}
+
+export const baselineOf = (node: NodeView): ScenarioBaseline => ({
+  carbonKg: node.carbonKg,
+  costEur: node.costEur,
+  leadDays: node.leadDays,
+})
+
+/**
+ * The preview while it still describes its node, else null: the node is gone, or its figures moved (a verification
+ * rebuilds them) and the result's deltas no longer hold. A snapshot repeating the same figures keeps it.
+ */
+export function keepPreview(preview: ScenarioPreview | null, nodes: Record<string, NodeView>): ScenarioPreview | null {
+  if (preview === null) return null
+  const node = nodes[preview.nodeId]
+  if (node === undefined) return null
+  const now = baselineOf(node)
+  const { baseline } = preview
+  const same =
+    now.carbonKg === baseline.carbonKg && now.costEur === baseline.costEur && now.leadDays === baseline.leadDays
+  return same ? preview : null
 }
 
 export interface GraphUi {
@@ -59,12 +85,12 @@ export const initialUi: GraphUi = {
 
 /**
  * Replaces the whole domain, `lastSeq` included even when it goes down: the sequence restarts at 0 when the API
- * restarts. UI state survives unless it points at a node the snapshot no longer has (after a reset, say).
+ * restarts. UI state survives unless it points at a node the snapshot no longer has (after a reset, say), and the
+ * scenario preview only while its node keeps its figures (keepPreview).
  */
 export function hydrateState(state: GraphUi, snapshot: GraphSnapshot): GraphDomain & GraphUi {
   const nodes = Object.fromEntries(snapshot.nodes.map((n) => [n.id, n]))
   const selectionGone = state.selectedNodeId !== null && !(state.selectedNodeId in nodes)
-  const previewGone = state.scenarioPreview !== null && !(state.scenarioPreview.nodeId in nodes)
   return {
     buyer: snapshot.buyer,
     nodes,
@@ -74,7 +100,7 @@ export function hydrateState(state: GraphUi, snapshot: GraphSnapshot): GraphDoma
     mode: snapshot.mode,
     selectedNodeId: selectionGone ? null : state.selectedNodeId,
     openPanels: selectionGone ? { ...state.openPanels, drawer: false, simulator: false } : state.openPanels,
-    scenarioPreview: selectionGone || previewGone ? null : state.scenarioPreview,
+    scenarioPreview: selectionGone ? null : keepPreview(state.scenarioPreview, nodes),
   }
 }
 
@@ -124,8 +150,13 @@ export function createGraphStore(): GraphStore {
     ...initialDomain,
     ...initialUi,
     hydrate: (snapshot) => set((s) => hydrateState(s, snapshot)),
-    // Returning the same state object skips notifying subscribers.
-    applyEvent: (event) => set((s) => applyEventState(s, event)),
+    // Returning the same state object skips notifying subscribers. A node event can move the figures the scenario
+    // preview was simulated against, so the preview is checked again.
+    applyEvent: (event) =>
+      set((s) => {
+        const next = applyEventState(s, event)
+        return next === s ? s : { ...next, scenarioPreview: keepPreview(s.scenarioPreview, next.nodes) }
+      }),
     select: (nodeId) =>
       set((s) => {
         if (nodeId !== null && !(nodeId in s.nodes)) return s

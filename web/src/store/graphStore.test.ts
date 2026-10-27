@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createGraphStore, selectLoaded } from './graphStore'
-import { audit, auditEvent, kpis, node, nodeEvent, resetEvent, snapshot } from './testFixtures'
+import { audit, auditEvent, kpis, node, nodeEvent, preview, resetEvent, snapshot } from './testFixtures'
 
 const ids = (store: ReturnType<typeof createGraphStore>) => Object.keys(store.getState().nodes).sort()
 
@@ -123,6 +123,55 @@ describe('applyEvent', () => {
 
     expect(store.getState().selectedNodeId).toBe('a')
     expect(store.getState().openPanels.drawer).toBe(true)
+  })
+})
+
+describe('scenario preview', () => {
+  const setup = () => {
+    const store = createGraphStore()
+    const a = node('a', 22_562, { costEur: 52_600, leadDays: 7 })
+    store.getState().hydrate(snapshot(1, [a, node('b', 10)]))
+    store.getState().select('a')
+    store.getState().setScenarioPreview(preview(a))
+    return { store, a }
+  }
+
+  it('lives beside the base nodes and never changes them', () => {
+    const { store, a } = setup()
+    expect(store.getState().scenarioPreview?.nodeId).toBe('a')
+    expect(store.getState().nodes.a).toBe(a)
+  })
+
+  it('survives events and snapshots that leave the figures of its node alone', () => {
+    const { store, a } = setup()
+    const kept = store.getState().scenarioPreview
+    store.getState().applyEvent(nodeEvent(2, node('b', 99), 'node.updated'))
+    store.getState().applyEvent(auditEvent(3, audit(1)))
+    store.getState().applyEvent(nodeEvent(4, { ...a, label: 'Renamed' }, 'node.updated'))
+    store.getState().hydrate(snapshot(4, [{ ...a }, node('b', 99)]))
+    expect(store.getState().scenarioPreview).toBe(kept)
+  })
+
+  it('is dropped when the figures of its node move, because the deltas were taken against the old ones', () => {
+    const { store, a } = setup()
+    store.getState().applyEvent(nodeEvent(2, { ...a, carbonKg: 20_700, status: 'VERIFIED' }, 'node.updated'))
+    expect(store.getState().scenarioPreview).toBeNull()
+
+    store.getState().setScenarioPreview(preview(store.getState().nodes.a))
+    store.getState().hydrate(snapshot(3, [{ ...store.getState().nodes.a, leadDays: 40 }]))
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it('is dropped with its node, and when another node is selected', () => {
+    const { store, a } = setup()
+    store.getState().hydrate(snapshot(0, [node('b', 10)]))
+    expect(store.getState().scenarioPreview).toBeNull()
+
+    store.getState().hydrate(snapshot(1, [a, node('b', 10)]))
+    store.getState().select('a')
+    store.getState().setScenarioPreview(preview(a))
+    store.getState().select('b')
+    expect(store.getState().scenarioPreview).toBeNull()
   })
 })
 

@@ -1,4 +1,5 @@
-import type { AuditEntry, DomainEvent, GraphSnapshot, Kpis, NodeView } from '@/api/client'
+import type { AuditEntry, DomainEvent, GraphSnapshot, Kpis, NodeView, ScenarioResult } from '@/api/client'
+import type { ScenarioPreview } from './graphStore'
 
 // Small builders for the store tests. Only the fields the store and selectors read are meaningful.
 
@@ -92,3 +93,25 @@ export const auditEvent = (seq: number, entry: AuditEntry): DomainEvent => ({
 })
 
 export const resetEvent = (seq: number): DomainEvent => ({ type: 'graph.reset', ...meta(seq) })
+
+/** N1 air → sea as the domain's SimulatorTests compute it: 7.5 t, €48,690, 40 days, win-win. */
+export const scenarioResult = (overrides: Partial<ScenarioResult> = {}): ScenarioResult => ({
+  carbonKg: 7488.8,
+  costEur: 48_690,
+  leadDays: 40,
+  delta: { carbonKg: -15_074, costEur: -3910, leadDays: 33 },
+  mac: { kind: 'abatement', macEurPerT: -259.4, deltaCostEur: -3910, deltaCarbonT: 15.074 },
+  badge: 'win-win',
+  inputs: [],
+  massUnknown: false,
+  illustrative: true,
+  ...overrides,
+})
+
+/** A mode-change preview for `n`, simulated against its current figures. */
+export const preview = (n: NodeView, result: ScenarioResult = scenarioResult()): ScenarioPreview => ({
+  nodeId: n.id,
+  change: { mode: 'sea', alternativeId: null },
+  result,
+  baseline: { carbonKg: n.carbonKg, costEur: n.costEur, leadDays: n.leadDays },
+})

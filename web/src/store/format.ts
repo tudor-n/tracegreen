@@ -4,6 +4,11 @@ import type { Kpis } from '@/api/client'
 // (CLAUDE.md: tonnes with one decimal, euros without decimals, days as integers). No carbon is computed here.
 
 const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const tonnesDelta = new Intl.NumberFormat('en-GB', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+})
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
@@ -31,6 +36,15 @@ export function formatTonnes(kg: number): string {
 /** "48.0 tCO₂e". */
 export function formatTonnesCo2e(kg: number): string {
   return `${formatTonnes(kg)} ${CO2E_UNIT}`
+}
+
+/**
+ * A change in kilograms (a scenario delta from the API) as signed tonnes with one decimal, without a unit:
+ * −15 074 → "-15.1", 400 → "+0.4". A change that rounds to nothing reads "0.0", without a sign.
+ */
+export function formatTonnesDelta(kg: number): string {
+  if (!Number.isFinite(kg)) return MISSING
+  return tonnesDelta.format(noNegativeZero(Math.round((kg / 1000) * 10) / 10))
 }
 
 /** Whole euros: 12 345.6 → "€12,346". */

@@ -12,13 +12,14 @@ import { useCallback, useEffect } from 'react'
 import { canvasCopy } from '@/copy/dashboard'
 import { type GraphRfNode, layoutKey, selectGraphView, useGraphStore } from '@/store'
 import { BuyerNode } from './BuyerNode'
+import { GhostNode } from './GhostNode'
 import { SupplierNode } from './SupplierNode'
 
 // The supplier graph. Controlled: nodes and edges come from the memoised store selector, positions from the dagre
 // layout. Only selection goes back, as the store's `select` action; React Flow's node objects, measurements and
 // positions are never stored (roadmap §8.4).
 
-const nodeTypes: NodeTypes = { supplier: SupplierNode, buyer: BuyerNode }
+const nodeTypes: NodeTypes = { supplier: SupplierNode, buyer: BuyerNode, ghost: GhostNode }
 
 const FIT_VIEW = { padding: 0.15, maxZoom: 1.25, duration: 300 }
 
@@ -34,12 +35,14 @@ function Canvas() {
   const { nodes, edges } = useGraphStore(selectGraphView)
   const select = useGraphStore((s) => s.select)
   const nodeSet = useGraphStore((s) => layoutKey(Object.keys(s.nodes)))
+  const ghostOf = useGraphStore((s) => s.scenarioPreview?.nodeId ?? null)
   const { fitView } = useReactFlow()
 
-  // A node arriving or leaving moves the whole column, so frame the graph again: the new node may be off screen.
+  // A node arriving or leaving moves the whole column, and a ghost appears left of it, so frame the graph again: the
+  // new node may be off screen. Picking another scenario for the same supplier keeps the frame.
   useEffect(() => {
     void fitView(FIT_VIEW)
-  }, [fitView, nodeSet])
+  }, [fitView, nodeSet, ghostOf])
 
   // Clicks, Enter on a focused node, Escape and clicks on the pane all arrive as select changes.
   const onNodesChange = useCallback(

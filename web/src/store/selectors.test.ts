@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { createGraphStore } from './graphStore'
-import { BUYER_NODE_ID, computeLayout, createLayoutMemo, layoutKey, NODE_SIZE } from './layout'
+import { BUYER_NODE_ID, computeLayout, createLayoutMemo, ghostPosition, layoutKey, NODE_SIZE } from './layout'
 import {
   createGraphViewSelector,
   EDGE_WIDTH,
   edgeWidth,
+  type GhostRfNode,
+  ghostId,
   hotspotIds,
   type SupplierRfNode,
   selectSelectedNode,
   sortedNodes,
+  toGhost,
   toRfEdges,
   toRfNodes,
 } from './selectors'
-import { node, nodeEvent, snapshot } from './testFixtures'
+import { node, nodeEvent, preview, snapshot } from './testFixtures'
 
 describe('hotspotIds', () => {
   const nodes = [node('a', 300), node('b', 48_000), node('c', 900), node('d', 48_000)]
@@ -158,6 +161,46 @@ describe('graph view selector', () => {
     const next = select(store.getState())
     expect(next.nodes.map((n) => n.id)).toEqual([BUYER_NODE_ID, 'a', 'b', 'c'])
     expect(next.nodes.find((n) => n.id === 'a')?.position).not.toEqual(first.nodes.find((n) => n.id === 'a')?.position)
+  })
+})
+
+describe('ghost node', () => {
+  const positions = computeLayout(['a', 'b'])
+  const at = (id: string) => positions.get(id) ?? expect.unreachable(`no position for ${id}`)
+
+  it('sits left of its supplier on the same row, clear of it, with a dashed edge into it', () => {
+    const ghost = toGhost(preview(node('a', 10)), positions) ?? expect.unreachable('no ghost')
+    expect(ghost.node).toMatchObject({ id: ghostId('a'), type: 'ghost', selectable: false, focusable: false })
+    expect(ghost.node.position).toEqual(ghostPosition(at('a')))
+    expect(ghost.node.position.y).toBe(at('a').y)
+    expect(ghost.node.position.x + NODE_SIZE.supplier.width).toBeLessThan(at('a').x)
+    expect(ghost.edge).toMatchObject({ source: ghostId('a'), target: 'a', className: 'ghost-edge' })
+  })
+
+  it('is not drawn for a supplier without a position', () => {
+    expect(toGhost(preview(node('gone', 10)), positions)).toBeNull()
+  })
+
+  it('joins the view without moving or changing the base nodes', () => {
+    const store = createGraphStore()
+    const a = node('a', 22_562)
+    store.getState().hydrate(snapshot(1, [a, node('b', 10)]))
+    const select = createGraphViewSelector()
+    const before = select(store.getState())
+
+    store.getState().setScenarioPreview(preview(a))
+    const withGhost = select(store.getState())
+    expect(withGhost.nodes.map((n) => n.id)).toEqual([BUYER_NODE_ID, 'a', 'b', ghostId('a')])
+    expect(withGhost.nodes.slice(0, 3).map((n) => n.position)).toEqual(before.nodes.map((n) => n.position))
+    expect((withGhost.nodes[1] as SupplierRfNode).data.node).toBe(a)
+    expect(withGhost.edges.slice(0, 2)).toEqual(before.edges)
+    expect((withGhost.nodes[3] as GhostRfNode).data.preview.result.badge).toBe('win-win')
+    expect(select(store.getState())).toBe(withGhost)
+
+    store.getState().setScenarioPreview(null)
+    const after = select(store.getState())
+    expect(after.nodes.map((n) => n.id)).toEqual([BUYER_NODE_ID, 'a', 'b'])
+    expect(after.edges).toBe(before.edges)
   })
 })
 

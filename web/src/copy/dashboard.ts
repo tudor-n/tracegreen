@@ -74,6 +74,14 @@ export const drawerCopy = {
   simulate: 'Simulate',
 } as const
 
+/** A simulated change (B5), shown as a ghost node beside its supplier. The MAC badge names come from ./labels.ts. */
+export const scenarioCopy = {
+  whatIf: 'What if',
+  modeChange: (mode: string) => `Switch to ${mode}`,
+  supplierSwap: 'Switch supplier',
+  versusNow: (delta: string) => `${delta} vs now`,
+} as const
+
 /**
  * The QR card in the node drawer. Ruling 6: a link opens only on a phone on the laptop's hotspot, so the card always
  * says so; `loopback` means the API built the link from a localhost address, which no phone can reach.

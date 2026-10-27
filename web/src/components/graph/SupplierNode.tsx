@@ -68,6 +68,8 @@ function SupplierNodeView({ data, selected }: NodeProps<SupplierRfNode>) {
           {hotspot && `, ${nodeCopy.hotspot}`}
         </span>
       </div>
+      {/* The dashed edge from a ghost node (B5) ends here. */}
+      <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </div>
   )

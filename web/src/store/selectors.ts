@@ -1,17 +1,20 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { Buyer, NodeView } from '@/api/client'
-import type { GraphState } from './graphStore'
-import { BUYER_NODE_ID, createLayoutMemo, NODE_SIZE, type XY } from './layout'
+import type { GraphState, ScenarioPreview } from './graphStore'
+import { BUYER_NODE_ID, createLayoutMemo, ghostPosition, NODE_SIZE, type XY } from './layout'
 
 // React Flow gets arrays derived from the store and never writes back (roadmap §8.4): the canvas is controlled,
 // clicks go to `select`, and nothing React Flow creates is stored.
 
 export type SupplierNodeData = { node: NodeView; hotspot: boolean }
 export type BuyerNodeData = { buyer: Buyer }
+export type GhostNodeData = { preview: ScenarioPreview }
 export type SupplierRfNode = Node<SupplierNodeData, 'supplier'>
 export type BuyerRfNode = Node<BuyerNodeData, 'buyer'>
-export type GraphRfNode = SupplierRfNode | BuyerRfNode
+export type GhostRfNode = Node<GhostNodeData, 'ghost'>
+export type GraphRfNode = SupplierRfNode | BuyerRfNode | GhostRfNode
 export type SupplierRfEdge = Edge<{ width: number }>
+export type GhostRfEdge = Edge
 
 /** How many of the largest emitters get the hotspot ring. */
 export const HOTSPOT_COUNT = 1
@@ -91,40 +94,77 @@ export function toRfEdges(nodes: readonly NodeView[]): SupplierRfEdge[] {
   })
 }
 
+/** The React Flow id of the ghost for a supplier. */
+export const ghostId = (nodeId: string): string => `ghost-${nodeId}`
+
+/**
+ * The scenario preview as a ghost node left of its supplier, with a dashed edge into the supplier. Null while the
+ * supplier has no position. Built from the preview alone, so the supplier's own node, edge and figures stay as they are.
+ */
+export function toGhost(
+  preview: ScenarioPreview,
+  positions: Map<string, XY>,
+): { node: GhostRfNode; edge: GhostRfEdge } | null {
+  const supplier = positions.get(preview.nodeId)
+  if (supplier === undefined) return null
+  const id = ghostId(preview.nodeId)
+  return {
+    node: {
+      id,
+      type: 'ghost',
+      position: ghostPosition(supplier),
+      ...sized(NODE_SIZE.supplier),
+      data: { preview },
+      selectable: false,
+      focusable: false,
+    },
+    edge: { id: `edge-${id}`, source: id, target: preview.nodeId, className: 'ghost-edge', selectable: false },
+  }
+}
+
 export interface GraphView {
   nodes: GraphRfNode[]
-  edges: SupplierRfEdge[]
+  edges: (SupplierRfEdge | GhostRfEdge)[]
 }
 
 /**
- * A selector for `useGraphStore` that returns the same `GraphView` object until the nodes, the buyer or the selection
- * change, so React Flow does not rerender on unrelated updates. The layout reruns only when the set of node ids
- * changes, and the edges only when the nodes change; a selection rebuilds just the node array.
+ * A selector for `useGraphStore` that returns the same `GraphView` object until the nodes, the buyer, the selection or
+ * the scenario preview change, so React Flow does not rerender on unrelated updates. The layout reruns only when the
+ * set of node ids changes, and the supplier edges only when the nodes change; a selection or a preview rebuilds just
+ * the arrays around them.
  */
 export function createGraphViewSelector(): (state: GraphState) => GraphView {
   const layout = createLayoutMemo()
   let nodesIn: GraphState['nodes'] | null = null
   let buyerIn: Buyer | null = null
   let selectedIn: string | null = null
+  let previewIn: ScenarioPreview | null = null
   let sorted: NodeView[] = []
   let hotspots = new Set<string>()
+  let edges: SupplierRfEdge[] = []
   let view: GraphView = { nodes: [], edges: [] }
 
   return (state) => {
     const nodesChanged = state.nodes !== nodesIn
-    if (!nodesChanged && state.buyer === buyerIn && state.selectedNodeId === selectedIn) return view
+    const unchanged =
+      !nodesChanged &&
+      state.buyer === buyerIn &&
+      state.selectedNodeId === selectedIn &&
+      state.scenarioPreview === previewIn
+    if (unchanged) return view
     if (nodesChanged) {
       sorted = sortedNodes(state.nodes)
       hotspots = hotspotIds(sorted)
+      edges = toRfEdges(sorted)
     }
     const positions = layout(sorted.map((n) => n.id))
-    view = {
-      nodes: toRfNodes(state.buyer, sorted, positions, hotspots, state.selectedNodeId),
-      edges: nodesChanged ? toRfEdges(sorted) : view.edges,
-    }
+    const nodes = toRfNodes(state.buyer, sorted, positions, hotspots, state.selectedNodeId)
+    const ghost = state.scenarioPreview === null ? null : toGhost(state.scenarioPreview, positions)
+    view = ghost === null ? { nodes, edges } : { nodes: [...nodes, ghost.node], edges: [...edges, ghost.edge] }
     nodesIn = state.nodes
     buyerIn = state.buyer
     selectedIn = state.selectedNodeId
+    previewIn = state.scenarioPreview
     return view
   }
 }
