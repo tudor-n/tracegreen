@@ -104,6 +104,8 @@ public sealed class MemoryRepository : IRepository
                 TransportMode = patch.TransportMode,
                 EnergySource = patch.EnergySource,
                 MassT = patch.MassT ?? node.MassT,
+                CostEur = patch.CostEur,
+                LeadDays = patch.LeadDays,
             };
             ws.Nodes[node.Id] = patched;
             ws.Verifications[verification.Id] = verification;

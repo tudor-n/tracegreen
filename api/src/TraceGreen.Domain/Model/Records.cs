@@ -72,13 +72,15 @@ public sealed record SupplierNode(
     public decimal CarbonKg => Status == NodeStatus.Verified && ActivityKg is { } activity ? activity : SpendKg;
 }
 
-/// <summary>The fields a supplier verification may change on a node.</summary>
+/// <summary>The fields a supplier verification may change on a node; cost and lead time follow the confirmed mode.</summary>
 public sealed record NodePatch(
     NodeStatus Status,
     decimal? ActivityKg,
     TransportMode? TransportMode,
     EnergySource? EnergySource,
-    decimal? MassT);
+    decimal? MassT,
+    decimal CostEur,
+    int LeadDays);
 
 public sealed record Verification(
     Guid Id,

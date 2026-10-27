@@ -88,6 +88,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/request-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint a signed single-use verification link for a node and record link.requested in the audit log */
+        post: operations["RequestLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/verify/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults; nothing personal */
+        get: operations["GetVerifyContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit the supplier's answers: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
+        post: operations["SubmitVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute every hash of the tamper-evident audit log; brokenAt is the 1-based position of the first bad entry */
+        post: operations["VerifyAuditChain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -99,6 +167,23 @@ export interface paths {
         put?: never;
         /** Back to the seed start state, then publish graph.reset */
         post: operations["ResetDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dev/simulate-answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer for a supplier without a phone: mints a link and submits through the same path, so audit rows and events match */
+        post: operations["SimulateAnswer"];
         delete?: never;
         options?: never;
         head?: never;
@@ -151,6 +236,13 @@ export interface components {
             /** Format: double */
             kg: number;
             factors: components["schemas"]["FactorLookup"][];
+        };
+        ChainVerification: {
+            valid: boolean;
+            /** Format: int32 */
+            length: number;
+            /** Format: int32 */
+            brokenAt: null | number;
         };
         /** @enum {unknown} */
         ClassificationSource: "invoice" | "cache" | "model" | "stub";
@@ -346,11 +438,30 @@ export interface components {
             costEur: number;
             /** Format: int32 */
             leadDays: number;
+            warnings: components["schemas"]["PlausibilityWarning"][];
             /** Format: date-time */
             createdAt: string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane";
+        PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST";
+        PlausibilityWarning: {
+            code: components["schemas"]["PlausibilityCode"];
+            detail: string;
+        };
+        /** @enum {unknown} */
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited";
+        RequestLinkRequest: {
+            /** Format: uuid */
+            nodeId: string;
+        };
+        RequestLinkResponse: {
+            /** Format: uuid */
+            nodeId: string;
+            url: string;
+            /** Format: date-time */
+            expiresAt: string;
+            loopback: boolean;
+        };
         Scenario: {
             /** Format: uuid */
             id: string;
@@ -392,6 +503,14 @@ export interface components {
             massUnknown: boolean;
             illustrative: boolean;
         };
+        SimulateAnswerRequest: {
+            /** Format: uuid */
+            nodeId: string;
+            transportMode?: null | components["schemas"]["TransportMode"];
+            energySource?: null | components["schemas"]["EnergySource"];
+            /** Format: double */
+            massT?: null | number;
+        };
         /** @enum {unknown} */
         TransportMode: "road" | "rail" | "sea" | "air";
         /** @enum {unknown} */
@@ -405,6 +524,39 @@ export interface components {
             massTConfirmed: null | number;
             /** Format: date-time */
             consumedAt: string;
+        };
+        VerifyContext: {
+            /** Format: uuid */
+            nodeId: string;
+            supplierLabel: string;
+            buyerName: string;
+            invoiceNumber: string;
+            /** Format: date */
+            issueDate: string;
+            itemDescription: string;
+            origin: string;
+            dest: string;
+            modes: components["schemas"]["TransportMode"][];
+            defaultMode: components["schemas"]["TransportMode"];
+            energySources: components["schemas"]["EnergySource"][];
+            defaultEnergy: components["schemas"]["EnergySource"];
+            /** Format: double */
+            massT: null | number;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        VerifyOutcome: {
+            /** Format: uuid */
+            nodeId: string;
+            status: components["schemas"]["NodeStatus"];
+            warnings: components["schemas"]["PlausibilityWarning"][];
+        };
+        VerifyRequest: {
+            t: string;
+            transportMode?: null | components["schemas"]["TransportMode"];
+            energySource?: null | components["schemas"]["EnergySource"];
+            /** Format: double */
+            massT?: null | number;
         };
     };
     responses: never;
@@ -587,6 +739,186 @@ export interface operations {
             };
         };
     };
+    RequestLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestLinkResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetVerifyContext: {
+        parameters: {
+            query: {
+                t: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyContext"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SubmitVerification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOutcome"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    VerifyAuditChain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChainVerification"];
+                };
+            };
+        };
+    };
     ResetDemo: {
         parameters: {
             query?: never;
@@ -609,6 +941,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    SimulateAnswer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulateAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOutcome"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
             };
         };
     };

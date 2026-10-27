@@ -1,5 +1,6 @@
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Plausibility;
 using TraceGreen.Domain.Seed;
 using TraceGreen.Domain.Ubl;
 
@@ -78,6 +79,7 @@ public sealed class NodeViewMapper
             SpendEur: node.SpendEur,
             CostEur: node.CostEur,
             LeadDays: node.LeadDays,
+            Warnings: PlausibilityRules.Check(node.TransportMode, node.MassT),
             CreatedAt: node.CreatedAt);
     }
 

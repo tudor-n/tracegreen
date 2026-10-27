@@ -3,6 +3,7 @@ using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
+using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
 
 namespace TraceGreen.Tests.Contracts;
@@ -28,7 +29,7 @@ public abstract class RepositoryContract
     private static Verification NewVerification(Guid nodeId, string nonce) => new(
         Ids.NewId(), Ids.DemoWorkspace, nodeId, nonce, TransportMode.Road, EnergySource.Grid, 1.4m, Now, "iphash", Now);
 
-    private static readonly NodePatch VerifiedPatch = new(NodeStatus.Verified, 123m, TransportMode.Road, EnergySource.Grid, 1.4m);
+    private static readonly NodePatch VerifiedPatch = new(NodeStatus.Verified, 123m, TransportMode.Road, EnergySource.Grid, 1.4m, 4321m, 3);
 
     private static async Task<IReadOnlyList<AuditEntry>> AllAudit(IRepository repo) =>
         await repo.ListAuditAsync(Ctx, 0, 10_000, CancellationToken.None);
@@ -157,10 +158,25 @@ public abstract class RepositoryContract
         var stored = await repo.GetNodeAsync(Ctx, N3, CancellationToken.None);
         Assert.Equal(NodeStatus.Verified, stored!.Status);
         Assert.Equal(TransportMode.Road, stored.TransportMode);
+        Assert.Equal(4321m, stored.CostEur);
+        Assert.Equal(3, stored.LeadDays);
         Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
         var audit = await AllAudit(repo);
         Assert.Equal(auditBefore + 1, audit.Count);
         Assert.True(AuditChain.Verify(audit).Valid);
+    }
+
+    [Fact]
+    public async Task StoredExtractHashesToTheStoredInvoiceHash()
+    {
+        // The verify flow recomputes the hash from the stored extract (C2), so a storage round trip must not change it.
+        var repo = await MakeAsync();
+
+        foreach (var node in await repo.ListNodesAsync(Ctx, CancellationToken.None))
+        {
+            var invoice = await repo.GetInvoiceAsync(Ctx, node.InvoiceId, CancellationToken.None);
+            Assert.Equal(invoice!.InvoiceHash, Hashing.InvoiceHash(invoice.Extracted));
+        }
     }
 
     [Fact]

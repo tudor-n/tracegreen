@@ -65,4 +65,11 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   UnsupportedMediaType: 'Upload an XML file.',
   UnsupportedCurrency: 'Currency not supported.',
   NoLane: 'Supplier country not covered.',
+  NodeNotFound: 'Supplier not on the graph.',
+  InvalidToken: 'Link not valid.',
+  LinkExpired: 'Link expired.',
+  InvoiceChanged: 'The invoice has changed.',
+  AlreadyUsed: 'Link already used.',
+  InvalidAnswer: 'Answer not accepted.',
+  RateLimited: 'Too many attempts. Wait a minute.',
 }

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace TraceGreen.Domain.Model;
 
 /// <summary>Which estimate <see cref="NodeView.CarbonKg"/> comes from. Serialised "spend" | "activity".</summary>
@@ -42,6 +44,7 @@ public sealed record InvoiceSummary(Guid Id, string Number, DateOnly IssueDate, 
 /// Provenance line (ruling 3): <see cref="Basis"/> says which figure <see cref="CarbonKg"/> is, and that figure's
 /// <see cref="CarbonFigure.Factors"/> carry source, year and row label. A PLACEHOLDER source is shown as is.
 /// <see cref="CostEur"/> and <see cref="LeadDays"/> derive from the lane and are illustrative like it.
+/// <see cref="Warnings"/> are derived from the supplier's answers on every read (D2: shown, never blocking).
 /// </summary>
 public sealed record NodeView(
     Guid Id,
@@ -62,6 +65,7 @@ public sealed record NodeView(
     decimal SpendEur,
     decimal CostEur,
     int LeadDays,
+    IReadOnlyList<PlausibilityWarning> Warnings,
     DateTimeOffset CreatedAt);
 
 /// <summary>What a dashboard learns about a supplier answer: never the nonce or the address hash.</summary>
@@ -74,3 +78,46 @@ public sealed record VerificationView(
 
 /// <summary>Answer to an import: the created node and the KPIs after it, the same values the <c>node.created</c> event carries.</summary>
 public sealed record IngestResult(NodeView Node, Kpis Kpis);
+
+/// <summary>
+/// Plausibility rules over a supplier's answers, serialised by their rule names. <c>SEA_TOO_FAST</c> needs dispatch and
+/// delivery dates that no invoice carries yet (D3), so it is part of the contract but not evaluated.
+/// </summary>
+public enum PlausibilityCode
+{
+    [JsonStringEnumMemberName("AIR_HEAVY")] AirHeavy,
+    [JsonStringEnumMemberName("SEA_TOO_FAST")] SeaTooFast,
+}
+
+/// <summary>A "please reconfirm" note; it never blocks a verification. <see cref="Detail"/> is English for logs and tooltips; UIs key on <see cref="Code"/>.</summary>
+public sealed record PlausibilityWarning(PlausibilityCode Code, string Detail);
+
+/// <summary>A signed single-use verification link. The token exists only inside <see cref="Url"/>.</summary>
+public sealed record LinkGrant(Guid NodeId, string Url, DateTimeOffset ExpiresAt);
+
+/// <summary>
+/// What the supplier's phone page needs to ask its two questions, and nothing personal: company names, the invoiced item,
+/// the lane's modes with the default pre-selected, and the energy answers with grid pre-selected.
+/// <see cref="ItemDescription"/> is invoice text: render it as text.
+/// </summary>
+public sealed record VerifyContext(
+    Guid NodeId,
+    string SupplierLabel,
+    string BuyerName,
+    string InvoiceNumber,
+    DateOnly IssueDate,
+    string ItemDescription,
+    string Origin,
+    string Dest,
+    IReadOnlyList<TransportMode> Modes,
+    TransportMode DefaultMode,
+    IReadOnlyList<EnergySource> EnergySources,
+    EnergySource DefaultEnergy,
+    decimal? MassT,
+    DateTimeOffset ExpiresAt);
+
+/// <summary>The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.</summary>
+public sealed record VerifyAnswer(string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT);
+
+/// <summary>What the phone page shows after a submit: the node's new status and any plausibility warnings.</summary>
+public sealed record VerifyOutcome(Guid NodeId, NodeStatus Status, IReadOnlyList<PlausibilityWarning> Warnings);

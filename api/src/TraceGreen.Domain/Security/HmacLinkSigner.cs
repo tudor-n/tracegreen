@@ -80,6 +80,13 @@ public sealed class HmacLinkSigner : ILinkSigner
         return Result<LinkClaims, TokenError>.Ok(new LinkClaims(nodeId, invoiceHash, nonce, expiresAt));
     }
 
+    public bool TryReadNodeId(string token, out Guid nodeId)
+    {
+        nodeId = Guid.Empty;
+        var parts = token.Split('.');
+        return parts.Length == 6 && parts[0] == Version && Guid.TryParseExact(parts[1], "D", out nodeId);
+    }
+
     private byte[] Signature(Guid nodeId, long expires, string nonce, string invoiceHash)
     {
         var message = string.Join('|', nodeId.ToString("D"), expires.ToString(CultureInfo.InvariantCulture), nonce, invoiceHash);

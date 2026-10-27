@@ -48,6 +48,7 @@ export function node(id: string, carbonKg: number, overrides: Partial<NodeView> 
     spendEur: 1000,
     costEur: 100,
     leadDays: 3,
+    warnings: [],
     createdAt: '2026-10-20T10:00:00Z',
     ...overrides,
   }
