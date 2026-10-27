@@ -15,6 +15,13 @@ public enum ProblemCode
     [JsonStringEnumMemberName("UnsupportedMediaType")] UnsupportedMediaType,
     [JsonStringEnumMemberName("UnsupportedCurrency")] UnsupportedCurrency,
     [JsonStringEnumMemberName("NoLane")] NoLane,
+    [JsonStringEnumMemberName("NodeNotFound")] NodeNotFound,
+    [JsonStringEnumMemberName("InvalidToken")] InvalidToken,
+    [JsonStringEnumMemberName("LinkExpired")] LinkExpired,
+    [JsonStringEnumMemberName("InvoiceChanged")] InvoiceChanged,
+    [JsonStringEnumMemberName("AlreadyUsed")] AlreadyUsed,
+    [JsonStringEnumMemberName("InvalidAnswer")] InvalidAnswer,
+    [JsonStringEnumMemberName("RateLimited")] RateLimited,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -37,6 +44,13 @@ public static class Problems
             ProblemCode.UnsupportedMediaType => (StatusCodes.Status415UnsupportedMediaType, "Send multipart/form-data or text/xml"),
             ProblemCode.UnsupportedCurrency => (StatusCodes.Status422UnprocessableEntity, "Currency not supported"),
             ProblemCode.NoLane => (StatusCodes.Status422UnprocessableEntity, "No freight lane for the supplier country"),
+            ProblemCode.NodeNotFound => (StatusCodes.Status404NotFound, "Node not found"),
+            ProblemCode.InvalidToken => (StatusCodes.Status401Unauthorized, "Link not valid"),
+            ProblemCode.LinkExpired => (StatusCodes.Status410Gone, "Link expired"),
+            ProblemCode.InvoiceChanged => (StatusCodes.Status410Gone, "Invoice changed since the link was made"),
+            ProblemCode.AlreadyUsed => (StatusCodes.Status409Conflict, "Link already used"),
+            ProblemCode.InvalidAnswer => (StatusCodes.Status422UnprocessableEntity, "Answer not accepted"),
+            ProblemCode.RateLimited => (StatusCodes.Status429TooManyRequests, "Too many requests"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

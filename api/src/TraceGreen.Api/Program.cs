@@ -66,6 +66,8 @@ app.MapHealth();
 app.MapEvents();
 app.MapGraph();
 app.MapIngest();
+app.MapVerify();
+app.MapAudit();
 app.MapDev();
 
 app.Run();

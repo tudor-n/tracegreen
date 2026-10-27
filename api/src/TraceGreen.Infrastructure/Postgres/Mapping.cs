@@ -57,6 +57,8 @@ internal static class Mapping
         row.TransportMode = Name(patch.TransportMode);
         row.EnergySource = Name(patch.EnergySource);
         row.MassT = patch.MassT ?? row.MassT;
+        row.CostEur = patch.CostEur;
+        row.LeadDays = patch.LeadDays;
     }
 
     public static SupplierNode ToDomain(NodeRow r) => new(

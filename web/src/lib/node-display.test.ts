@@ -79,11 +79,9 @@ describe('provenanceLine', () => {
     )
   })
 
-  it('falls back to the bare label when the figure has no factor rows', () => {
-    expect(provenanceLine(node('a', 1))).toBe('Spend-based estimate')
-    expect(provenanceLine(node('a', 1, { basis: 'activity', activity: { kg: 1, factors: [] } }))).toBe(
-      'Supplier-confirmed',
-    )
+  it('is null when the figure has no factor rows to name', () => {
+    expect(provenanceLine(node('a', 1))).toBeNull()
+    expect(provenanceLine(node('a', 1, { basis: 'activity', activity: { kg: 1, factors: [] } }))).toBeNull()
   })
 })
 
