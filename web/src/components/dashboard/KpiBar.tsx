@@ -11,13 +11,13 @@ import { CO2E_UNIT, formatKpis } from '@/store'
 export function KpiBar({ kpis, connection }: { kpis: Kpis | null; connection: Connection }) {
   if (kpis === null) {
     return connection === 'offline' ? (
-      <p role="alert" data-testid="kpi-bar" className="py-3 text-sm text-destructive">
+      <p role="alert" data-testid="kpi-bar" className="glass rounded-[var(--r-tile)] px-4 py-3 text-sm text-destructive">
         {kpiCopy.unavailable}
       </p>
     ) : (
       <div aria-hidden data-testid="kpi-bar" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-[4.5rem] rounded-lg bg-muted motion-safe:animate-pulse" />
+          <div key={i} className="glass h-[5.5rem] rounded-[var(--r-tile)] motion-safe:animate-pulse" />
         ))}
       </div>
     )
@@ -51,8 +51,8 @@ interface KpiProps {
 
 function Kpi({ testId, label, value, unit, subtitle, info }: KpiProps) {
   return (
-    <div data-testid={testId} className="flex min-h-[4.5rem] flex-col rounded-lg border bg-card px-3 py-2">
-      <dt className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+    <div data-testid={testId} className="glass flex min-h-[5.5rem] flex-col gap-1 rounded-[var(--r-tile)] px-4 py-3">
+      <dt className="flex items-center gap-1 text-xs font-medium text-ink-2">
         {label}
         {info !== undefined && (
           <Tooltip>
@@ -67,10 +67,10 @@ function Kpi({ testId, label, value, unit, subtitle, info }: KpiProps) {
         )}
       </dt>
       <dd className="flex items-baseline gap-1">
-        <span className="text-2xl font-semibold tabular-nums">{value}</span>
-        {unit !== undefined && <span className="text-sm text-muted-foreground">{unit}</span>}
+        <span className="font-heading text-[28px] leading-none font-semibold tracking-[-0.025em]">{value}</span>
+        {unit !== undefined && <span className="text-[13px] font-medium text-mute">{unit}</span>}
       </dd>
-      {subtitle !== undefined && <dd className="text-xs text-muted-foreground">{subtitle}</dd>}
+      {subtitle !== undefined && <dd className="text-xs text-mute">{subtitle}</dd>}
     </div>
   )
 }

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { Backdrop } from '@/components/brand/Backdrop'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { KpiBar } from '@/components/dashboard/KpiBar'
 import { Toolbar } from '@/components/dashboard/Toolbar'
@@ -38,22 +39,25 @@ export default function Dashboard() {
     graph = <GraphCanvas />
   }
 
+  // The supplier-confirmed share as the API sent it drives the backdrop and the buyer's glow; nothing is computed.
+  const share = kpis !== null && Number.isFinite(kpis.primaryShare) ? Math.min(1, Math.max(0, kpis.primaryShare)) : 0
+  const windowStyle = { '--g': share } as CSSProperties
+
   return (
     <TooltipProvider>
-      <div className="flex h-dvh flex-col">
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
+      <div className="tg-window isolate flex h-dvh flex-col gap-3 p-3" style={windowStyle}>
+        <Backdrop clean={share > 0} />
+        <header className="glass flex flex-wrap items-start justify-between gap-3 rounded-[var(--r-tile)] px-4 py-3">
           <div>
             <h1>
               <Wordmark size={22} variant="intro" label={dashboardTitle} />
             </h1>
-            {buyer !== null && <p className="text-sm text-muted-foreground">{buyer.name}</p>}
+            {buyer !== null && <p className="mt-1.5 text-[13px] text-ink-2">{buyer.name}</p>}
           </div>
           <Toolbar connection={connection} />
         </header>
-        <div className="border-b px-4 py-3">
-          <KpiBar kpis={kpis} connection={connection} />
-        </div>
-        <main className="relative min-h-0 flex-1" data-testid="graph">
+        <KpiBar kpis={kpis} connection={connection} />
+        <main className="work-surface relative min-h-0 flex-1 overflow-hidden rounded-[var(--r-panel)]" data-testid="graph">
           {graph}
         </main>
       </div>
