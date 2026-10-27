@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 
 namespace TraceGreen.Api;
 
@@ -19,8 +20,15 @@ public sealed record AppConfig(
     int AiTimeoutMs,
     int RateLimitPerMin,
     string? SeedDir,
-    string EnvironmentName)
+    string EnvironmentName,
+    IReadOnlyList<IPNetwork> TrustedProxies)
 {
+    /// <summary>
+    /// Proxies whose <c>X-Forwarded-For</c> is believed: loopback (Vite on the host) and Docker's default address pool
+    /// (Vite or nginx in Compose). A phone on the hotspot is in neither, so it cannot pick its own rate-limit bucket.
+    /// </summary>
+    public const string DefaultTrustedProxies = "127.0.0.0/8,::1/128,172.16.0.0/12";
+
     public const string DevelopmentSecret = "dev-only-secret-change-me-0123456789abcdef";
     public const int MinSecretLength = 32;
 
@@ -82,7 +90,8 @@ public sealed record AppConfig(
             AiTimeoutMs: GetInt(env, "AI_TIMEOUT_MS", 10000),
             RateLimitPerMin: GetInt(env, "RATE_LIMIT_PER_MIN", 10),
             SeedDir: Get(env, "SEED_DIR"),
-            EnvironmentName: environmentName);
+            EnvironmentName: environmentName,
+            TrustedProxies: GetNetworks(env, "TRUSTED_PROXIES", DefaultTrustedProxies));
     }
 
     private static string? Get(IDictionary<string, string?> env, string key) =>
@@ -98,6 +107,19 @@ public sealed record AppConfig(
         return int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var v) && v > 0
             ? v
             : throw new InvalidOperationException($"{key} must be a positive integer, got {raw}.");
+    }
+
+    private static IReadOnlyList<IPNetwork> GetNetworks(IDictionary<string, string?> env, string key, string fallback)
+    {
+        var raw = Get(env, key) ?? fallback;
+        var networks = new List<IPNetwork>();
+        foreach (var part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            networks.Add(IPNetwork.TryParse(part, out var network)
+                ? network
+                : throw new InvalidOperationException($"{key} must be a comma-separated list of CIDR ranges, got {part}."));
+        }
+        return networks;
     }
 
     private static decimal GetDecimal(IDictionary<string, string?> env, string key, decimal fallback)
