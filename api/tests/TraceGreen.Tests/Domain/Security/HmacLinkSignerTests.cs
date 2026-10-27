@@ -116,4 +116,22 @@ public class HmacLinkSignerTests
         Assert.NotEqual(Hashing.IpHash("10.0.0.1", Secret), Hashing.IpHash("10.0.0.1", Secret + "x"));
         Assert.Equal(64, Hashing.IpHash("10.0.0.1", Secret).Length);
     }
+
+    [Fact]
+    public void ReadsTheNodeIdWithoutCheckingTheSignature()
+    {
+        var claims = Claims();
+        var token = Signer.Sign(claims);
+
+        Assert.True(new HmacLinkSigner(Secret + "x").TryReadNodeId(token, out var nodeId));
+        Assert.Equal(claims.NodeId, nodeId);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("garbage")]
+    [InlineData("v2.11111111-1111-4111-8111-000000000001.1.n.h.s")]
+    [InlineData("v1.not-a-guid.1.n.h.s")]
+    public void ReadingTheNodeIdOfAMalformedTokenFails(string token) =>
+        Assert.False(Signer.TryReadNodeId(token, out _));
 }
