@@ -39,15 +39,17 @@ describe('hotspotIds', () => {
 })
 
 describe('edgeWidth', () => {
-  it('grows with the log of the kilograms', () => {
-    expect(edgeWidth(1000)).toBeCloseTo(Math.log(1000) * EDGE_WIDTH.perLogKg)
-    expect(edgeWidth(1000)).toBeLessThan(edgeWidth(10_000))
+  it('grows by 5 px per decade of kilograms from 1.5 px at about 2 t', () => {
+    expect(edgeWidth(10 ** 3.3)).toBeCloseTo(EDGE_WIDTH.min)
+    expect(edgeWidth(10 ** 4)).toBeCloseTo(5)
+    expect(edgeWidth(4900)).toBeLessThan(edgeWidth(10_000))
   })
 
   it('clamps to the minimum and maximum, also for zero, negative and non-finite input', () => {
     expect(edgeWidth(0)).toBe(EDGE_WIDTH.min)
     expect(edgeWidth(-5)).toBe(EDGE_WIDTH.min)
     expect(edgeWidth(1)).toBe(EDGE_WIDTH.min)
+    expect(edgeWidth(1500)).toBe(EDGE_WIDTH.min)
     expect(edgeWidth(Number.NaN)).toBe(EDGE_WIDTH.min)
     expect(edgeWidth(1e12)).toBe(EDGE_WIDTH.max)
     expect(edgeWidth(Number.POSITIVE_INFINITY)).toBe(EDGE_WIDTH.max)
@@ -81,7 +83,7 @@ describe('toRfNodes and toRfEdges', () => {
     expect(toRfNodes(null, nodes, positions, new Set(), null).map((n) => n.id)).toEqual(['a', 'b'])
   })
 
-  it('draws one edge per supplier into the buyer, with its width', () => {
+  it("draws one status edge per supplier into the buyer, with its width and the supplier's status", () => {
     const edges = toRfEdges(nodes)
     expect(edges.map((e) => [e.source, e.target])).toEqual([
       ['a', BUYER_NODE_ID],
@@ -89,6 +91,9 @@ describe('toRfNodes and toRfEdges', () => {
     ])
     expect(edges[1].data?.width).toBe(edgeWidth(20))
     expect(edges[1].style?.strokeWidth).toBe(edgeWidth(20))
+    expect(edges[1]).toMatchObject({ type: 'status', data: { status: 'ESTIMATED' } })
+    const verified = toRfEdges([node('v', 20_000, { status: 'VERIFIED' })])
+    expect(verified[0].data?.status).toBe('VERIFIED')
   })
 })
 

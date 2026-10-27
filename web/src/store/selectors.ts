@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { Buyer, NodeView } from '@/api/client'
+import type { Buyer, NodeStatus, NodeView } from '@/api/client'
 import type { GraphState } from './graphStore'
 import { BUYER_NODE_ID, createLayoutMemo, NODE_SIZE, type XY } from './layout'
 
@@ -11,12 +11,13 @@ export type BuyerNodeData = { buyer: Buyer }
 export type SupplierRfNode = Node<SupplierNodeData, 'supplier'>
 export type BuyerRfNode = Node<BuyerNodeData, 'buyer'>
 export type GraphRfNode = SupplierRfNode | BuyerRfNode
-export type SupplierRfEdge = Edge<{ width: number }>
+export type SupplierEdgeData = { width: number; status: NodeStatus }
+export type SupplierRfEdge = Edge<SupplierEdgeData, 'status'>
 
 /** How many of the largest emitters get the hotspot ring. */
 export const HOTSPOT_COUNT = 1
 
-export const EDGE_WIDTH = { min: 1, max: 8, perLogKg: 0.6 } as const
+export const EDGE_WIDTH = { min: 1.5, max: 9, perDecade: 5, fromLog10Kg: 3.3 } as const
 
 /** Nodes in a stable order: oldest first, then by id. */
 export function sortedNodes(nodes: Record<string, NodeView>): NodeView[] {
@@ -34,9 +35,13 @@ export function hotspotIds(nodes: readonly NodeView[], count: number = HOTSPOT_C
   return new Set(ranked.slice(0, Math.max(0, count)).map((n) => n.id))
 }
 
-/** Stroke width in px from a clamped natural log of the node's kilograms (roadmap §6: edge_width = clamp(log(kg))). */
+/**
+ * Stroke width in px on a log scale of the node's kilograms (roadmap §6: edge_width = clamp(log(kg))), as the design
+ * handoff sets it: clamp(1.5, (log10(kg) − 3.3) × 5 + 1.5, 9), so 2 t draws at 1.5 px and about 45 t reaches 9 px.
+ */
 export function edgeWidth(carbonKg: number): number {
-  const scaled = carbonKg > 1 ? Math.log(carbonKg) * EDGE_WIDTH.perLogKg : 0
+  const scaled =
+    carbonKg > 0 ? (Math.log10(carbonKg) - EDGE_WIDTH.fromLog10Kg) * EDGE_WIDTH.perDecade + EDGE_WIDTH.min : 0
   return Math.min(EDGE_WIDTH.max, Math.max(EDGE_WIDTH.min, scaled))
 }
 
@@ -76,7 +81,7 @@ export function toRfNodes(
   return [buyerNode, ...suppliers]
 }
 
-/** One edge per supplier, into the buyer. */
+/** One edge per supplier, into the buyer, coloured by the supplier's status (StatusEdge). */
 export function toRfEdges(nodes: readonly NodeView[]): SupplierRfEdge[] {
   return nodes.map((node) => {
     const width = edgeWidth(node.carbonKg)
@@ -84,7 +89,8 @@ export function toRfEdges(nodes: readonly NodeView[]): SupplierRfEdge[] {
       id: `edge-${node.id}`,
       source: node.id,
       target: BUYER_NODE_ID,
-      data: { width },
+      type: 'status',
+      data: { width, status: node.status },
       style: { strokeWidth: width },
       selectable: false,
     }

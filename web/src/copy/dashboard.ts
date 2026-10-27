@@ -21,6 +21,7 @@ export const nodeCopy = {
   noFactors: 'No factor rows for this figure.',
   placeholder: 'Placeholder factor',
   hotspot: 'largest emitter',
+  hotspotTag: 'Largest emitter',
   status: {
     ESTIMATED: 'Estimated',
     PARTIAL: 'Partly confirmed',

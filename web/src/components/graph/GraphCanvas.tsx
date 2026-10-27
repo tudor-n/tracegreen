@@ -2,6 +2,7 @@ import '@xyflow/react/dist/style.css'
 import {
   Background,
   Controls,
+  type EdgeTypes,
   type NodeChange,
   type NodeTypes,
   ReactFlow,
@@ -12,6 +13,7 @@ import { useCallback, useEffect } from 'react'
 import { canvasCopy } from '@/copy/dashboard'
 import { type GraphRfNode, layoutKey, selectGraphView, useGraphStore } from '@/store'
 import { BuyerNode } from './BuyerNode'
+import { StatusEdge } from './StatusEdge'
 import { SupplierNode } from './SupplierNode'
 
 // The supplier graph. Controlled: nodes and edges come from the memoised store selector, positions from the dagre
@@ -19,6 +21,7 @@ import { SupplierNode } from './SupplierNode'
 // positions are never stored (roadmap §8.4).
 
 const nodeTypes: NodeTypes = { supplier: SupplierNode, buyer: BuyerNode }
+const edgeTypes: EdgeTypes = { status: StatusEdge }
 
 const FIT_VIEW = { padding: 0.15, maxZoom: 1.25, duration: 300 }
 
@@ -58,10 +61,10 @@ function Canvas() {
   return (
     <ReactFlow
       aria-label={canvasCopy.label}
-      className="[--xy-edge-stroke:color-mix(in_oklab,var(--muted-foreground)_55%,transparent)]"
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={onNodesChange}
       nodesDraggable={false}
       nodesConnectable={false}

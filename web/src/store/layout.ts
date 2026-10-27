@@ -10,8 +10,8 @@ export const BUYER_NODE_ID = 'buyer'
 
 /** Box sizes the layout reserves; the node components (B2) are drawn to fit them. */
 export const NODE_SIZE = {
-  supplier: { width: 240, height: 88 },
-  buyer: { width: 240, height: 96 },
+  supplier: { width: 248, height: 112 },
+  buyer: { width: 248, height: 104 },
 } as const
 
 /**

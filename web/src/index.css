@@ -236,38 +236,173 @@
 }
 
 /*
- * Supplier nodes (F2): the tone follows data-status, the red ring data-hotspot (an overlay, never a status).
- * Tints mix in oklab: in oklch the white card's hue of 0 would pull every tint towards pink.
+ * Status language (design handoff): green is earned, amber means estimated (never "error"), red is reserved for the
+ * hotspot. Every status pairs its colour with a word; partial uses stripes, not a third colour. Selection takes the
+ * status colour: a 2px ring, a 6px halo, a coloured drop shadow and an outer glow that breathes while still estimated.
  */
 @layer components {
+  .status-dot {
+    display: inline-block;
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--amber);
+    transition: background-color 600ms var(--ease), box-shadow 600ms var(--ease);
+  }
+  .status-dot[data-status='PARTIAL'] {
+    background: repeating-linear-gradient(45deg, var(--amber) 0 2.5px, var(--green) 2.5px 5px);
+  }
+  .status-dot[data-status='VERIFIED'] {
+    background: var(--green);
+    box-shadow: var(--glow-dot);
+  }
+  .status-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px 0 8px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: var(--amber-tint);
+    color: var(--amber-ink);
+    transition: background-color 600ms var(--ease), color 600ms var(--ease);
+  }
+  .status-chip[data-status='VERIFIED'] {
+    background: var(--green-tint);
+    color: var(--green-ink);
+  }
+  .tag {
+    flex: none;
+    max-width: 100%;
+    padding: 1px 6px;
+    border-radius: var(--r-tag);
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--fill);
+    color: var(--ink-2);
+  }
+  .tag-estimated {
+    background: var(--amber-tint);
+    color: var(--amber-ink);
+    font-weight: 600;
+  }
+  .tag-hotspot {
+    background: var(--red-tint);
+    color: var(--red-ink);
+    font-weight: 600;
+  }
+
   .supplier-node {
     --tone: var(--amber);
-    border: 2px solid var(--tone);
-    background-color: color-mix(in oklab, var(--tone) 14%, var(--card));
-    box-shadow: var(--hotspot-ring, 0 0 #0000), 0 1px 2px rgb(0 0 0 / 0.08);
-  }
-  .supplier-node[data-status='PARTIAL'] {
-    --tone: var(--amber);
-    background-image: repeating-linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--amber) 22%, var(--card)) 0 8px,
-      color-mix(in oklab, var(--green) 22%, var(--card)) 8px 16px
-    );
+    --tone-rgb: 240 138 28;
+    position: relative;
+    background: var(--card);
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 250ms var(--ease);
+    animation: tg-appear 900ms var(--ease) backwards;
   }
   .supplier-node[data-status='VERIFIED'] {
     --tone: var(--green);
+    --tone-rgb: 18 129 79;
   }
-  .supplier-node[data-hotspot='true'] {
-    --hotspot-ring: 0 0 0 3px var(--background), 0 0 0 6px var(--red);
+  /* The hotspot: a 2px red outline 4px out, drawn as a pseudo-element so the focus ring keeps `outline`. */
+  .supplier-node[data-hotspot='true']::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border: 2px solid var(--red);
+    border-radius: calc(var(--r-card) + 6px);
+    pointer-events: none;
   }
   .supplier-node[data-selected='true'] {
-    outline: 2px solid var(--foreground);
-    outline-offset: 3px;
+    box-shadow:
+      0 0 0 2px var(--tone),
+      0 0 0 8px rgb(var(--tone-rgb) / 0.13),
+      0 10px 30px -6px rgb(var(--tone-rgb) / 0.5);
   }
-  .supplier-node[data-selected='true'][data-hotspot='true'] {
-    outline-offset: 9px;
+  .supplier-node[data-selected='true'][data-status='VERIFIED'] {
+    box-shadow:
+      0 0 0 2px var(--tone),
+      0 0 0 8px rgb(var(--tone-rgb) / 0.1),
+      0 10px 30px -6px rgb(var(--tone-rgb) / 0.5);
+  }
+  .supplier-node[data-selected='true']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: 0 0 24px rgb(var(--tone-rgb) / 0.42);
+    pointer-events: none;
+    animation: tg-breathe 3.2s ease-in-out infinite;
+  }
+  .supplier-node[data-selected='true'][data-status='VERIFIED']::after {
+    box-shadow: 0 0 24px rgb(var(--tone-rgb) / 0.4);
+    opacity: 0.85;
+    animation: none;
+  }
+  /* Canvas nodes keep the green focus ring, drawn on the card rather than React Flow's square wrapper. */
+  .react-flow__node:focus-visible {
+    outline: none;
+  }
+  .react-flow__node:focus-visible .supplier-node,
+  .react-flow__node:focus-visible .buyer-node {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* The buyer's own node glows brighter as more of the chain is proven: g = supplier-confirmed share, 0–1. */
+  .buyer-node {
+    background: var(--card);
+    box-shadow:
+      var(--card-shadow),
+      0 0 calc((12 + 34 * var(--g)) * 1px) calc(3 * var(--g) * 1px) rgb(18 129 79 / calc(0.12 + 0.5 * var(--g)));
+  }
+
+  /* Supply lines: width encodes tonnes, colour the status. */
+  .supply-line path {
+    stroke-linecap: round;
+    transition:
+      stroke 900ms var(--ease),
+      stroke-width 900ms var(--ease),
+      opacity 900ms var(--ease),
+      filter 900ms var(--ease);
+  }
+  .supply-line-base {
+    stroke: var(--amber-edge);
+  }
+  .supply-line[data-status='VERIFIED'] .supply-line-base {
+    stroke: var(--green);
+    filter: drop-shadow(0 0 3.5px rgb(18 129 79 / 0.6));
+  }
+  .supply-line-proof {
+    stroke: var(--green);
+    stroke-dasharray: 5 7;
+    stroke-linecap: butt;
   }
 }
+
+@keyframes tg-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.96);
+  }
+}
+@keyframes tg-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
 /*
  * Logo 5 wordmark (design handoff, "Logo 5 · construction"). The line centre sits 0.42em below the baseline, 0.075em
  * thick with round caps. Trace dots: dash 0.07em, gap 0.2em, from 0.04em in. Amber from 0.17em into the G to the r→e
