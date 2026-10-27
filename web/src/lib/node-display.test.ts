@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FactorLookup } from '@/api/client'
 import { node } from '@/store/testFixtures'
-import { aiMappedLabel, isPlaceholder, shownFigure } from './node-display'
+import { aiMappedLabel, invoiceCount, invoicePeriod, isPlaceholder, shownFigure } from './node-display'
 
 const row = (source: string): FactorLookup => ({ value: 1, unit: 'kgCO2e/t', source, year: 2026, rowLabel: 'row' })
 
@@ -44,5 +44,23 @@ describe('aiMappedLabel', () => {
 
   it('shows nothing when the invoice itself classified the line', () => {
     expect(aiMappedLabel({ ...classification, source: 'invoice', aiMapped: false, confidence: 1 })).toBeNull()
+  })
+})
+
+describe('invoiceCount and invoicePeriod', () => {
+  const on = (id: string, invoiceId: string, issueDate: string) => {
+    const base = node(id, 1000)
+    return { ...base, invoice: { ...base.invoice, id: invoiceId, issueDate } }
+  }
+
+  it('counts distinct invoices, not suppliers', () => {
+    expect(invoiceCount([on('a', 'i1', '2026-10-01'), on('b', 'i1', '2026-10-01'), on('c', 'i2', '2026-09-30')])).toBe(2)
+    expect(invoiceCount([])).toBe(0)
+  })
+
+  it('names the month of the latest invoice, and nothing without a readable date', () => {
+    expect(invoicePeriod([on('a', 'i1', '2026-09-30'), on('b', 'i2', '2026-10-14')])).toBe('October 2026')
+    expect(invoicePeriod([on('a', 'i1', 'not a date')])).toBeNull()
+    expect(invoicePeriod([])).toBeNull()
   })
 })

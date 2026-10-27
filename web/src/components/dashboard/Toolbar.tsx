@@ -6,16 +6,25 @@ import type { Connection } from '@/hooks/useGraphEvents'
 import { type ActionOutcome, fetchDemoTools, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
 import { cn } from '@/lib/utils'
 
-// Import, Load demo invoice and Reset demo. The outcome is shown as text; the graph itself updates from the event
-// stream, never from these responses.
+// Import, Load demo invoice and Reset demo, in the top bar. The outcome arrives as a floating notification that slides in
+// from the right and leaves after a few seconds; the graph itself updates from the event stream, never from these
+// responses.
 
 type Action = 'import' | 'demo' | 'reset'
+
+const NOTICE_MS = 6000
 
 export function Toolbar({ connection }: { connection: Connection }) {
   const [busy, setBusy] = useState<Action | null>(null)
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null)
   const demoTools = useDemoTools(connection)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (outcome === null) return
+    const timer = setTimeout(() => setOutcome(null), NOTICE_MS)
+    return () => clearTimeout(timer)
+  }, [outcome])
 
   const run = async (action: Action, request: () => Promise<ActionOutcome>) => {
     setBusy(action)
@@ -31,8 +40,8 @@ export function Toolbar({ connection }: { connection: Connection }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <>
+      <div className="flex flex-none items-center gap-2">
         <input
           ref={fileInput}
           type="file"
@@ -48,7 +57,7 @@ export function Toolbar({ connection }: { connection: Connection }) {
           {busy === 'import' ? toolbarCopy.importing : toolbarCopy.import}
         </Button>
         <Button
-          variant="outline"
+          variant="secondary"
           data-testid="toolbar-demo"
           disabled={busy !== null}
           onClick={() => void run('demo', loadDemoInvoice)}
@@ -70,11 +79,14 @@ export function Toolbar({ connection }: { connection: Connection }) {
       <p
         role="status"
         data-testid="toolbar-message"
-        className={cn('min-h-4 max-w-md text-right text-xs', outcome?.ok === false ? 'text-destructive' : 'text-muted-foreground')}
+        className={cn(
+          outcome !== null && 'notice surface-floating',
+          outcome?.ok === false ? 'text-destructive' : 'text-ink',
+        )}
       >
         {outcome?.message}
       </p>
-    </div>
+    </>
   )
 }
 

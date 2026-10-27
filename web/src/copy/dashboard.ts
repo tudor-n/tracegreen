@@ -5,11 +5,27 @@ import type { NodeStatus, ProblemCode } from '@/api/client'
 
 export const dashboardTitle = 'TraceGreen'
 
+export const topBarCopy = {
+  title: (period: string | null) => (period === null ? 'Supply chain' : `Supply chain · ${period}`),
+  subtitle: (buyer: string, suppliers: number, invoices: number) =>
+    `${buyer} · ${suppliers} ${suppliers === 1 ? 'supplier' : 'suppliers'} from ${invoices} e-Factura ${invoices === 1 ? 'invoice' : 'invoices'}`,
+} as const
+
+export const sidebarCopy = {
+  region: 'Sidebar',
+  buyerLine: (city: string) => `Buyer · ${city}`,
+  suppliers: 'Suppliers',
+  noSuppliers: 'No suppliers yet.',
+} as const
+
 export const kpiCopy = {
   region: 'Key figures',
-  total: 'Total emissions',
+  total: 'Total footprint',
+  totalSub: (verified: number, suppliers: number) => `${verified} of ${suppliers} suppliers verified`,
   spend: 'Spend',
-  nodes: 'Suppliers',
+  spendSub: (invoices: number) => `across ${invoices} ${invoices === 1 ? 'invoice' : 'invoices'}`,
+  status: 'Status',
+  hotspot: 'Hotspot',
   shareInfo: 'About the supplier-confirmed share',
   unavailable: 'Figures unavailable until the API answers.',
 } as const
@@ -20,8 +36,8 @@ export const nodeCopy = {
   factorsHeading: 'Factors behind this number',
   noFactors: 'No factor rows for this figure.',
   placeholder: 'Placeholder factor',
+  tonnes: (t: string) => `${t} t`,
   hotspot: 'largest emitter',
-  hotspotTag: 'Largest emitter',
   status: {
     ESTIMATED: 'Estimated',
     PARTIAL: 'Partly confirmed',
@@ -31,6 +47,7 @@ export const nodeCopy = {
 
 export const canvasCopy = {
   label: 'Supplier graph',
+  legend: 'Line width follows tCO₂e (log scale)',
   loading: 'Loading the supplier graph…',
   offline: "Can't reach the API. Trying again every 5 seconds.",
   empty: 'No suppliers yet. Import a UBL invoice or load the demo invoice.',

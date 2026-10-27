@@ -19,3 +19,19 @@ export function aiMappedLabel(classification: ClassificationView): string | null
   const { confidence } = classification
   return confidence === null || !Number.isFinite(confidence) ? AI_MAPPED : `${AI_MAPPED} · ${confidence.toFixed(2)}`
 }
+
+/** How many distinct invoices the suppliers came from. */
+export function invoiceCount(nodes: readonly NodeView[]): number {
+  return new Set(nodes.map((n) => n.invoice.id)).size
+}
+
+const monthYear = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+/** The month of the latest invoice, "October 2026", or null with no (readable) invoice dates. */
+export function invoicePeriod(nodes: readonly NodeView[]): string | null {
+  const latest = nodes
+    .map((n) => Date.parse(n.invoice.issueDate))
+    .filter(Number.isFinite)
+    .reduce((a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY)
+  return Number.isFinite(latest) ? monthYear.format(latest) : null
+}

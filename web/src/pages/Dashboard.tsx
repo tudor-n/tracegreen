@@ -2,15 +2,17 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Backdrop } from '@/components/brand/Backdrop'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { KpiBar } from '@/components/dashboard/KpiBar'
+import { Sidebar } from '@/components/dashboard/Sidebar'
 import { Toolbar } from '@/components/dashboard/Toolbar'
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { canvasCopy, dashboardTitle } from '@/copy/dashboard'
+import { canvasCopy, dashboardTitle, topBarCopy } from '@/copy/dashboard'
 import { type GraphStoreActions, useGraphEvents } from '@/hooks/useGraphEvents'
+import { invoiceCount, invoicePeriod } from '@/lib/node-display'
 import { cn } from '@/lib/utils'
 import { graphStore, selectLoaded, useGraphStore } from '@/store'
 
-// The buyer's dashboard: toolbar, KPI bar and supplier graph, kept in sync with the API for as long as it is mounted.
+// The buyer's dashboard: sidebar, top bar with the actions, KPI tiles and the supplier graph, kept in sync with the API for as long as it is mounted.
 
 /** The sync drives the app store through these two actions only (docs/plan/README.md §3). */
 const sync: GraphStoreActions = {
@@ -23,7 +25,8 @@ export default function Dashboard() {
   const loaded = useGraphStore(selectLoaded)
   const kpis = useGraphStore((s) => s.kpis)
   const buyer = useGraphStore((s) => s.buyer)
-  const supplierCount = useGraphStore((s) => Object.keys(s.nodes).length)
+  const nodes = useGraphStore((s) => s.nodes)
+  const supplierCount = Object.keys(nodes).length
 
   let graph: ReactNode
   if (!loaded) {
@@ -36,8 +39,17 @@ export default function Dashboard() {
   } else if (supplierCount === 0) {
     graph = <GraphMessage>{canvasCopy.empty}</GraphMessage>
   } else {
-    graph = <GraphCanvas />
+    graph = (
+      <>
+        <GraphCanvas />
+        <span className="glass pointer-events-none absolute bottom-3 left-3.5 z-10 inline-flex h-7 items-center rounded-full px-3 text-xs text-ink-2">
+          {canvasCopy.legend}
+        </span>
+      </>
+    )
   }
+  const nodeList = Object.values(nodes)
+  const invoices = invoiceCount(nodeList)
 
   // The supplier-confirmed share as the API sent it drives the backdrop and the buyer's glow; nothing is computed.
   const share = kpis !== null && Number.isFinite(kpis.primaryShare) ? Math.min(1, Math.max(0, kpis.primaryShare)) : 0
@@ -45,21 +57,30 @@ export default function Dashboard() {
 
   return (
     <TooltipProvider>
-      <div className="tg-window isolate flex h-dvh flex-col gap-3 p-3" style={windowStyle}>
+      <div className="tg-window isolate flex h-dvh gap-3 p-3" style={windowStyle}>
         <Backdrop clean={share > 0} />
-        <header className="glass flex flex-wrap items-start justify-between gap-3 rounded-[var(--r-tile)] px-4 py-3">
-          <div>
-            <h1>
-              <Wordmark size={22} variant="intro" label={dashboardTitle} />
-            </h1>
-            {buyer !== null && <p className="mt-1.5 text-[13px] text-ink-2">{buyer.name}</p>}
-          </div>
-          <Toolbar connection={connection} />
-        </header>
-        <KpiBar kpis={kpis} connection={connection} />
-        <main className="work-surface relative min-h-0 flex-1 overflow-hidden rounded-[var(--r-panel)]" data-testid="graph">
-          {graph}
-        </main>
+        <Sidebar className="hidden min-[1360px]:flex" />
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <header className="glass flex h-[52px] flex-none items-center gap-3 rounded-[var(--r-tile)] pr-2.5 pl-[18px]">
+            <span className="flex-none min-[1360px]:hidden">
+              <Wordmark size={18} variant="static" label={dashboardTitle} />
+            </span>
+            <div className="flex min-w-0 flex-1 flex-col leading-tight">
+              <h1 className="text-sm font-bold">{topBarCopy.title(invoicePeriod(nodeList))}</h1>
+              {buyer !== null && (
+                <p className="truncate text-xs text-mute">{topBarCopy.subtitle(buyer.name, supplierCount, invoices)}</p>
+              )}
+            </div>
+            <Toolbar connection={connection} />
+          </header>
+          <KpiBar kpis={kpis} invoices={invoices} connection={connection} />
+          <main
+            className="work-surface relative min-h-0 flex-1 overflow-hidden rounded-[var(--r-panel)]"
+            data-testid="graph"
+          >
+            {graph}
+          </main>
+        </div>
       </div>
     </TooltipProvider>
   )

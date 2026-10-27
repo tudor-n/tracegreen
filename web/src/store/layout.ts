@@ -10,8 +10,8 @@ export const BUYER_NODE_ID = 'buyer'
 
 /** Box sizes the layout reserves; the node components (B2) are drawn to fit them. */
 export const NODE_SIZE = {
-  supplier: { width: 248, height: 112 },
-  buyer: { width: 248, height: 104 },
+  supplier: { width: 300, height: 70 },
+  buyer: { width: 196, height: 96 },
 } as const
 
 /**
@@ -21,7 +21,7 @@ export const NODE_SIZE = {
  */
 export function computeLayout(supplierIds: readonly string[]): Map<string, XY> {
   const g = new dagre.graphlib.Graph()
-  g.setGraph({ rankdir: 'LR', nodesep: 24, ranksep: 160, marginx: 16, marginy: 16 })
+  g.setGraph({ rankdir: 'LR', nodesep: 26, ranksep: 210, marginx: 16, marginy: 16 })
   g.setDefaultEdgeLabel(() => ({}))
   g.setNode(BUYER_NODE_ID, { ...NODE_SIZE.buyer })
   for (const id of [...supplierIds].sort()) {

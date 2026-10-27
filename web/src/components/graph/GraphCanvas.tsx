@@ -75,7 +75,7 @@ function Canvas() {
       maxZoom={2}
     >
       <Background color="#d4d4d9" gap={22} size={1} />
-      <Controls showInteractive={false} />
+      <Controls showInteractive={false} position="bottom-right" />
     </ReactFlow>
   )
 }

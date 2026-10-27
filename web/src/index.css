@@ -257,46 +257,6 @@
     background: var(--green);
     box-shadow: var(--glow-dot);
   }
-  .status-chip {
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px 0 8px;
-    border-radius: var(--r-pill);
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    background: var(--amber-tint);
-    color: var(--amber-ink);
-    transition: background-color 600ms var(--ease), color 600ms var(--ease);
-  }
-  .status-chip[data-status='VERIFIED'] {
-    background: var(--green-tint);
-    color: var(--green-ink);
-  }
-  .tag {
-    flex: none;
-    max-width: 100%;
-    padding: 1px 6px;
-    border-radius: var(--r-tag);
-    font-size: 11px;
-    font-weight: 500;
-    background: var(--fill);
-    color: var(--ink-2);
-  }
-  .tag-estimated {
-    background: var(--amber-tint);
-    color: var(--amber-ink);
-    font-weight: 600;
-  }
-  .tag-hotspot {
-    background: var(--red-tint);
-    color: var(--red-ink);
-    font-weight: 600;
-  }
-
   .supplier-node {
     --tone: var(--amber);
     --tone-rgb: 240 138 28;
@@ -304,8 +264,23 @@
     isolation: isolate;
     background: var(--card);
     box-shadow: var(--card-shadow);
-    transition: box-shadow 250ms var(--ease);
+    transition:
+      box-shadow 300ms var(--ease),
+      translate 300ms var(--ease);
     animation: tg-appear 900ms var(--ease) backwards;
+  }
+  .supplier-node:hover {
+    translate: 0 -1px;
+  }
+  .status-word {
+    color: var(--amber-ink);
+    transition: color 600ms var(--ease);
+  }
+  .status-word[data-status='PARTIAL'] {
+    color: var(--ink-2);
+  }
+  .status-word[data-status='VERIFIED'] {
+    color: var(--green-ink);
   }
   .supplier-node[data-status='VERIFIED'] {
     --tone: var(--green);
@@ -371,11 +346,12 @@
   }
   /* The supplier-confirmed share meter fills from the left. */
   .meter {
-    height: 4px;
-    margin-top: 8px;
+    display: block;
+    height: 6px;
+    margin: 2px 0;
     overflow: hidden;
     border-radius: var(--r-pill);
-    background: var(--fill);
+    background: rgb(0 0 0 / 0.1);
   }
   .meter-fill {
     display: block;
@@ -385,6 +361,46 @@
     box-shadow: var(--glow-meter);
     transform-origin: left center;
     transition: transform 1.2s var(--ease);
+  }
+
+  /* Notification arrives: a floating card slides in from the right edge. */
+  .notice {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 30;
+    max-width: 344px;
+    padding: 12px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    animation: tg-notice 700ms var(--ease) both;
+  }
+
+  /* Navigation rows: selected is always solid green with white text, whatever the supplier's status. */
+  .nav-row {
+    color: var(--ink);
+    transition: background-color 200ms var(--ease);
+  }
+  .nav-row:hover {
+    background: rgb(0 0 0 / 0.05);
+  }
+  .nav-row-value {
+    color: #5a5a5f;
+  }
+  .nav-row-selected,
+  .nav-row-selected:hover {
+    background: var(--green);
+    color: #fff;
+    box-shadow: var(--glow-row);
+  }
+  .nav-row-selected .nav-row-value {
+    color: rgb(255 255 255 / 0.88);
+  }
+  .nav-row-selected .status-dot {
+    box-shadow: 0 0 0 1.5px #fff;
+  }
+  .nav-row-selected .status-dot[data-status='VERIFIED'] {
+    background: #9be3bd;
   }
 
   /* Canvas nodes keep the green focus ring, drawn on the card rather than React Flow's square wrapper. */
@@ -399,9 +415,11 @@
 
   /* The buyer's own node glows brighter as more of the chain is proven: g = supplier-confirmed share, 0–1. */
   .buyer-node {
-    background: var(--card);
+    background: var(--ink);
+    color: #fff;
+    transition: box-shadow 1.4s var(--ease);
     box-shadow:
-      var(--card-shadow),
+      0 12px 26px -12px rgb(0 0 0 / 0.5),
       0 0 calc((12 + 34 * var(--g)) * 1px) calc(3 * var(--g) * 1px) rgb(18 129 79 / calc(0.12 + 0.5 * var(--g)));
   }
 
@@ -454,6 +472,12 @@
   from {
     color: var(--green);
     text-shadow: 0 0 22px rgb(18 129 79 / 0.6);
+  }
+}
+@keyframes tg-notice {
+  from {
+    transform: translateX(110%);
+    opacity: 0.4;
   }
 }
 @keyframes tg-breathe {
