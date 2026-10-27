@@ -1,3 +1,4 @@
+using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
@@ -30,6 +31,10 @@ public sealed class GraphService(IRepository repo, IEventBus bus, NodeViewMapper
             ?? throw new InvalidOperationException($"Node {node.Id} has no invoice {node.InvoiceId}.");
         return mapper.Map(node, invoice);
     }
+
+    /// <summary>Recomputes every hash of the workspace's audit log from genesis (C4).</summary>
+    public async Task<ChainVerification> VerifyAuditAsync(Ctx ctx, CancellationToken ct) =>
+        AuditChain.Verify(await AuditAsync(ctx, ct));
 
     public async Task<Kpis> KpisAsync(Ctx ctx, CancellationToken ct) =>
         KpiCalculator.Compute(await repo.ListNodesAsync(ctx, ct));

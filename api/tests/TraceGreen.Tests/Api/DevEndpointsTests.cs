@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
@@ -56,5 +57,18 @@ public class DevEndpointsDisabledTests : IClassFixture<NoDemoToolsWebAppFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(before, bus.LastSeq(Ids.DemoWorkspace));
+    }
+
+    [Fact]
+    public async Task SimulateAnswerIsNotFoundWithoutDemoTools()
+    {
+        var repo = _factory.Services.GetRequiredService<IRepository>();
+        var client = _factory.CreateClient();
+        var n3 = Guid.Parse("11111111-1111-4111-8111-000000000003");
+
+        var response = await client.PostAsJsonAsync("/api/dev/simulate-answer", new { nodeId = n3, transportMode = "road" }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(await repo.ListVerificationsAsync(new Ctx(Ids.DemoWorkspace, "test"), n3, TestContext.Current.CancellationToken));
     }
 }

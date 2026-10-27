@@ -27,7 +27,16 @@ public static class DevEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
-        app.MapPost("/api/dev/simulate-answer", (SimulateAnswerRequest body) => Results.StatusCode(StatusCodes.Status501NotImplemented))
+        app.MapPost("/api/dev/simulate-answer", async (SimulateAnswerRequest body, HttpContext http, AppConfig config, DemoService demo, SeedBundle seed, CancellationToken ct) =>
+            {
+                if (!config.DemoTools)
+                {
+                    return Results.NotFound();
+                }
+                var result = await demo.SimulateAnswerAsync(
+                    Workspace.Demo(seed), body.NodeId, body.TransportMode, body.EnergySource, body.MassT, VerifyEndpoints.ClientAddress(http), ct);
+                return result.Match(TypedResults.Ok, VerifyEndpoints.ToProblem);
+            })
             .WithName("SimulateAnswer")
             .WithTags("Dev")
             .WithSummary("Answer for a supplier without a phone: mints a link and submits through the same path, so audit rows and events match")
