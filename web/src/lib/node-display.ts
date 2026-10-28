@@ -1,11 +1,37 @@
-import type { CarbonFigure, ClassificationView, FactorLookup, NodeView } from '@/api/client'
-import { AI_MAPPED } from '@/copy/labels'
+import type { CarbonFigure, ClassificationView, FactorLookup, NodeStatus, NodeView } from '@/api/client'
+import { AI_MAPPED, provenance } from '@/copy/labels'
 
 // What a supplier node shows, decided from the read model alone. Nothing here computes carbon.
 
 /** The figure behind `carbonKg`: the activity figure once the node is on that basis, the spend figure otherwise. */
 export function shownFigure(node: NodeView): CarbonFigure {
   return node.basis === 'activity' && node.activity !== null ? node.activity : node.spend
+}
+
+/**
+ * Ruling 3's provenance line: "Supplier-confirmed · <source> <year>" once `carbonKg` is the activity figure, else
+ * "Spend-based estimate · <source>". The spend figure's source is its first row, the emission factor; the rows after
+ * it are the currency and price conversions. The activity figure names each distinct source and year of its rows.
+ * Null when the figure has no factor rows (a row dropped from factors.json since the import), so there is no source
+ * to name.
+ */
+export function provenanceLine(node: NodeView): string | null {
+  if (node.basis === 'activity' && node.activity !== null) {
+    const rows = [...new Map(node.activity.factors.map((f) => [`${f.source} ${f.year}`, f])).values()]
+    const [first, ...rest] = rows
+    if (first === undefined) return null
+    return [provenance.activity(first.source, first.year), ...rest.map((f) => `${f.source} ${f.year}`)].join('; ')
+  }
+  const factor = node.spend.factors[0]
+  return factor === undefined ? null : provenance.spend(factor.source)
+}
+
+/**
+ * Whether a status change is the one the flip animation marks: anything else turning VERIFIED. The same node rendered
+ * again, a first render, or a reset taking a node back to ESTIMATED never flips.
+ */
+export function justVerified(previous: NodeStatus, next: NodeStatus): boolean {
+  return previous !== 'VERIFIED' && next === 'VERIFIED'
 }
 
 /** A factor row the seed still marks as a placeholder. It stays visible on screen (PRIORITY-CHANGES.md §2). */

@@ -1,3 +1,4 @@
+using System.Net;
 using TraceGreen.Api;
 
 namespace TraceGreen.Tests.Api;
@@ -41,4 +42,22 @@ public class AppConfigTests
         Assert.False(c.DemoTools);
         Assert.Equal("http://localhost:8000", c.AiBaseUrl);
     }
+
+    [Fact]
+    public void TrustsLoopbackAndDockerProxiesByDefault()
+    {
+        var trusted = AppConfig.FromEnvironment(Env()).TrustedProxies;
+
+        Assert.Contains(trusted, n => n.Contains(IPAddress.Parse("172.18.0.4")));
+        Assert.Contains(trusted, n => n.Contains(IPAddress.Loopback));
+        Assert.DoesNotContain(trusted, n => n.Contains(IPAddress.Parse("192.168.137.23")));
+    }
+
+    [Fact]
+    public void TrustedProxiesAreConfigurable() =>
+        Assert.Equal([IPNetwork.Parse("10.42.0.1/32")], AppConfig.FromEnvironment(Env(("TRUSTED_PROXIES", "10.42.0.1/32"))).TrustedProxies);
+
+    [Fact]
+    public void RefusesAMalformedTrustedProxy() =>
+        Assert.Throws<InvalidOperationException>(() => AppConfig.FromEnvironment(Env(("TRUSTED_PROXIES", "10.42.0.1/99"))));
 }

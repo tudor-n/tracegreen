@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatDate,
+  formatDateTime,
   formatDays,
   formatEuros,
   formatFactorValue,
+  formatKm,
   formatKpis,
   formatShare,
+  formatTimeLeft,
   formatTonnes,
   formatTonnesCo2e,
 } from './format'
@@ -63,6 +67,62 @@ describe('formatFactorValue', () => {
     expect(formatFactorValue(5000)).toBe('5,000')
     expect(formatFactorValue(0.123456789)).toBe('0.123457')
     expect(formatFactorValue(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatKm', () => {
+  it('shows whole kilometres, and the dash for a lane without a distance', () => {
+    expect(formatKm(7500)).toBe('7,500 km')
+    expect(formatKm(412.6)).toBe('413 km')
+    expect(formatKm(null)).toBe('–')
+    expect(formatKm(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatDate', () => {
+  it('shows a calendar date without shifting it by a time zone', () => {
+    expect(formatDate('2026-10-28')).toBe('28 Oct 2026')
+    expect(formatDate('2026-01-01')).toBe('1 Jan 2026')
+  })
+
+  it('shows the dash for something that is not a date', () => {
+    expect(formatDate('soon')).toBe('–')
+  })
+})
+
+describe('formatDateTime', () => {
+  it('shows the instant with seconds on a 24-hour clock', () => {
+    expect(formatDateTime('2026-11-01T09:03:00+00:00', 'UTC')).toBe('1 Nov 2026, 09:03:00')
+    expect(formatDateTime('2026-10-24T13:05:09.123Z', 'UTC')).toBe('24 Oct 2026, 13:05:09')
+  })
+
+  it('converts to the given time zone', () => {
+    expect(formatDateTime('2026-10-24T21:30:00Z', 'Europe/Bucharest')).toBe('25 Oct 2026, 00:30:00')
+  })
+
+  it('shows the dash for something that is not an instant', () => {
+    expect(formatDateTime('later')).toBe('–')
+  })
+})
+
+describe('formatTimeLeft', () => {
+  const s = 1000
+  const min = 60 * s
+  const h = 60 * min
+  const d = 24 * h
+
+  it('shows the two largest units, rounded down', () => {
+    expect(formatTimeLeft(7 * d - s)).toBe('6d 23h')
+    expect(formatTimeLeft(7 * d)).toBe('7d 0h')
+    expect(formatTimeLeft(5 * h + 12 * min + 59 * s)).toBe('5h 12m')
+    expect(formatTimeLeft(90 * s)).toBe('1m 30s')
+    expect(formatTimeLeft(40 * s + 999)).toBe('40s')
+  })
+
+  it('reads 0s when nothing is left, and the dash for no time at all', () => {
+    expect(formatTimeLeft(999)).toBe('0s')
+    expect(formatTimeLeft(-5 * min)).toBe('0s')
+    expect(formatTimeLeft(Number.NaN)).toBe('–')
   })
 })
 

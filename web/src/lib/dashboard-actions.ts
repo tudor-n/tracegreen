@@ -1,10 +1,13 @@
-import { api, type ProblemCode } from '@/api/client'
+import { api, type ChainVerification, type ProblemCode, type RequestLinkResponse } from '@/api/client'
 import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
-// The toolbar's requests. Each resolves to the text to show; none touches the store, because the API publishes the
-// result on the event stream (node.created, graph.reset) and the sync applies it.
+// The dashboard's requests. Each resolves to what to show; none touches the store, because the API publishes the
+// result on the event stream (node.created, graph.reset, audit.appended) and the sync applies it.
 
 export type ActionOutcome = { ok: boolean; message: string }
+
+/** A request's answer: its body, or the text to show instead. */
+export type Answer<T> = { ok: true; data: T } | { ok: false; message: string }
 
 /** The text for a failed request: the headline for the API's error code, then its detail; else the HTTP status. */
 export function failureMessage(status: number, body: unknown): string {
@@ -29,11 +32,11 @@ interface Sent<T> {
   response: Response
 }
 
-async function send<T>(
+/** The successful response, or the text to show when the request failed or the API refused it. */
+async function call<T>(
   request: () => Promise<Sent<T>>,
-  onOk: (data: T | undefined) => string,
   byStatus: Partial<Record<number, string>> = {},
-): Promise<ActionOutcome> {
+): Promise<Answer<Sent<T>>> {
   let sent: Sent<T>
   try {
     sent = await request()
@@ -41,8 +44,25 @@ async function send<T>(
     return { ok: false, message: toolbarCopy.unreachable }
   }
   const { status, ok } = sent.response
-  if (ok) return { ok: true, message: onOk(sent.data) }
+  if (ok) return { ok: true, data: sent }
   return { ok: false, message: byStatus[status] ?? failureMessage(status, sent.error) }
+}
+
+async function send<T>(
+  request: () => Promise<Sent<T>>,
+  onOk: (data: T | undefined) => string,
+  byStatus: Partial<Record<number, string>> = {},
+): Promise<ActionOutcome> {
+  const answer = await call(request, byStatus)
+  return answer.ok ? { ok: true, message: onOk(answer.data.data) } : answer
+}
+
+/** A request whose body is the point: a success without one is reported by its status. */
+async function fetchBody<T>(request: () => Promise<Sent<T>>): Promise<Answer<T>> {
+  const answer = await call(request)
+  if (!answer.ok) return answer
+  const { data, response } = answer.data
+  return data === undefined ? { ok: false, message: toolbarCopy.httpError(response.status) } : { ok: true, data }
 }
 
 /** POST /api/ingest/ubl with the file in the multipart field `file`. */
@@ -77,6 +97,19 @@ export function resetDemo(): Promise<ActionOutcome> {
     () => toolbarCopy.resetDone,
     { 404: toolbarCopy.resetUnavailable },
   )
+}
+
+/**
+ * POST /api/request-link: a signed single-use link for the supplier's phone. The token exists only inside `url`, so
+ * the answer is kept in the component that shows it and never logged.
+ */
+export function requestLink(nodeId: string): Promise<Answer<RequestLinkResponse>> {
+  return fetchBody(() => api.POST('/api/request-link', { body: { nodeId } }))
+}
+
+/** POST /api/audit/verify: the API recomputes every hash of the audit log and names the first entry that fails. */
+export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
+  return fetchBody(() => api.POST('/api/audit/verify'))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

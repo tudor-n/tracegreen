@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
-import { failureMessage } from './dashboard-actions'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { api } from '@/api/client'
+import { failureMessage, requestLink, verifyAuditChain } from './dashboard-actions'
 
 const problem = (status: number, code: string, detail: string) => ({
   type: 'about:blank',
@@ -39,5 +40,57 @@ describe('failureMessage', () => {
 
   it("reads a proxy's bare 413 as too large", () => {
     expect(failureMessage(413, '<html>413 Request Entity Too Large</html>')).toBe('File too large.')
+  })
+})
+
+describe('requestLink', () => {
+  const nodeId = '00000000-0000-0000-0000-0000000000a1'
+  const link = { nodeId, url: 'http://192.168.137.1:3000/verify/a1?t=v1.x', expiresAt: '2026-11-03T10:00:00Z', loopback: false }
+  const answer = (status: number, body: { data?: unknown; error?: unknown }) =>
+    vi.spyOn(api, 'POST').mockResolvedValue({ ...body, response: new Response(null, { status }) } as never)
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the node id and returns the link', async () => {
+    const post = answer(201, { data: link })
+    expect(await requestLink(nodeId)).toEqual({ ok: true, data: link })
+    expect(post).toHaveBeenCalledWith('/api/request-link', { body: { nodeId } })
+  })
+
+  it("shows the API's problem when the node is gone", async () => {
+    answer(404, { error: problem(404, 'NodeNotFound', 'No node 00000000-0000-0000-0000-0000000000a1.') })
+    expect(await requestLink(nodeId)).toEqual({
+      ok: false,
+      message: 'Supplier not on the graph. No node 00000000-0000-0000-0000-0000000000a1.',
+    })
+  })
+
+  it('reports an unreachable API, and a success without a body by its status', async () => {
+    vi.spyOn(api, 'POST').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect(await requestLink(nodeId)).toEqual({ ok: false, message: "Can't reach the API. Check that it is running." })
+    answer(201, {})
+    expect(await requestLink(nodeId)).toEqual({ ok: false, message: 'The API answered HTTP 201. Try again.' })
+  })
+})
+
+describe('verifyAuditChain', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("returns the API's verdict", async () => {
+    const verdict = { valid: false, length: 7, brokenAt: 3 }
+    const post = vi
+      .spyOn(api, 'POST')
+      .mockResolvedValue({ data: verdict, response: new Response(null, { status: 200 }) } as never)
+    expect(await verifyAuditChain()).toEqual({ ok: true, data: verdict })
+    expect(post).toHaveBeenCalledWith('/api/audit/verify')
+  })
+
+  it('shows the status while the endpoint is not implemented', async () => {
+    vi.spyOn(api, 'POST').mockResolvedValue({ error: undefined, response: new Response(null, { status: 501 }) } as never)
+    expect(await verifyAuditChain()).toEqual({ ok: false, message: 'The API answered HTTP 501. Try again.' })
   })
 })

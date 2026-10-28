@@ -1,6 +1,9 @@
 import { Loader2Icon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
+import { AuditPanel, AuditToggle } from '@/components/dashboard/AuditPanel'
+import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { KpiBar } from '@/components/dashboard/KpiBar'
+import { NodeDrawer } from '@/components/dashboard/NodeDrawer'
 import { Toolbar } from '@/components/dashboard/Toolbar'
 import { GraphCanvas } from '@/components/graph/GraphCanvas'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -23,6 +26,8 @@ export default function Dashboard() {
   const kpis = useGraphStore((s) => s.kpis)
   const buyer = useGraphStore((s) => s.buyer)
   const supplierCount = useGraphStore((s) => Object.keys(s.nodes).length)
+  // The drawer mounts inside the graph area, so it never covers the toolbar or the KPI bar.
+  const [graphArea, setGraphArea] = useState<HTMLElement | null>(null)
 
   let graph: ReactNode
   if (!loaded) {
@@ -43,18 +48,30 @@ export default function Dashboard() {
       <div className="flex h-dvh flex-col">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div>
-            <h1 className="text-lg font-semibold">{dashboardTitle}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold">{dashboardTitle}</h1>
+              <ConnectionBadge connection={connection} />
+            </div>
             {buyer !== null && <p className="text-sm text-muted-foreground">{buyer.name}</p>}
           </div>
-          <Toolbar connection={connection} />
+          <div className="flex items-start gap-2">
+            <AuditToggle />
+            <Toolbar connection={connection} />
+          </div>
         </header>
         <div className="border-b px-4 py-3">
           <KpiBar kpis={kpis} connection={connection} />
         </div>
-        <main className="relative min-h-0 flex-1" data-testid="graph">
+        <main ref={setGraphArea} className="relative min-h-0 flex-1 overflow-hidden" data-testid="graph">
           {graph}
         </main>
       </div>
+      {graphArea !== null && (
+        <>
+          <AuditPanel container={graphArea} connection={connection} />
+          <NodeDrawer container={graphArea} />
+        </>
+      )}
     </TooltipProvider>
   )
 }

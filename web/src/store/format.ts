@@ -8,6 +8,7 @@ const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
 const factorValue = new Intl.NumberFormat('en-GB', { maximumSignificantDigits: 6 })
+const calendarDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
 const MISSING = '–'
 
@@ -55,6 +56,57 @@ export function formatShare(fraction: number): string {
 export function formatFactorValue(value: number): string {
   if (!Number.isFinite(value)) return MISSING
   return factorValue.format(noNegativeZero(value))
+}
+
+/** Whole kilometres: 7500 → "7,500 km". A lane without a distance shows the dash. */
+export function formatKm(km: number | null): string {
+  if (km === null || !Number.isFinite(km)) return MISSING
+  return `${integer.format(noNegativeZero(Math.round(km)))} km`
+}
+
+const dateTimeOptions: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+}
+const localDateTime = new Intl.DateTimeFormat('en-GB', dateTimeOptions)
+
+/**
+ * An instant from the API ("2026-11-01T09:03:00+00:00") as "1 Nov 2026, 09:03:00", in the viewer's time zone unless
+ * one is given (the tests pass "UTC").
+ */
+export function formatDateTime(iso: string, timeZone?: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return MISSING
+  const format = timeZone === undefined ? localDateTime : new Intl.DateTimeFormat('en-GB', { ...dateTimeOptions, timeZone })
+  return format.format(date)
+}
+
+/** A calendar date from the API ("2026-10-28") as "28 Oct 2026", read in UTC so no time zone moves it a day. */
+export function formatDate(isoDate: string): string {
+  const date = new Date(`${isoDate.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? MISSING : calendarDate.format(date)
+}
+
+/**
+ * Time left in its two largest whole units, rounded down so a link never reads as lasting longer than it does:
+ * 7 days less a minute → "6d 23h", 90 s → "1m 30s", 40 s → "40s". Nothing left (or less) reads "0s".
+ */
+export function formatTimeLeft(ms: number): string {
+  if (!Number.isFinite(ms)) return MISSING
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const days = Math.floor(total / 86_400)
+  const hours = Math.floor(total / 3600) % 24
+  const minutes = Math.floor(total / 60) % 60
+  const seconds = total % 60
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
 }
 
 export interface KpiFigures {
