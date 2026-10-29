@@ -5,7 +5,7 @@ import { AnswerGroup } from '@/components/verify/AnswerGroup'
 import { ReconfirmBanner, ResultMessage } from '@/components/verify/ResultMessage'
 import { dashboardTitle } from '@/copy/dashboard'
 import { type Lang, verifyCopy } from '@/copy/verify'
-import { fixtureApi } from '@/lib/verify-fixture'
+import { verifyApi } from '@/lib/verify-api'
 import {
   canSubmit,
   formatIssueDate,
@@ -15,17 +15,13 @@ import {
   reconfirmLines,
   resolveLang,
   submitBody,
-  type VerifyApi,
   verifyReducer,
 } from '@/lib/verify-state'
 
 // The supplier's phone page. It reads the token from ?t= and the language from ?lang=, loads the link's context,
 // offers both questions pre-selected and sends the answers. No cookies, storage, login, email, camera, clipboard or
-// personal data, and nothing here logs the URL or the token. Strings come from web/src/copy/verify.ts; the decisions
-// from web/src/lib/verify-state.ts, which this page only performs and renders.
-
-// C5 step 2 replaces the fixture with the API through web/src/api/client.ts.
-const api: VerifyApi = fixtureApi
+// personal data, and nothing here logs the URL or the token. Strings come from web/src/copy/verify.ts, the decisions
+// from web/src/lib/verify-state.ts and the requests from web/src/lib/verify-api.ts; this page performs and renders them.
 
 export default function Verify() {
   const [params, setParams] = useSearchParams()
@@ -42,7 +38,7 @@ export default function Verify() {
   useEffect(() => {
     if (state.phase !== 'loading' || token === null) return
     let current = true
-    void api.context(token).then((reply) => {
+    void verifyApi.context(token).then((reply) => {
       if (!current) return
       dispatch(reply.ok ? { kind: 'contextLoaded', context: reply.data } : { kind: 'failed', failure: reply.failure })
     })
@@ -55,7 +51,7 @@ export default function Verify() {
   useEffect(() => {
     if (state.phase !== 'submitting' || token === null) return
     let current = true
-    void api.submit(submitBody(token, state.answers)).then((reply) => {
+    void verifyApi.submit(submitBody(token, state.answers)).then((reply) => {
       if (!current) return
       dispatch(reply.ok ? { kind: 'submitted', outcome: reply.data } : { kind: 'failed', failure: reply.failure })
     })
