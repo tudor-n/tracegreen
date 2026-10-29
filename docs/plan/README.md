@@ -151,13 +151,13 @@ Record each outcome in `docs/DECISIONS.md` (A10 creates it; until then, use the 
 
 **M1, Sun 25 Oct**
 
-- [ ] `seed/invoices/N1-shenzhen.xml`, imported from the browser, shows an amber node with the hotspot ring in under 2 s.
-- [ ] KPIs come from the API (snapshot and event payloads). The browser computes none of them.
-- [ ] The same result with `DATA_MODE=postgres` (the Compose default) and `DATA_MODE=memory`.
-- [ ] "Load demo invoice" and "Reset demo" work. Reset returns to the seed state: N2 green, N3 and N4 amber, N5 partial, no N1.
-- [ ] `GET /api/health` returns `ai` and `baseUrl`.
-- [ ] `pnpm typecheck && pnpm lint` is clean; `dotnet test` and `pnpm test` pass.
-- [ ] A person records the screen.
+- [x] `seed/invoices/N1-shenzhen.xml`, imported from the browser, shows an amber node with the hotspot ring in under 2 s.
+- [x] KPIs come from the API (snapshot and event payloads). The browser computes none of them.
+- [x] The same result with `DATA_MODE=postgres` (the Compose default) and `DATA_MODE=memory`.
+- [x] "Load demo invoice" and "Reset demo" work. Reset returns to the seed state: N2 green, N3 and N4 amber, N5 partial, no N1.
+- [x] `GET /api/health` returns `ai` and `baseUrl`.
+- [x] `pnpm typecheck && pnpm lint` is clean; `dotnet test` and `pnpm test` pass.
+- [x] A person records the screen.
 
 **M2, Sun 1 Nov**
 
