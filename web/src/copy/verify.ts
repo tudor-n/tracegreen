@@ -1,9 +1,9 @@
-import type { EnergySource, TransportMode } from '@/api/client'
+import type { EnergySource, PlausibilityCode, TransportMode } from '@/api/client'
 
 // Every string the supplier reads on /verify/:nodeId, in Romanian (the default) and English. The page renders them as
 // plain text and asks for no personal data. Both languages are typed by VerifyStrings, so a string missing in either
-// one fails `pnpm typecheck`; the option records are keyed by the generated enums, so a new mode or energy source does
-// too. When the slice-3 contract (A5) generates the warning codes, key `reconfirm.warnings` by that type.
+// one fails `pnpm typecheck`; the option and warning records are keyed by the generated enums, so a new mode, energy
+// source or plausibility code does too.
 
 export type Lang = 'ro' | 'en'
 export const DEFAULT_LANG: Lang = 'ro'
@@ -17,18 +17,33 @@ interface Message {
 export type VerifyResult = 'thanks' | 'alreadyUsed' | 'expired' | 'invoiceChanged' | 'invalid' | 'rateLimited' | 'offline'
 
 export interface VerifyStrings {
+  title: string
+  /** Who asks, from the link's context. */
+  intro: (buyer: string) => string
+  labels: { supplier: string; item: string; invoice: string; route: string }
+  /** The toggle names the other language in that language, so either reader can find it. */
+  language: { switchTo: string; switchLabel: string }
+  loading: string
   transport: { question: string; options: Record<TransportMode, string> }
   energy: { question: string; options: Record<EnergySource, string> }
   skip: string
+  /** Shown instead of a working submit button when both questions are skipped. */
+  answerOne: string
   submit: string
+  submitting: string
   results: Record<VerifyResult, Message>
   retry: string
   /** The "please reconfirm" banner for plausibility warnings. It never blocks (D2). */
-  reconfirm: { title: string; warnings: { AIR_HEAVY: string; SEA_TOO_FAST: string } }
+  reconfirm: { title: string; warnings: Record<PlausibilityCode, string> }
 }
 
 export const verifyCopy = {
   ro: {
+    title: 'Confirmați livrarea',
+    intro: (buyer: string) => `${buyer} vă roagă să confirmați două detalii despre această livrare.`,
+    labels: { supplier: 'Furnizor', item: 'Articol', invoice: 'Factura', route: 'Traseu' },
+    language: { switchTo: 'English', switchLabel: 'Afișează pagina în engleză' },
+    loading: 'Se încarcă…',
     transport: {
       question: 'Cum a fost transportată această livrare?',
       options: { road: 'Rutier', rail: 'Feroviar', sea: 'Maritim', air: 'Aerian' },
@@ -38,7 +53,9 @@ export const verifyCopy = {
       options: { grid: 'Rețeaua electrică', renewable: 'Majoritar regenerabilă', unknown: 'Nu știu' },
     },
     skip: 'Sari peste',
+    answerOne: 'Răspundeți la cel puțin o întrebare.',
     submit: 'Trimite',
+    submitting: 'Se trimite…',
     results: {
       thanks: {
         title: 'Mulțumim',
@@ -81,6 +98,11 @@ export const verifyCopy = {
     },
   },
   en: {
+    title: 'Confirm the delivery',
+    intro: (buyer: string) => `${buyer} asks you to confirm two details about this delivery.`,
+    labels: { supplier: 'Supplier', item: 'Item', invoice: 'Invoice', route: 'Route' },
+    language: { switchTo: 'Română', switchLabel: 'Show this page in Romanian' },
+    loading: 'Loading…',
     transport: {
       question: 'How did this shipment travel?',
       options: { road: 'Road', rail: 'Rail', sea: 'Sea', air: 'Air' },
@@ -90,7 +112,9 @@ export const verifyCopy = {
       options: { grid: 'Grid', renewable: 'Mostly renewable', unknown: "Don't know" },
     },
     skip: 'Skip',
+    answerOne: 'Answer at least one question.',
     submit: 'Submit',
+    submitting: 'Sending…',
     results: {
       thanks: {
         title: 'Thank you',
