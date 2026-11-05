@@ -14,10 +14,12 @@ The web and AI services reload on save (their watchers poll, so expect a second 
 Tests inside the containers:
 
 ```
-docker compose exec api dotnet test
+docker compose exec -e DATABASE_URL=postgres://tracegreen:tracegreen@db:5432/tracegreen_test api dotnet test
 docker compose exec ai uv run pytest
 docker compose exec web pnpm test
 ```
+
+The `-e DATABASE_URL=…` matters. The api container's own `DATABASE_URL` is the dev database `tracegreen`, and the Postgres contract tests reset the demo workspace, so a plain `docker compose exec api dotnet test` wipes the live graph. Create the scratch database once first (next section).
 
 Wipe the database and reseed from scratch: `docker compose down -v && docker compose up`.
 
