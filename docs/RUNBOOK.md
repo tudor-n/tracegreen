@@ -14,10 +14,12 @@ The web and AI services reload on save (their watchers poll, so expect a second 
 Tests inside the containers:
 
 ```
-docker compose exec api dotnet test
+docker compose exec -e DATABASE_URL=postgres://tracegreen:tracegreen@db:5432/tracegreen_test api dotnet test
 docker compose exec ai uv run pytest
 docker compose exec web pnpm test
 ```
+
+The `-e DATABASE_URL=…` matters. The api container's own `DATABASE_URL` is the dev database `tracegreen`, and the Postgres contract tests reset the demo workspace, so a plain `docker compose exec api dotnet test` wipes the live graph. Create the scratch database once first (next section).
 
 Wipe the database and reseed from scratch: `docker compose down -v && docker compose up`.
 
@@ -28,10 +30,12 @@ The Postgres repository contract runs only when `DATABASE_URL` is set. Create a 
 ## Demo laptop (production images)
 
 1. Put the laptop and the phones on the same network (a phone hotspot, or the laptop's own hotspot: Windows Mobile Hotspot, whose IP is usually `192.168.137.1`, or NetworkManager on Linux, usually `10.42.0.1`, see [Linux](#linux)). Find the laptop IP with `ipconfig` (Windows) or `ip -4 addr` (Linux).
-2. Edit `.env.demo`: `PUBLIC_BASE_URL=http://<laptop-ip>:3000`.
-3. `docker compose -f compose.yml -f compose.demo.yml up --build` — runs the one-shot migrate + seed, then the API, AI and nginx (serving the built SPA on port 3000 and proxying `/api`).
+2. Edit `.env.demo`: `PUBLIC_BASE_URL=http://<laptop-ip>:3000`. Or leave it empty: links then take their base from the dashboard's own request, so open the dashboard at `http://<laptop-ip>:3000`, never `localhost` (the link card warns when the base is a loopback address).
+3. `docker compose -f compose.yml -f compose.demo.yml up --build` — runs the one-shot migrate + seed, then the API, AI and nginx (serving the built SPA on port 3000 and proxying `/api`). Fallback without the database: `DATA_MODE=memory docker compose -f compose.yml -f compose.demo.yml up -d` (the seed is loaded at boot, nothing persists).
 4. Allow inbound TCP 3000 once in Windows Firewall (elevated PowerShell): `scripts/firewall.ps1`. On Linux, see the firewall notes under [Linux](#linux).
-5. From the laptop, run `node scripts/demo-check.mjs` to confirm the LAN URL answers; then open the LAN URL on a phone.
+5. From the laptop, run `node scripts/demo-check.mjs` to confirm the LAN URL answers; then open the LAN URL on a phone. (`demo-check.mjs` and `firewall.ps1` are task B7 and not written yet. Until then: `curl -s http://<laptop-ip>:3000/api/health` must show `"loopback":false`, and the same URL must open on the phone.)
+
+Only phones on the laptop's network can open a link (ruling R6 in `docs/DECISIONS.md`): a phone on mobile data or another Wi-Fi cannot. Keep the team's second phone on the hotspot as the fallback.
 
 Reset to the demo start state at any time with the "Reset demo" button (or `POST /api/dev/reset`). Restarting the stack keeps the data in the `pgdata` volume; `down -v` wipes it and the next `up` reseeds.
 
