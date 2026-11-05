@@ -59,7 +59,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | T12 | 29 Oct | Live update to the node flip and KPIs; PARTIAL state | **built**: event stream, store and flip animation exist; the flip under 2 s over the hotspot is not measured yet (A8) |
 | T13 | 30 Oct | Audit log and panel | **done** |
 | T14 | 31 Oct | Simulator drawer with MAC badge states | **done**: the math and the endpoints (A7), the simulator panel with all four badge states and the ghost node (B5) |
-| T15 | 1 Nov | Error, loading and empty states; CSP; environment hygiene | **partial**: CSP and environment hygiene done; the state coverage on the demo path is checked by the Playwright smoke (B6), which is open |
+| T15 | 1 Nov | Error, loading and empty states; CSP; environment hygiene | **done**: CSP and environment hygiene; the states on the demo path are checked by the Playwright smoke (B6, `web/e2e/demo-path.spec.ts`), which passes against Compose in both data modes |
 | T16 | 1 Nov | First timed two-device run-through | **open** (A8) |
 | T17–T21, T23 | 3–5 Nov | Field visits, pitch deck, backup video, rehearsals, pack list | **outside** |
 | T22 | 5 Nov | Freeze scope and tag `v0.9-prehack` | **open**: `scripts/preflight.mjs` blocks the tag while any factor source says PLACEHOLDER or the ETS price has no source (T4) |
