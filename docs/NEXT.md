@@ -106,7 +106,7 @@ What changed, by ANAF rule. Amounts, quantities, unit codes, origin countries, c
 
 The new CUIs have a valid check digit and are not registered at ANAF (ANAF's public VAT-payer lookup, 2026-10-23), so none identifies a real company. The exchange rates are the BNR reference rates published on the invoices' issue dates (2026-10-05: 5.3306; 2026-10-12: 5.3373), from `https://curs.bnr.ro/files/xml/years/nbrfxrates2026.xml`.
 
-Decisions behind it, and the one still open for A's confirmation (the adversarial line's description): `docs/DECISIONS.md`, "Seed invoices at ANAF".
+Decisions behind it, including the adversarial line's description (accepted by A on 2026-11-05): `docs/DECISIONS.md`, "Seed invoices at ANAF".
 
 The API reads `seed/` once at startup. After pulling these changes, restart it (`docker compose restart api`) and press "Reset demo", or run `docker compose down -v && docker compose up`, so the stored buyer and seed invoices match the files.
 
