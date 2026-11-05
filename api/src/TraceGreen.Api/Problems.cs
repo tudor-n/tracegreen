@@ -22,6 +22,10 @@ public enum ProblemCode
     [JsonStringEnumMemberName("AlreadyUsed")] AlreadyUsed,
     [JsonStringEnumMemberName("InvalidAnswer")] InvalidAnswer,
     [JsonStringEnumMemberName("RateLimited")] RateLimited,
+    [JsonStringEnumMemberName("AlternativeNotFound")] AlternativeNotFound,
+    [JsonStringEnumMemberName("InvalidChange")] InvalidChange,
+    [JsonStringEnumMemberName("ModeNotAvailable")] ModeNotAvailable,
+    [JsonStringEnumMemberName("MassUnknown")] MassUnknown,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -51,6 +55,10 @@ public static class Problems
             ProblemCode.AlreadyUsed => (StatusCodes.Status409Conflict, "Link already used"),
             ProblemCode.InvalidAnswer => (StatusCodes.Status422UnprocessableEntity, "Answer not accepted"),
             ProblemCode.RateLimited => (StatusCodes.Status429TooManyRequests, "Too many requests"),
+            ProblemCode.AlternativeNotFound => (StatusCodes.Status404NotFound, "Alternative supplier not found"),
+            ProblemCode.InvalidChange => (StatusCodes.Status422UnprocessableEntity, "Change not accepted"),
+            ProblemCode.ModeNotAvailable => (StatusCodes.Status422UnprocessableEntity, "Mode not available on this lane"),
+            ProblemCode.MassUnknown => (StatusCodes.Status422UnprocessableEntity, "Mass unknown"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);
@@ -65,6 +73,16 @@ public static class Problems
         IngestErrorCode.Duplicate => ProblemCode.Duplicate,
         IngestErrorCode.UnsupportedCurrency => ProblemCode.UnsupportedCurrency,
         IngestErrorCode.NoLane => ProblemCode.NoLane,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
+    };
+
+    public static ProblemCode From(ScenarioErrorCode code) => code switch
+    {
+        ScenarioErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
+        ScenarioErrorCode.AlternativeNotFound => ProblemCode.AlternativeNotFound,
+        ScenarioErrorCode.InvalidChange => ProblemCode.InvalidChange,
+        ScenarioErrorCode.ModeNotAvailable => ProblemCode.ModeNotAvailable,
+        ScenarioErrorCode.MassUnknown => ProblemCode.MassUnknown,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

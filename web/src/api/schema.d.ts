@@ -156,6 +156,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/simulate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What a change of mode or supplier would do to a node's carbon, cost and lead time, with the MAC and its badge; nothing is stored */
+        post: operations["Simulate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recompute a change on the server, save it next to the node (never over it) and publish scenario.saved */
+        post: operations["SaveScenario"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -194,6 +228,14 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AlternativeView: {
+            id: string;
+            label: string;
+            country: string;
+            origin: string;
+            mode: components["schemas"]["TransportMode"];
+            illustrative: boolean;
+        };
         ApiProblem: {
             type: string;
             title: string;
@@ -428,6 +470,7 @@ export interface components {
             classification: components["schemas"]["ClassificationView"];
             invoice: components["schemas"]["InvoiceSummary"];
             lane: components["schemas"]["LaneView"];
+            alternatives: components["schemas"]["AlternativeView"][];
             /** Format: double */
             massT: null | number;
             transportMode: null | components["schemas"]["TransportMode"];
@@ -449,7 +492,7 @@ export interface components {
             detail: string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -489,6 +532,12 @@ export interface components {
         };
         /** @enum {unknown} */
         ScenarioKind: "mode" | "supplier";
+        ScenarioRequest: {
+            /** Format: uuid */
+            nodeId: string;
+            mode?: null | components["schemas"]["TransportMode"];
+            alternativeId?: null | string;
+        };
         ScenarioResult: {
             /** Format: double */
             carbonKg: number;
@@ -915,6 +964,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChainVerification"];
+                };
+            };
+        };
+    };
+    Simulate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioResult"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SaveScenario: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Scenario"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
                 };
             };
         };
