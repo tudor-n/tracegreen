@@ -27,6 +27,33 @@ The API picks Postgres because Compose sets `DATABASE_URL`. To run the same stac
 
 The Postgres repository contract runs only when `DATABASE_URL` is set. Create a scratch database once (`docker compose exec db psql -U tracegreen -d tracegreen -c "CREATE DATABASE tracegreen_test"`), then `DATABASE_URL=postgres://tracegreen:tracegreen@localhost:5432/tracegreen_test dotnet test` from `api/`. Never point it at the dev database: the tests reset the demo workspace.
 
+## Playwright smoke (`pnpm e2e`)
+
+`web/e2e/demo-path.spec.ts` walks the demo path against the running stack: reset → load the demo invoice (N1 ESTIMATED) → request a link → a phone-sized page answers Air + Grid → N1 is VERIFIED on the dashboard within 2 s of the submit → the same link says "already used" → simulator: Sea is `win-win`, N1-alt is `premium` or `below-ets`, Apply leaves N1 as it is → the audit chain is valid. It starts no server, and it resets the demo workspace first, so do not run it while someone is using the stack.
+
+1. Bring the stack up (`docker compose up`, see above) and wait until `curl -s localhost:8080/api/health` answers.
+2. Once per machine: `cd web && pnpm exec playwright install chromium` (a browser download, not a package).
+3. `cd web && pnpm e2e`. A run takes about 7 s.
+
+Both data modes: the stack above runs Postgres. For memory mode, recreate only the API with `DATA_MODE=memory docker compose up -d api` (PowerShell: `$env:DATA_MODE="memory"; docker compose up -d api`, then `Remove-Item Env:DATA_MODE`), run `pnpm e2e`, then `docker compose up -d api` to go back to Postgres.
+
+Another origin, such as the demo image: `E2E_BASE_URL=http://<host>:3000 pnpm e2e`.
+
+A failed run leaves a screenshot and a trace in `web/test-results/` (git-ignored); open the trace with `pnpm exec playwright show-trace <path>/trace.zip`.
+
+Rate limit: a run makes about four calls to `/api/verify*` (under the Vite dev server, React's StrictMode loads the supplier page's context twice), and the API allows `RATE_LIMIT_PER_MIN` (10) a minute per client address. Two runs a minute pass; a third within the same minute fails at step 3 with `data-result="rateLimited"`. Wait a minute, or `docker compose restart api` (the limiter lives in memory).
+
+Frozen test hooks: the smoke and the CI job depend on these, so rename one only together with the spec.
+
+| Where | Hooks |
+|---|---|
+| Toolbar | `toolbar-reset`, `toolbar-demo`, `toolbar-audit` |
+| Graph | `node-<id>` with `data-status`; `ghost-<id>` with `data-badge`; `ghost-<id>-saved` |
+| Node drawer | `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate` |
+| Simulator | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
+| Audit panel | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
+| Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-submit` |
+
 ## Demo laptop (production images)
 
 1. Put the laptop and the phones on the same network (a phone hotspot, or the laptop's own hotspot: Windows Mobile Hotspot, whose IP is usually `192.168.137.1`, or NetworkManager on Linux, usually `10.42.0.1`, see [Linux](#linux)). Find the laptop IP with `ipconfig` (Windows) or `ip -4 addr` (Linux).

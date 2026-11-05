@@ -18,6 +18,8 @@ interface AnswerGroupProps<T extends string> {
   skipLabel: string
   disabled: boolean
   onChange: (value: T | null) => void
+  /** The group's `data-testid`; each option gets `<testId>-<value>`, and skip `<testId>-skip`. */
+  testId?: string
 }
 
 export function AnswerGroup<T extends string>({
@@ -27,6 +29,7 @@ export function AnswerGroup<T extends string>({
   skipLabel,
   disabled,
   onChange,
+  testId,
 }: AnswerGroupProps<T>) {
   const headingId = useId()
   return (
@@ -34,18 +37,25 @@ export function AnswerGroup<T extends string>({
       <h2 id={headingId} className="text-lg leading-snug font-semibold">
         {question}
       </h2>
-      <div role="group" aria-labelledby={headingId} className="grid grid-cols-2 gap-2">
+      <div role="group" aria-labelledby={headingId} data-testid={testId} className="grid grid-cols-2 gap-2">
         {options.map((option) => (
           <Choice
             key={option.value}
             pressed={selected === option.value}
             disabled={disabled}
+            testId={testId && `${testId}-${option.value}`}
             onClick={() => onChange(option.value)}
           >
             {option.label}
           </Choice>
         ))}
-        <Choice pressed={selected === null} disabled={disabled} skip onClick={() => onChange(null)}>
+        <Choice
+          pressed={selected === null}
+          disabled={disabled}
+          skip
+          testId={testId && `${testId}-skip`}
+          onClick={() => onChange(null)}
+        >
           {skipLabel}
         </Choice>
       </div>
@@ -57,14 +67,16 @@ interface ChoiceProps {
   pressed: boolean
   disabled: boolean
   skip?: boolean
+  testId?: string
   onClick: () => void
   children: ReactNode
 }
 
-function Choice({ pressed, disabled, skip = false, onClick, children }: ChoiceProps) {
+function Choice({ pressed, disabled, skip = false, testId, onClick, children }: ChoiceProps) {
   return (
     <button
       type="button"
+      data-testid={testId}
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
