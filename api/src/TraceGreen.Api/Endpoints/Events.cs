@@ -69,8 +69,12 @@ public static class EventsEndpoints
         IEventBus bus, Guid workspaceId, long? since, [EnumeratorCancellation] CancellationToken ct)
     {
         // Subscribe before replaying so nothing published in between is lost; the client ignores duplicate sequence numbers.
+        // Pump() is called directly, not through Task.Run: it runs synchronously up to its first real await, which comes
+        // after Subscribe has registered the subscriber, so the subscription exists before hello is sent.
         var channel = Channel.CreateUnbounded<DomainEvent>(new UnboundedChannelOptions { SingleReader = true });
-        _ = Task.Run(async () =>
+        _ = Pump();
+
+        async Task Pump()
         {
             try
             {
@@ -86,7 +90,7 @@ public static class EventsEndpoints
             {
                 channel.Writer.TryComplete();
             }
-        }, CancellationToken.None);
+        }
 
         yield return new SseItem<string>("{}", "hello")
         {
