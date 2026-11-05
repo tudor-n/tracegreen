@@ -36,8 +36,18 @@ export const HASHED_TERMS = [
   {
     kind: 'company name',
     instead: 'leave it out; the seed stays fictional (Transilvania Electro-Assembly SRL and its five suppliers)',
-    contains: [],
-    exact: [],
+    contains: [
+      { length: 9, sha256: '8146c43229fc8e29987913e2ada59a0cd737e3798faccc5310c9aa200899b277' },
+      { length: 7, sha256: 'c27e13bdfeef173ea6328ab1f72810f8a4a8fd6aa7608786526681596d89c907' },
+      { length: 5, sha256: '0600c79833cc723f51a26a1c39b46fcc6bb909a6db9b8c9a3885469f8aaa3fc2' },
+      { length: 10, sha256: '3ce50b4077295def9dd7c77c0d63bb11d584e5d21ffc0495ac2dbb5c3cf23612' },
+      { length: 9, sha256: 'fa4ad48a5a6f26fe43445091e0d9ebf705b66edf3a1f1998dd49374f817fc8a3' },
+    ],
+    // The two names with an everyday lower-case twin, matched as whole words in that case only.
+    exact: [
+      '02fb3680cd781f8fa918bdb75abe6a38d9165b849b54bdf6f71a174d69c617b2',
+      'd6693a421ebd3bd40ed01f429f4cd9d45f31352982d7565a5a0ead7ec64dc373',
+    ],
   },
   {
     kind: 'retired product name',
@@ -55,6 +65,7 @@ export const EXEMPT_PATHS = [
   '.claude/hooks/',
   'scripts/lib/banned-terms.mjs',
   'scripts/lib/banned-terms.test.mjs',
+  'scripts/lib/preflight-checks.test.mjs',
 ];
 
 export function sha256(word) {
