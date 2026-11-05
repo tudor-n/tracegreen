@@ -84,7 +84,7 @@ Order-of-work ruling (same review): build vertical slices toward the demo path F
 - **The three imports (N1 Shenzhen, N2 Taiwan, N5 Hamburg) are expected to fail only seller identification (`ERRIdentif`)** — ANAF identifies the seller by a Romanian CUI and these suppliers have none; `scripts/validate-seed-anaf.mjs` lists them in `EXPECTED_FAILURES` and fails them on any other message or if ANAF accepts them — cost if wrong: the three files get Romanian VAT registrations.
 - **The parser reads the classification scheme STI as CPV** — ANAF accepts CPV codes only under STI — cost if wrong: one line.
 - **RON VAT totals use the BNR rate published on the invoice's issue date** — BR-RO-030 and BR-53 require the figure; nothing in TraceGreen reads it — cost if wrong: two numbers in three files.
-- **The adversarial line's injected instruction moved from `cbc:Name` to `cbc:Description`**, so its parsed description reads "Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …" and `seed/ai-cache.json` is re-keyed — BR-RO-L100 caps the name at 100 characters; the injection itself stays (roadmap A3) — cost if wrong: shorten the text to fit the name and restore the old key. Open: raised for A's confirmation in C2, not yet recorded.
+- **The adversarial line's injected instruction moved from `cbc:Name` to `cbc:Description`**, so its parsed description reads "Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …" and `seed/ai-cache.json` is re-keyed — BR-RO-L100 caps the name at 100 characters; the injection itself stays (roadmap A3) — cost if wrong: shorten the text to fit the name and restore the old key. Accepted by A on 2026-11-05: the injection test still works, and shortening the attack text would weaken it.
 
 ## Data and audit
 
