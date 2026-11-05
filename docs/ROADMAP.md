@@ -9,7 +9,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | ID | Due | What | Status |
 |---|---|---|---|
 | M1 | 25 Oct | Import an XML from the browser, and an amber node appears with its KPIs | **done**: recorded 2026-10-24 (B3) and re-run 2026-10-29 (C4), in both data modes (`NEXT.md`, "M1 check") |
-| M2 | 1 Nov | Two-device verify loop: the phone flips the node green in under 2 s, then the simulator runs | **open**: the verify loop is built end to end, but the timed two-device run (T16, task A8) is not recorded and the simulator panel is not built |
+| M2 | 1 Nov | Two-device verify loop: the phone flips the node green in under 2 s, then the simulator runs | **open**: the API-level checks passed on the demo image in both modes on 2026-11-05 (`NEXT.md`, "M2 pre-check"); the timed two-device run (T16) and the simulator panel (B5) remain |
 
 ## Features
 
