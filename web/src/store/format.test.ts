@@ -11,6 +11,9 @@ import {
   formatTimeLeft,
   formatTonnes,
   formatTonnesCo2e,
+  formatTonnesDelta,
+  formatEurosDelta,
+  formatDaysDelta,
 } from './format'
 import { kpis } from './testFixtures'
 
@@ -32,6 +35,40 @@ describe('formatTonnes', () => {
 
   it('prints a dash for a missing number', () => {
     expect(formatTonnes(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatTonnesDelta', () => {
+  it('signs a change in tonnes with one decimal', () => {
+    expect(formatTonnesDelta(-15_074)).toBe('-15.1')
+    expect(formatTonnesDelta(400)).toBe('+0.4')
+    expect(formatTonnesDelta(1_234_567)).toBe('+1,234.6')
+  })
+
+  it('reads 0.0 without a sign when the change rounds to nothing, and the dash for no number', () => {
+    expect(formatTonnesDelta(0)).toBe('0.0')
+    expect(formatTonnesDelta(20)).toBe('0.0')
+    expect(formatTonnesDelta(-20)).toBe('0.0')
+    expect(formatTonnesDelta(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatEurosDelta and formatDaysDelta', () => {
+  it('sign a change in whole euros and whole days', () => {
+    expect(formatEurosDelta(-3910)).toBe('-€3,910')
+    expect(formatEurosDelta(8350.4)).toBe('+€8,350')
+    expect(formatDaysDelta(33)).toBe('+33 days')
+    expect(formatDaysDelta(-5)).toBe('-5 days')
+    expect(formatDaysDelta(-1)).toBe('-1 day')
+  })
+
+  it('read a change that rounds to nothing without a sign, and the dash for no number', () => {
+    expect(formatEurosDelta(0.4)).toBe('€0')
+    expect(formatEurosDelta(-0.4)).toBe('€0')
+    expect(formatDaysDelta(0)).toBe('0 days')
+    expect(formatDaysDelta(-0.2)).toBe('0 days')
+    expect(formatEurosDelta(Number.NaN)).toBe('–')
+    expect(formatDaysDelta(Number.POSITIVE_INFINITY)).toBe('–')
   })
 })
 

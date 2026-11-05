@@ -4,7 +4,19 @@ import type { Kpis } from '@/api/client'
 // (CLAUDE.md: tonnes with one decimal, euros without decimals, days as integers). No carbon is computed here.
 
 const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const tonnesDelta = new Intl.NumberFormat('en-GB', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+})
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+const eurosDelta = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+  signDisplay: 'exceptZero',
+})
+const integerDelta = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0, signDisplay: 'exceptZero' })
 const percent = new Intl.NumberFormat('en-GB', { style: 'percent', maximumFractionDigits: 0 })
 const integer = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 })
 const factorValue = new Intl.NumberFormat('en-GB', { maximumSignificantDigits: 6 })
@@ -33,10 +45,25 @@ export function formatTonnesCo2e(kg: number): string {
   return `${formatTonnes(kg)} ${CO2E_UNIT}`
 }
 
+/**
+ * A change in kilograms (a scenario delta from the API) as signed tonnes with one decimal, without a unit:
+ * −15 074 → "-15.1", 400 → "+0.4". A change that rounds to nothing reads "0.0", without a sign.
+ */
+export function formatTonnesDelta(kg: number): string {
+  if (!Number.isFinite(kg)) return MISSING
+  return tonnesDelta.format(noNegativeZero(Math.round((kg / 1000) * 10) / 10))
+}
+
 /** Whole euros: 12 345.6 → "€12,346". */
 export function formatEuros(eur: number): string {
   if (!Number.isFinite(eur)) return MISSING
   return euros.format(noNegativeZero(Math.round(eur)))
+}
+
+/** A change in euros, signed and whole: −3 910 → "-€3,910", 8 350 → "+€8,350", 0.4 → "€0". */
+export function formatEurosDelta(eur: number): string {
+  if (!Number.isFinite(eur)) return MISSING
+  return eurosDelta.format(noNegativeZero(Math.round(eur)))
 }
 
 /** Whole days: "1 day", "35 days". */
@@ -44,6 +71,13 @@ export function formatDays(days: number): string {
   if (!Number.isFinite(days)) return MISSING
   const n = noNegativeZero(Math.round(days))
   return `${integer.format(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`
+}
+
+/** A change in days, signed and whole: 33 → "+33 days", −1 → "-1 day", 0 → "0 days". */
+export function formatDaysDelta(days: number): string {
+  if (!Number.isFinite(days)) return MISSING
+  const n = noNegativeZero(Math.round(days))
+  return `${integerDelta.format(n)} ${Math.abs(n) === 1 ? 'day' : 'days'}`
 }
 
 /** A 0–1 share as a whole percentage: 0.374 → "37%". */

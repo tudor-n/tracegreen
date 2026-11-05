@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createGraphStore, selectLoaded } from './graphStore'
-import { audit, auditEvent, kpis, node, nodeEvent, resetEvent, snapshot } from './testFixtures'
+import {
+  audit,
+  auditEvent,
+  kpis,
+  node,
+  nodeEvent,
+  preview,
+  resetEvent,
+  savedScenario,
+  scenarioResult,
+  snapshot,
+} from './testFixtures'
 
 const ids = (store: ReturnType<typeof createGraphStore>) => Object.keys(store.getState().nodes).sort()
 
@@ -123,6 +134,101 @@ describe('applyEvent', () => {
 
     expect(store.getState().selectedNodeId).toBe('a')
     expect(store.getState().openPanels.drawer).toBe(true)
+  })
+})
+
+describe('scenario preview', () => {
+  const setup = () => {
+    const store = createGraphStore()
+    const a = node('a', 22_562, { costEur: 52_600, leadDays: 7 })
+    store.getState().hydrate(snapshot(1, [a, node('b', 10)]))
+    store.getState().select('a')
+    store.getState().setScenarioPreview(preview(a))
+    return { store, a }
+  }
+
+  it('lives beside the base nodes and never changes them', () => {
+    const { store, a } = setup()
+    expect(store.getState().scenarioPreview?.nodeId).toBe('a')
+    expect(store.getState().nodes.a).toBe(a)
+  })
+
+  it('survives events and snapshots that leave the figures of its node alone', () => {
+    const { store, a } = setup()
+    const kept = store.getState().scenarioPreview
+    store.getState().applyEvent(nodeEvent(2, node('b', 99), 'node.updated'))
+    store.getState().applyEvent(auditEvent(3, audit(1)))
+    store.getState().applyEvent(nodeEvent(4, { ...a, label: 'Renamed' }, 'node.updated'))
+    store.getState().hydrate(snapshot(4, [{ ...a }, node('b', 99)]))
+    expect(store.getState().scenarioPreview).toBe(kept)
+  })
+
+  it('is dropped when the figures of its node move, because the deltas were taken against the old ones', () => {
+    const { store, a } = setup()
+    store.getState().applyEvent(nodeEvent(2, { ...a, carbonKg: 20_700, status: 'VERIFIED' }, 'node.updated'))
+    expect(store.getState().scenarioPreview).toBeNull()
+
+    store.getState().setScenarioPreview(preview(store.getState().nodes.a))
+    store.getState().hydrate(snapshot(3, [{ ...store.getState().nodes.a, leadDays: 40 }]))
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it('is dropped when the simulator closes, and kept while other panels open and close', () => {
+    const { store } = setup()
+    store.getState().setPanel('simulator', true)
+    store.getState().setPanel('audit', true)
+    store.getState().setPanel('audit', false)
+    expect(store.getState().scenarioPreview).not.toBeNull()
+
+    store.getState().setPanel('simulator', false)
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it('is dropped with its node, and when another node is selected', () => {
+    const { store, a } = setup()
+    store.getState().hydrate(snapshot(0, [node('b', 10)]))
+    expect(store.getState().scenarioPreview).toBeNull()
+
+    store.getState().hydrate(snapshot(1, [a, node('b', 10)]))
+    store.getState().select('a')
+    store.getState().setScenarioPreview(preview(a))
+    store.getState().select('b')
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it("is marked saved with the server's result when the API saves the change it shows", () => {
+    const { store } = setup()
+    const recomputed = scenarioResult({ carbonKg: 7_400 })
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'sea', alternativeId: null }, recomputed))
+    expect(store.getState().scenarioPreview).toMatchObject({ savedId: 'scenario-1', result: recomputed })
+  })
+
+  it('ignores a save that is not of the change it shows, or that lands after it closed', () => {
+    const { store } = setup()
+    const before = store.getState().scenarioPreview
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'air', alternativeId: null }))
+    store.getState().markScenarioSaved(savedScenario('a', { mode: null, alternativeId: 'N1-alt' }))
+    store.getState().markScenarioSaved(savedScenario('b', { mode: 'sea', alternativeId: null }))
+    expect(store.getState().scenarioPreview).toBe(before)
+
+    store.getState().setScenarioPreview(null)
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'sea', alternativeId: null }))
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it('moves the sequence on a scenario.saved event and leaves the nodes and the preview alone', () => {
+    const { store, a } = setup()
+    const kept = store.getState().scenarioPreview
+    store.getState().applyEvent({
+      type: 'scenario.saved',
+      scenario: savedScenario('a', { mode: 'sea', alternativeId: null }),
+      seq: 2,
+      ts: '2026-11-05T10:00:00Z',
+      workspaceId: 'ws',
+    })
+    expect(store.getState().lastSeq).toBe(2)
+    expect(store.getState().nodes.a).toBe(a)
+    expect(store.getState().scenarioPreview).toBe(kept)
   })
 })
 

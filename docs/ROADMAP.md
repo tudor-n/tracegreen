@@ -18,7 +18,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | F1 | e-Factura import (UBL 2.1, BT-158 classification code and BT-159 origin country, unit codes) | **done** | `Domain/Ubl`, `POST /api/ingest/ubl`; the seed XMLs pass ANAF's validator (`NEXT.md`) |
 | F2 | Supply-chain graph: status colours, hotspot ring, log-width edges, KPI bar | **done** | `web/src/store`, `components/graph`, `KpiBar`; KPIs from the API, labelled per ruling R2 |
 | F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; M2's timed run is still open |
-| F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **partial** | Backend done (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel in the drawer is open |
+| F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **done** | Backend (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel and ghost node in the drawer (B5), checked in the browser in both data modes (`NEXT.md`) |
 | F5 | Audit log panel with chain check | **done** | `AuditPanel`, `POST /api/audit/verify` |
 | F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The live Python classifier is open; D4 places it in hackathon hours H1–H4 |
 | F7 | Plausibility check | **partial** | `AIR_HEAVY` on the answer and the node (D2); `SEA_TOO_FAST` is in the contract but not evaluated (D3) |
@@ -58,7 +58,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | T11 | 28 Oct | Mobile supplier page with RO/EN and the rate limit | **done**: phone-tested in C5 |
 | T12 | 29 Oct | Live update to the node flip and KPIs; PARTIAL state | **built**: event stream, store and flip animation exist; the flip under 2 s over the hotspot is not measured yet (A8) |
 | T13 | 30 Oct | Audit log and panel | **done** |
-| T14 | 31 Oct | Simulator drawer with MAC badge states | **partial**: the math and the endpoints are done (A7), the drawer panel is open |
+| T14 | 31 Oct | Simulator drawer with MAC badge states | **done**: the math and the endpoints (A7), the simulator panel with all four badge states and the ghost node (B5) |
 | T15 | 1 Nov | Error, loading and empty states; CSP; environment hygiene | **partial**: CSP and environment hygiene done; the state coverage on the demo path is checked by the Playwright smoke (B6), which is open |
 | T16 | 1 Nov | First timed two-device run-through | **open** (A8) |
 | T17–T21, T23 | 3–5 Nov | Field visits, pitch deck, backup video, rehearsals, pack list | **outside** |

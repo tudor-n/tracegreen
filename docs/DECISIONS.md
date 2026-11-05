@@ -71,6 +71,14 @@ Order-of-work ruling (same review): build vertical slices toward the demo path F
 - **Saving a scenario writes no audit entry** — the audit log records invoices and supplier answers, and a what-if changes neither; `scenario.saved` is published; a demo reset wipes scenarios — cost if wrong: one audit action.
 - **The ETS price reaches the service through `ServiceOptions.EtsPriceEurPerT` (`ETS_PRICE_EUR_PER_T`, placeholder 70)** — cost if wrong: none.
 
+## Simulator panel, slice 5 (B5)
+
+- **The scenario preview is UI state beside the domain nodes (`scenarioPreview`), never inside them** — the base node must never change, and the panel and the ghost node render the same answer — cost if wrong: none.
+- **The "Saved" mark lives on the preview (`savedId`, from the `POST /api/scenarios` answer), not in a store list fed by `scenario.saved`** — the snapshot carries no scenarios and polling hydrates every 5 s, so a list would empty itself, and after a reset it could not tell which scenarios the server wiped; `scenario.saved` only moves `lastSeq` — cost if wrong: a second dashboard does not show the save; a list needs scenarios in the snapshot (a contract change).
+- **The preview is dropped when its node's figures move, when another node is selected and when the simulator closes; an answer that lands after another pick or after closing is ignored** — its deltas were taken against the old figures — cost if wrong: none.
+- **A swap is titled by the alternative's label from `NodeView.alternatives`, and the alternative's mode carries the illustrative tag** — like every lane figure — cost if wrong: none.
+- **The node's current mode is disabled** — the panel never offers a change that changes nothing — cost if wrong: none.
+
 ## Seed invoices at ANAF (C2, 2026-10-23)
 
 - **The three imports (N1 Shenzhen, N2 Taiwan, N5 Hamburg) are expected to fail only seller identification (`ERRIdentif`)** — ANAF identifies the seller by a Romanian CUI and these suppliers have none; `scripts/validate-seed-anaf.mjs` lists them in `EXPECTED_FAILURES` and fails them on any other message or if ANAF accepts them — cost if wrong: the three files get Romanian VAT registrations.

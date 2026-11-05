@@ -38,6 +38,20 @@ export function computeLayout(supplierIds: readonly string[]): Map<string, XY> {
   return positions
 }
 
+/**
+ * Space between a ghost node (B5) and the supplier it is a scenario of: room for the dashed edge to show past the
+ * supplier's selection outline and hotspot ring, which reach about 15 px out.
+ */
+export const GHOST_GAP = 80
+
+/**
+ * A ghost sits left of its supplier on the same row, so the supplier column, the buyer and their edges stay where the
+ * layout put them. Kept out of `computeLayout`: a preview never moves the graph.
+ */
+export function ghostPosition(supplier: XY): XY {
+  return { x: supplier.x - NODE_SIZE.supplier.width - GHOST_GAP, y: supplier.y }
+}
+
 /** Same set of ids, in any order → same key. */
 export function layoutKey(supplierIds: readonly string[]): string {
   return [...supplierIds].sort().join('|')

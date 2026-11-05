@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
-import { failureMessage, requestLink, verifyAuditChain } from './dashboard-actions'
+import { savedScenario, scenarioResult } from '@/store/testFixtures'
+import { failureMessage, requestLink, saveScenario, simulateChange, verifyAuditChain } from './dashboard-actions'
 
 const problem = (status: number, code: string, detail: string) => ({
   type: 'about:blank',
@@ -92,5 +93,74 @@ describe('verifyAuditChain', () => {
   it('shows the status while the endpoint is not implemented', async () => {
     vi.spyOn(api, 'POST').mockResolvedValue({ error: undefined, response: new Response(null, { status: 501 }) } as never)
     expect(await verifyAuditChain()).toEqual({ ok: false, message: 'The API answered HTTP 501. Try again.' })
+  })
+})
+
+describe('simulateChange', () => {
+  const nodeId = '11111111-1111-4111-8111-000000000001'
+  const answer = (status: number, body: { data?: unknown; error?: unknown }) =>
+    vi.spyOn(api, 'POST').mockResolvedValue({ ...body, response: new Response(null, { status }) } as never)
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the node with a mode change and returns the result as the API computed it', async () => {
+    const result = scenarioResult()
+    const post = answer(200, { data: result })
+    expect(await simulateChange(nodeId, { mode: 'sea', alternativeId: null })).toEqual({ ok: true, data: result })
+    expect(post).toHaveBeenCalledWith('/api/simulate', { body: { nodeId, mode: 'sea', alternativeId: null } })
+  })
+
+  it('posts the node with an alternative supplier', async () => {
+    const post = answer(200, { data: scenarioResult({ badge: 'premium' }) })
+    await simulateChange(nodeId, { mode: null, alternativeId: 'N1-alt' })
+    expect(post).toHaveBeenCalledWith('/api/simulate', { body: { nodeId, mode: null, alternativeId: 'N1-alt' } })
+  })
+
+  it("shows the API's problem for a change the node cannot take", async () => {
+    answer(422, { error: problem(422, 'ModeNotAvailable', 'Lane CN-RO has no road leg.') })
+    expect(await simulateChange(nodeId, { mode: 'road', alternativeId: null })).toEqual({
+      ok: false,
+      message: 'This lane has no such mode. Lane CN-RO has no road leg.',
+    })
+    answer(422, { error: problem(422, 'MassUnknown', '') })
+    expect(await simulateChange(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
+      ok: false,
+      message: 'Mass unknown for this item.',
+    })
+  })
+
+  it('reports an unreachable API', async () => {
+    vi.spyOn(api, 'POST').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect(await simulateChange(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
+      ok: false,
+      message: "Can't reach the API. Check that it is running.",
+    })
+  })
+})
+
+describe('saveScenario', () => {
+  const nodeId = '11111111-1111-4111-8111-000000000001'
+  const answer = (status: number, body: { data?: unknown; error?: unknown }) =>
+    vi.spyOn(api, 'POST').mockResolvedValue({ ...body, response: new Response(null, { status }) } as never)
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the node with its change and returns the saved scenario', async () => {
+    const scenario = savedScenario(nodeId, { mode: null, alternativeId: 'N1-alt' })
+    const post = answer(201, { data: scenario })
+    expect(await saveScenario(nodeId, { mode: null, alternativeId: 'N1-alt' })).toEqual({ ok: true, data: scenario })
+    expect(post).toHaveBeenCalledWith('/api/scenarios', { body: { nodeId, mode: null, alternativeId: 'N1-alt' } })
+  })
+
+  it("shows the API's problem when the node is gone", async () => {
+    answer(404, { error: problem(404, 'NodeNotFound', 'No node on the graph.') })
+    expect(await saveScenario(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
+      ok: false,
+      message: 'Supplier not on the graph. No node on the graph.',
+    })
   })
 })

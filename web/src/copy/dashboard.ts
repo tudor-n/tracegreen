@@ -75,6 +75,47 @@ export const drawerCopy = {
 } as const
 
 /**
+ * A simulated change (B5): the ghost node beside its supplier and the simulator panel in the drawer. The MAC badge
+ * names come from ./labels.ts; cost, lead time and the MAC rest on illustrative lane figures and say so.
+ */
+export const scenarioCopy = {
+  whatIf: 'What if',
+  modeChange: (mode: string) => `Switch to ${mode}`,
+  supplierSwap: (supplier: string) => `Switch to ${supplier}`,
+  /** A swap to an alternative the node no longer lists. */
+  supplierSwapUnnamed: 'Switch supplier',
+  versusNow: (delta: string) => `${delta} vs now`,
+  massUnknownShort: 'Mass unknown',
+  saved: 'Saved',
+  massUnknown: 'The invoice gives no mass for this item, so this change cannot be estimated.',
+} as const
+
+export const simulatorCopy = {
+  title: 'Simulate a change',
+  modes: 'Transport mode',
+  current: 'now',
+  noLeg: 'Greyed-out modes have no leg on this lane.',
+  suppliers: 'Alternative supplier',
+  /** An alternative's country and the mode its lane ships by, which the swap uses. */
+  alternativeVia: (country: string, mode: string) => `${country} · ${mode}`,
+  noAlternatives: 'No other supplier of this category in the alternatives list.',
+  pick: 'Pick a mode or a supplier to see the change in emissions, cost and lead time.',
+  nothingToTry: 'This lane has a leg for one mode only and no other supplier makes this item, so there is nothing to try.',
+  simulating: 'Simulating…',
+  emissions: 'Emissions',
+  cost: 'Cost',
+  leadTime: 'Lead time',
+  mac: 'Abatement cost',
+  perTonne: (eur: string, unit: string) => `${eur} per ${unit}`,
+  /** "Apply" saves the change as a scenario next to the supplier (POST /api/scenarios); the supplier never changes. */
+  apply: 'Apply',
+  applying: 'Saving…',
+  applied: 'Saved',
+  applyNote: 'Saves this change as a scenario. The supplier itself stays as it is.',
+  appliedNote: 'Saved as a scenario. The supplier itself stays as it is.',
+} as const
+
+/**
  * The QR card in the node drawer. Ruling 6: a link opens only on a phone on the laptop's hotspot, so the card always
  * says so; `loopback` means the API built the link from a localhost address, which no phone can reach.
  */

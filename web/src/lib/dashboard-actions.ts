@@ -1,4 +1,12 @@
-import { api, type ChainVerification, type ProblemCode, type RequestLinkResponse } from '@/api/client'
+import {
+  api,
+  type ChainVerification,
+  type ProblemCode,
+  type RequestLinkResponse,
+  type Scenario,
+  type ScenarioChange,
+  type ScenarioResult,
+} from '@/api/client'
 import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
 // The dashboard's requests. Each resolves to what to show; none touches the store, because the API publishes the
@@ -110,6 +118,23 @@ export function requestLink(nodeId: string): Promise<Answer<RequestLinkResponse>
 /** POST /api/audit/verify: the API recomputes every hash of the audit log and names the first entry that fails. */
 export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
   return fetchBody(() => api.POST('/api/audit/verify'))
+}
+
+/**
+ * POST /api/simulate: what one change (a mode or an alternative supplier) would do to the node as it is now. The API
+ * computes every figure, delta, the MAC and its badge, and stores nothing; a mode the lane lacks, a node without a
+ * mass or an alternative of another category comes back as its problem's headline and detail.
+ */
+export function simulateChange(nodeId: string, change: ScenarioChange): Promise<Answer<ScenarioResult>> {
+  return fetchBody(() => api.POST('/api/simulate', { body: { nodeId, ...change } }))
+}
+
+/**
+ * POST /api/scenarios, the simulator's "Apply": the API recomputes the change, saves it next to the node (never over
+ * it) and publishes scenario.saved. The node keeps its figures; the answer is the saved scenario.
+ */
+export function saveScenario(nodeId: string, change: ScenarioChange): Promise<Answer<Scenario>> {
+  return fetchBody(() => api.POST('/api/scenarios', { body: { nodeId, ...change } }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */
