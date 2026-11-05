@@ -1,6 +1,6 @@
 # CI (task A9). Every action is pinned to the commit of a release tag (the tag is in the trailing comment); toolchains
 # match the Dockerfiles: .NET from api/global.json, Python 3.12 with uv 0.13.3, Node 24 with the pnpm of
-# web/package.json, Postgres 17. The e2e job (Compose + `pnpm e2e`) is added once B6 lands web/e2e.
+# web/package.json, Postgres 17. The e2e job runs the Playwright smoke against the demo image in both data modes.
 name: CI
 
 on:
@@ -127,3 +127,57 @@ jobs:
         run: pnpm gen:api
       - name: Fail if the committed types differ from the generated ones
         run: git diff --exit-code web/src/api/schema.d.ts
+
+  e2e:
+    name: e2e (Playwright smoke on the demo image, both data modes)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - working-directory: web
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for Playwright (a browser download, not a package)
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+      # The demo image is what phones load: nginx with the CSP, the built SPA and the Production API. The smoke's last
+      # step fails on any CSP violation, which only means something there.
+      - name: Build and start the demo image (Postgres)
+        run: |
+          docker compose -f compose.yml -f compose.demo.yml up -d --build
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:3000/api/health | grep -q '"mode":"postgres"' && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Smoke, Postgres
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://localhost:3000
+        run: pnpm e2e
+      # Recreating the API also clears the verify rate limit, which counts per client address.
+      - name: Restart the API in memory mode
+        env:
+          DATA_MODE: memory
+        run: |
+          docker compose -f compose.yml -f compose.demo.yml up -d api
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:3000/api/health | grep -q '"mode":"memory"' && exit 0
+            sleep 2
+          done
+          exit 1
+      - name: Smoke, memory
+        working-directory: web
+        env:
+          E2E_BASE_URL: http://localhost:3000
+        run: pnpm e2e
+      - name: Container logs
+        if: failure()
+        run: docker compose -f compose.yml -f compose.demo.yml logs --no-color --tail 200
