@@ -92,6 +92,14 @@ Order-of-work ruling (same review): build vertical slices toward the demo path F
 - **Seed nodes are stamped `2026-11-01T08:00Z`** — the layout must not depend on node order — cost if wrong: none.
 - **KPIs and events are published after the insert, outside any lock** — two actions within milliseconds can publish in reverse order; the next event or snapshot corrects it; serialise publishing if it ever shows — cost if wrong: a briefly stale KPI.
 
+## AI service contract and stub (C7)
+
+- **The chain is cache, then stub; no live provider yet** — D4 places the model in hackathon hours H1–H4, and every seed line is already served from the cache by the C# side — cost if wrong: the provider goes in a separate PR.
+- **The Python side enforces the allow-list too, with the C# rationale ("Category outside the allow-list: …")** — the C# side checks again (`EnforceAllowList`), so either side alone keeps an outside category off the graph — cost if wrong: none.
+- **The stub answers like the C# `StubAiClient` ("AI not configured", confidence 0, source `stub`)**, while the C# fallback after a failed call says "AI unavailable", so the two stay distinguishable in a raw response — cost if wrong: none.
+- **`/health` names the chain (`cache,stub`) and stays `ok` while the seed loaded; a broken seed file fails at startup** — `modelConfigured` reports the environment only, not a live provider — cost if wrong: one field.
+- **`/suggest` accepts the API's `node` and `candidates` as plain JSON and answers an empty list** — nothing reads them until a provider exists; the dashboard shows the curated alternatives — cost if wrong: typed models later.
+
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.

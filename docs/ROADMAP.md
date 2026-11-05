@@ -20,7 +20,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; M2's timed run is still open |
 | F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **done** | Backend (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel and ghost node in the drawer (B5), checked in the browser in both data modes (`NEXT.md`) |
 | F5 | Audit log panel with chain check | **done** | `AuditPanel`, `POST /api/audit/verify` |
-| F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The live Python classifier is open; D4 places it in hackathon hours H1–H4 |
+| F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The Python service answers `/classify` from the cache, then the stub, with the allow-list enforced (C7); the live model provider is open, and D4 places it in hackathon hours H1–H4 |
 | F7 | Plausibility check | **partial** | `AIR_HEAVY` on the answer and the node (D2); `SEA_TOO_FAST` is in the contract but not evaluated (D3) |
 | F8 | Optional mass confirmation | **partial** | `POST /api/verify` accepts `massT` and a confirmed mass replaces the invoice's; the supplier page does not ask for it yet |
 | F9 | PDF invoice drop | **open** | Hackathon, if time |
