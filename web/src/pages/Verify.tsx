@@ -60,6 +60,11 @@ export default function Verify() {
     }
   }, [state, token])
 
+  // How the page ended, for the Playwright smoke: `thanks` or the failure, never the token.
+  let result: string | undefined
+  if (state.phase === 'done') result = 'thanks'
+  else if (state.phase === 'failed') result = state.failure
+
   const other: Lang = lang === 'ro' ? 'en' : 'ro'
   const switchLanguage = () =>
     setParams(
@@ -72,7 +77,12 @@ export default function Verify() {
     )
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 py-5">
+    <main
+      data-testid="verify-page"
+      data-phase={state.phase}
+      data-result={result}
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 py-5"
+    >
       <header className="flex items-center justify-between gap-3">
         <span className="text-base font-semibold tracking-wide">{dashboardTitle}</span>
         <button
@@ -118,6 +128,7 @@ export default function Verify() {
             options={offeredModes(state.context).map((mode) => ({ value: mode, label: copy.transport.options[mode] }))}
             selected={state.answers.transport}
             skipLabel={copy.skip}
+            testId="verify-transport"
             disabled={state.phase === 'submitting'}
             onChange={(value) => dispatch({ kind: 'transport', value })}
           />
@@ -126,6 +137,7 @@ export default function Verify() {
             options={offeredEnergy(state.context).map((source) => ({ value: source, label: copy.energy.options[source] }))}
             selected={state.answers.energy}
             skipLabel={copy.skip}
+            testId="verify-energy"
             disabled={state.phase === 'submitting'}
             onChange={(value) => dispatch({ kind: 'energy', value })}
           />
@@ -137,6 +149,7 @@ export default function Verify() {
               </p>
             )}
             <Button
+              data-testid="verify-submit"
               className="h-14 w-full rounded-xl text-lg"
               disabled={state.phase === 'submitting' || !canSubmit(state.answers)}
               onClick={() => dispatch({ kind: 'submit' })}
