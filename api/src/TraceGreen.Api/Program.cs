@@ -46,7 +46,8 @@ builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
 builder.Services.AddSingleton(new ServiceOptions(
     AiTimeout: TimeSpan.FromMilliseconds(config.AiTimeoutMs),
     LinkTtl: TimeSpan.FromSeconds(config.LinkTtlSeconds),
-    IpHashKey: "ip-hash:" + config.LinkSecret));
+    IpHashKey: "ip-hash:" + config.LinkSecret,
+    EtsPriceEurPerT: config.EtsPriceEurPerT));
 builder.Services.AddSingleton<ILinkSigner>(new HmacLinkSigner(config.LinkSecret));
 builder.Services.AddSingleton<NodeViewMapper>();
 builder.Services.AddSingleton<GraphService>();
