@@ -6,7 +6,7 @@ import {
   type ScenarioChange,
   type ScenarioResult,
 } from '@/api/client'
-import { problemHeadlines, simulatorCopy, toolbarCopy } from '@/copy/dashboard'
+import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
 // The dashboard's requests. Each resolves to what to show; none touches the store, because the API publishes the
 // result on the event stream (node.created, graph.reset, audit.appended) and the sync applies it.
@@ -120,11 +120,12 @@ export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
 }
 
 /**
- * A simulated change for a node: the API's result against the node as it is now. The route is not in the contract yet
- * (A7, slice 5), so until it is this answers that the simulator is not available; the panel shows that as its error.
+ * POST /api/simulate: what one change (a mode or an alternative supplier) would do to the node as it is now. The API
+ * computes every figure, delta, the MAC and its badge, and stores nothing; a mode the lane lacks, a node without a
+ * mass or an alternative of another category comes back as its problem's headline and detail.
  */
-export function simulateChange(_nodeId: string, _change: ScenarioChange): Promise<Answer<ScenarioResult>> {
-  return Promise.resolve({ ok: false, message: simulatorCopy.unavailable })
+export function simulateChange(nodeId: string, change: ScenarioChange): Promise<Answer<ScenarioResult>> {
+  return fetchBody(() => api.POST('/api/simulate', { body: { nodeId, ...change } }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

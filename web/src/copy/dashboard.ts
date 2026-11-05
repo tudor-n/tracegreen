@@ -100,7 +100,6 @@ export const simulatorCopy = {
   leadTime: 'Lead time',
   mac: 'Abatement cost',
   perTonne: (eur: string, unit: string) => `${eur} per ${unit}`,
-  unavailable: 'The simulator is not on this server yet.',
 } as const
 
 /**
