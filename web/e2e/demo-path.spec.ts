@@ -1,4 +1,4 @@
-import { devices, expect, test } from '@playwright/test'
+import { type BrowserContext, devices, expect, test } from '@playwright/test'
 
 // The demo path (B6) as one scripted run against the running Compose stack: the dashboard on the laptop, and the
 // supplier page on a phone-sized second page. Every check reads a data-testid or another data-* attribute, never copy,
@@ -7,8 +7,20 @@ import { devices, expect, test } from '@playwright/test'
 /** N1, the demo invoice's node; its id is fixed in seed/demo-state.json. */
 const N1 = '11111111-1111-4111-8111-000000000001'
 
-test('demo path: import, verify on the phone, live flip, simulator, audit chain', async ({ page, browser }) => {
+/**
+ * Collects the browser's reports of Content Security Policy violations on every page of `context`. The demo image's
+ * nginx sends the header (B7); under the Vite dev server there is none, so the list stays empty there.
+ */
+function watchCsp(context: BrowserContext, into: string[]): void {
+  context.on('console', (message) => {
+    if (message.type() === 'error' && /Content Security Policy/i.test(message.text())) into.push(message.text())
+  })
+}
+
+test('demo path: import, verify on the phone, live flip, simulator, audit chain, CSP', async ({ page, browser }) => {
   const n1 = page.getByTestId(`node-${N1}`)
+  const cspViolations: string[] = []
+  watchCsp(page.context(), cspViolations)
   let link = ''
 
   await test.step('1. reset, then load the demo invoice: N1 is ESTIMATED', async () => {
@@ -28,6 +40,7 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain'
   })
 
   const phone = await browser.newContext({ ...devices['Pixel 7'] })
+  watchCsp(phone, cspViolations)
   try {
     const supplier = await phone.newPage()
     const verifyPage = supplier.getByTestId('verify-page')
@@ -78,5 +91,9 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain'
     await expect(page.getByTestId('audit-panel')).toBeVisible()
     await page.getByTestId('audit-verify').click()
     await expect(page.getByTestId('audit-chain')).toHaveAttribute('data-valid', 'true')
+  })
+
+  await test.step('8. no Content Security Policy violation on the dashboard or the phone', () => {
+    expect(cspViolations).toEqual([])
   })
 })

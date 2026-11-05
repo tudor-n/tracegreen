@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-11-05 (slice 6, the Playwright smoke, task B6 of `docs/plan/dev-b.md`; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
 
 ## What exists
 
@@ -34,6 +34,8 @@ Test counts after A7: 266 .NET tests; 252 in memory mode (the 14 Postgres contra
 Test counts after B5: 266 .NET tests, 252 in memory mode (run with `dotnet test` inside the `tracegreen-api` dev image); 171 web unit tests.
 
 Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven steps).
+
+Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 20 script tests (`node --test scripts/lib/*.test.mjs`, 8 of them for demo-check).
 
 ## Wire contract (slice 1)
 
@@ -94,6 +96,12 @@ Checked on 2026-11-05 in headless Chromium (a throwaway Playwright script, not a
 `web/e2e/demo-path.spec.ts` is one scripted run of the demo path against the running Compose stack, with the dashboard in a desktop page and the supplier page in a phone-sized one (Pixel 7): reset and load the demo invoice (N1 ESTIMATED) → request a link and read `qr-url` → the phone answers Air + Grid → N1 is VERIFIED on the dashboard within 2 s of the submit → the same link opened again says "already used" → simulator: Sea `win-win`, N1-alt `premium` or `below-ets` on the panel and the ghost, Apply saved, N1 still VERIFIED → audit chain valid. Every check reads a `data-testid` or another `data-*` attribute, never copy. How to run it, the rate-limit note and the frozen hooks: `docs/RUNBOOK.md`, "Playwright smoke". The supplier page (C5) gained test hooks only (`verify-page` with `data-phase` and `data-result`, the answer buttons, the submit button); its behaviour is unchanged.
 
 Checked on 2026-11-05 against Compose: passes in Postgres mode and in memory mode (`DATA_MODE=memory docker compose up -d api`), about 5–6 s per run, twice in a row in each mode. A third run within the same minute fails at step 3 with `rateLimited`, which is the 10-a-minute limit on `/api/verify*` doing its job.
+
+## Demo tooling (B7)
+
+- `scripts/demo-check.mjs` (Node, no dependencies; logic in `scripts/lib/demo-check.mjs`, tested): the URL (`PUBLIC_BASE_URL` from `.env.demo`, or the argument when it is left empty, RUNBOOK step 2) is set, not loopback, answers `/api/health`, is where the API builds QR links (with `PUBLIC_BASE_URL` set, `baseUrl.source` must be `configured`, which catches a stack not restarted after editing `.env.demo`), and `/api/events` sends its `hello` event. Checked on 2026-11-05: all five pass against the dev stack started with `PUBLIC_BASE_URL=http://<lan-ip>:3000`, and with it empty and the LAN URL as the argument (the check then says to open the dashboard at that address); health and the event stream pass through nginx on the demo image.
+- `scripts/firewall.ps1`: one inbound rule for TCP 3000 from the local subnet, idempotent, `-Remove` to delete it. It parses and its help loads; it has not been run elevated on a machine yet.
+- CSP: the header in `web/nginx.conf` is unchanged. The smoke passes against `compose.demo.yml` with no CSP violation on the dashboard or the phone page, and the header reaches the pages, the `/verify` route and the assets. The Linux firewall commands were already in `RUNBOOK.md`; ruling R6's fallback phone and the checks are now there too.
 
 ## Seed XML validation (2026-10-23)
 

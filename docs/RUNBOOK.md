@@ -29,7 +29,7 @@ The Postgres repository contract runs only when `DATABASE_URL` is set. Create a 
 
 ## Playwright smoke (`pnpm e2e`)
 
-`web/e2e/demo-path.spec.ts` walks the demo path against the running stack: reset → load the demo invoice (N1 ESTIMATED) → request a link → a phone-sized page answers Air + Grid → N1 is VERIFIED on the dashboard within 2 s of the submit → the same link says "already used" → simulator: Sea is `win-win`, N1-alt is `premium` or `below-ets`, Apply leaves N1 as it is → the audit chain is valid. It starts no server, and it resets the demo workspace first, so do not run it while someone is using the stack.
+`web/e2e/demo-path.spec.ts` walks the demo path against the running stack: reset → load the demo invoice (N1 ESTIMATED) → request a link → a phone-sized page answers Air + Grid → N1 is VERIFIED on the dashboard within 2 s of the submit → the same link says "already used" → simulator: Sea is `win-win`, N1-alt is `premium` or `below-ets`, Apply leaves N1 as it is → the audit chain is valid → no Content Security Policy violation on either page. It starts no server, and it resets the demo workspace first, so do not run it while someone is using the stack.
 
 1. Bring the stack up (`docker compose up`, see above) and wait until `curl -s localhost:8080/api/health` answers.
 2. Once per machine: `cd web && pnpm exec playwright install chromium` (a browser download, not a package).
@@ -65,6 +65,14 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 Only phones on the laptop's network can open a link (ruling R6 in `docs/DECISIONS.md`): a phone on mobile data or another Wi-Fi cannot. Keep the team's second phone on the hotspot as the fallback.
 
 Reset to the demo start state at any time with the "Reset demo" button (or `POST /api/dev/reset`). Restarting the stack keeps the data in the `pgdata` volume; `down -v` wipes it and the next `up` reseeds.
+
+**Handing over to the second phone.** A link works once: if the first phone could not open it, scan the same QR code with the second; if the first phone already submitted, request a new link.
+
+**The demo checks (B7).**
+
+- `node scripts/demo-check.mjs` prints PASS or FAIL for five checks and exits 1 unless all pass: the URL is set (`PUBLIC_BASE_URL` from `.env.demo`; when it is left empty, pass the address the dashboard will be opened at, `node scripts/demo-check.mjs http://<laptop-ip>:3000`), it is not a loopback address, `/api/health` answers on it, the API builds its QR links on it (with `PUBLIC_BASE_URL` set this fails until the stack is restarted after editing `.env.demo`; without it, the check reminds you to open the dashboard at that address), and `/api/events` delivers its first event through nginx. It runs from the laptop, so it proves the stack answers on that address; a phone also needs the hotspot and the firewall rule.
+- `scripts/firewall.ps1` adds one inbound rule, "TraceGreen demo (TCP 3000)", for TCP 3000 from the local subnet on every network profile (Windows often files a Mobile Hotspot network as Public). It needs an elevated PowerShell; if the execution policy blocks it, run `powershell -ExecutionPolicy Bypass -File scripts/firewall.ps1`. Running it twice changes nothing, and `-Remove` deletes the rule after the demo.
+- The Playwright smoke runs against the demo image too: `docker compose -f compose.yml -f compose.demo.yml up --build -d`, then `cd web && pnpm e2e`. Its last step fails on any Content Security Policy violation the browser reports, on the dashboard or on the phone page. To go back to development afterwards, run `docker compose build` before `docker compose up -d --remove-orphans`, because the demo build reuses the image names.
 
 ## Running services on the host instead
 
