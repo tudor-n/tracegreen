@@ -1,6 +1,7 @@
 // Demo-laptop check (B7; docs/RUNBOOK.md, "Demo laptop" step 5): can a phone on the hotspot reach this laptop, and
 // will the QR links point at it? Prints PASS, FAIL or SKIP per check and exits 1 unless every check passes.
-// Usage: node scripts/demo-check.mjs [url]   (url defaults to PUBLIC_BASE_URL in .env.demo). Node 24+, no dependencies.
+// Usage: node scripts/demo-check.mjs [url]   (url defaults to PUBLIC_BASE_URL in .env.demo; pass the LAN address the
+// dashboard will be opened at when PUBLIC_BASE_URL is left empty, RUNBOOK "Demo laptop" step 2). Node 24+, no dependencies.
 // Run it from the laptop with the demo stack up. It reads the URL from the laptop's side, so it proves the stack
 // answers on that address; a phone still needs to be on the same hotspot, and port 3000 open (scripts/firewall.ps1).
 import { readFileSync } from 'node:fs';
@@ -10,6 +11,7 @@ import {
   baseUrlProblem,
   envValue,
   healthProblem,
+  linkNote,
   linkProblem,
   loopbackProblem,
   normalizeUrl,
@@ -19,16 +21,18 @@ import {
 const root = fileURLToPath(new URL('..', import.meta.url));
 const TIMEOUT_MS = 5000;
 
+/** The URL to check, where it came from, and whether .env.demo gives PUBLIC_BASE_URL a value the API must use. */
 function configuredUrl() {
-  const fromArg = process.argv[2];
-  if (fromArg !== undefined) return { value: fromArg, from: 'the command line' };
-  let text = '';
+  let fromFile;
   try {
-    text = readFileSync(join(root, '.env.demo'), 'utf8');
+    fromFile = envValue(readFileSync(join(root, '.env.demo'), 'utf8'), 'PUBLIC_BASE_URL')?.trim();
   } catch {
-    return { value: undefined, from: '.env.demo (not found)' };
+    fromFile = undefined;
   }
-  return { value: envValue(text, 'PUBLIC_BASE_URL'), from: '.env.demo' };
+  const configured = fromFile !== undefined && fromFile !== '';
+  const fromArg = process.argv[2];
+  if (fromArg !== undefined) return { value: fromArg, from: 'the command line', configured };
+  return { value: fromFile, from: '.env.demo', configured };
 }
 
 async function getJson(url) {
@@ -73,7 +77,7 @@ async function firstStreamChunk(url) {
 const unreachable = (error) =>
   `No answer (${error?.cause?.code ?? error?.name ?? 'error'}). Is the demo stack up, and is this the laptop's current IP?`;
 
-const { value, from } = configuredUrl();
+const { value, from, configured } = configuredUrl();
 const base = value === undefined ? '' : normalizeUrl(value.trim());
 let health = null;
 
@@ -92,7 +96,12 @@ const checks = [
       return healthProblem(health.status, health.body);
     },
   },
-  { title: 'QR links use this address', needs: 2, run: () => linkProblem(health.body, base) },
+  {
+    title: 'QR links use this address',
+    needs: 2,
+    run: () => linkProblem(health.body, base, configured),
+    note: () => linkNote(health.body, base),
+  },
   {
     title: `${base}/api/events opens and sends its first event`,
     needs: 2,
@@ -118,7 +127,8 @@ for (const [i, check] of checks.entries()) {
   const problem = await check.run();
   passed[i] = problem === null;
   console.log(`${problem === null ? 'PASS' : 'FAIL'}  ${check.title}`);
-  if (problem !== null) console.log(`      ${problem}`);
+  const detail = problem ?? check.note?.() ?? null;
+  if (detail !== null) console.log(`      ${detail}`);
 }
 const failed = passed.filter((ok) => !ok).length;
 console.log(failed === 0 ? 'Phones on the same network can open this laptop\'s links.' : `${failed} of ${checks.length} checks did not pass.`);

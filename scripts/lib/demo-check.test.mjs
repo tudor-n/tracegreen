@@ -6,6 +6,7 @@ import {
   envValue,
   healthProblem,
   isLoopbackHost,
+  linkNote,
   linkProblem,
   loopbackProblem,
   normalizeUrl,
@@ -62,15 +63,30 @@ test('healthProblem passes only a 200 with ok: true', () => {
   assert.match(healthProblem(200, null), /without/);
 });
 
-test('linkProblem wants the API to build links from PUBLIC_BASE_URL as configured', () => {
+test('linkProblem, with PUBLIC_BASE_URL set: the API must use it as configured', () => {
   const base = 'http://192.168.137.1:3000';
   const health = (url, source, loopback = false) => ({ baseUrl: { url, source, loopback } });
-  assert.equal(linkProblem(health(base, 'configured'), base), null);
-  assert.equal(linkProblem(health(`${base}/`, 'configured'), base), null);
-  assert.match(linkProblem(health(base, 'forwarded'), base), /from the request \(forwarded\).*Set PUBLIC_BASE_URL/);
-  assert.match(linkProblem(health('http://10.42.0.1:3000', 'configured'), base), /not from http:\/\/192\.168\.137\.1:3000.*Restart/);
-  assert.match(linkProblem(health('http://localhost:8080', 'request', true), base), /localhost:8080 \(request\)/);
-  assert.match(linkProblem({}, base), /did not report/);
+  assert.equal(linkProblem(health(base, 'configured'), base, true), null);
+  assert.equal(linkProblem(health(`${base}/`, 'configured'), base, true), null);
+  assert.match(linkProblem(health(base, 'forwarded'), base, true), /from the request \(forwarded\), not from PUBLIC_BASE_URL.*Restart/);
+  assert.match(linkProblem(health('http://10.42.0.1:3000', 'configured'), base, true), /not from http:\/\/192\.168\.137\.1:3000.*Restart/);
+  assert.match(linkProblem({}, base, true), /did not report/);
+});
+
+test('linkProblem, with PUBLIC_BASE_URL empty: a request to the URL must yield links on it', () => {
+  const base = 'http://192.168.137.1:3000';
+  const health = (url, source, loopback = false) => ({ baseUrl: { url, source, loopback } });
+  assert.equal(linkProblem(health(base, 'forwarded'), base, false), null);
+  assert.equal(linkProblem(health(base, 'request'), base, false), null);
+  const wrong = linkProblem(health('http://localhost:8080', 'request', true), base, false);
+  assert.match(wrong, /localhost:8080 \(request\), not from/);
+  assert.doesNotMatch(wrong, /Restart/);
+});
+
+test('linkNote reminds where to open the dashboard only when links follow the request', () => {
+  const base = 'http://192.168.137.1:3000';
+  assert.equal(linkNote({ baseUrl: { url: base, source: 'configured' } }, base), null);
+  assert.match(linkNote({ baseUrl: { url: base, source: 'forwarded' } }, base), /open it at http:\/\/192\.168\.137\.1:3000, never at localhost/);
 });
 
 test('streamProblem wants an event stream that delivers its first event', () => {

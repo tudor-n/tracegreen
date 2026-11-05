@@ -29,7 +29,7 @@ export const normalizeUrl = (url) => url.replace(/\/+$/, '');
 /** Why `value` cannot be the origin phones open, or null: it must be an http(s) origin with no path. */
 export function baseUrlProblem(value) {
   if (value === undefined || value.trim() === '') {
-    return 'PUBLIC_BASE_URL is empty: set it in .env.demo to http://<laptop-ip>:3000 (`ipconfig` or `ip -4 addr`).';
+    return 'PUBLIC_BASE_URL is empty in .env.demo: set it to http://<laptop-ip>:3000 (`ipconfig` or `ip -4 addr`), or pass the address the dashboard will be opened at: node scripts/demo-check.mjs http://<laptop-ip>:3000';
   }
   let url;
   try {
@@ -60,21 +60,30 @@ export function healthProblem(status, body) {
 }
 
 /**
- * Why the API would put another origin than `base` in its QR links, or null. It must use PUBLIC_BASE_URL as configured
- * (`source: "configured"`); anything else means the containers did not get the value, e.g. .env.demo was edited after
- * the stack started.
+ * Why the API would put another origin than `base` in its QR links, or null. With `configured` (PUBLIC_BASE_URL has a
+ * value in .env.demo) the API must use it as configured (`source: "configured"`); anything else means the containers
+ * did not get the value, e.g. .env.demo was edited after the stack started. Without it, RUNBOOK's other way applies:
+ * the API takes the base from each request, so it is enough that a request to `base` yields links on `base`.
  */
-export function linkProblem(body, base) {
+export function linkProblem(body, base, configured) {
   const info = body?.baseUrl;
   if (typeof info?.url !== 'string') return '/api/health did not report the base URL the API builds links from.';
+  const restart = configured ? ' Restart the stack after editing .env.demo.' : '';
   if (normalizeUrl(info.url) !== normalizeUrl(base)) {
-    return `The API builds links from ${info.url} (${info.source}), not from ${normalizeUrl(base)}. Restart the stack after editing .env.demo.`;
+    return `The API builds links from ${info.url} (${info.source}), not from ${normalizeUrl(base)}.${restart}`;
   }
-  if (info.source !== 'configured') {
-    return `The API takes this address from the request (${info.source}), so links follow the address the dashboard is opened at; opened at localhost, it prints localhost links. Set PUBLIC_BASE_URL in .env.demo and restart the stack.`;
+  if (configured && info.source !== 'configured') {
+    return `The API takes this address from the request (${info.source}), not from PUBLIC_BASE_URL.${restart}`;
   }
   if (info.loopback === true) return `The API reports ${info.url} as a loopback address.`;
   return null;
+}
+
+/** What a person must keep in mind when the links pass without PUBLIC_BASE_URL, or null when it is configured. */
+export function linkNote(body, base) {
+  return body?.baseUrl?.source === 'configured'
+    ? null
+    : `PUBLIC_BASE_URL is empty, so links follow the address the dashboard is opened at: open it at ${normalizeUrl(base)}, never at localhost.`;
 }
 
 /** Why `GET /api/events` is not a live event stream, or null: it must be text/event-stream and deliver its first event. */
