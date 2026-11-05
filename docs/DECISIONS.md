@@ -95,4 +95,4 @@ Order-of-work ruling (same review): build vertical slices toward the demo path F
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.
-- **The e2e job waits for B6** (`web/e2e` does not exist yet) — cost if wrong: none.
+- **The e2e job runs the smoke against the demo image, on Postgres and then with only the API recreated in memory mode** — the demo image is what phones load, and the smoke's CSP step only means something behind its nginx; recreating the API skips a second build and clears the per-address verify rate limit between the runs; container logs are printed on failure instead of adding an artifact action — cost if wrong: about two minutes of CI per run.
