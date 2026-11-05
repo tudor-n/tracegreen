@@ -73,6 +73,7 @@ public sealed class NodeViewMapper
             Classification: classification,
             Invoice: new InvoiceSummary(invoice.Id, invoice.Extracted.Number, invoice.IssueDate, invoice.Currency, invoice.TotalAmount),
             Lane: laneView,
+            Alternatives: ScenarioService.AlternativesFor(_seed, node.CategoryId).Select(Alternative).ToList(),
             MassT: node.MassT,
             TransportMode: node.TransportMode,
             EnergySource: node.EnergySource,
@@ -81,6 +82,12 @@ public sealed class NodeViewMapper
             LeadDays: node.LeadDays,
             Warnings: PlausibilityRules.Check(node.TransportMode, node.MassT),
             CreatedAt: node.CreatedAt);
+    }
+
+    private AlternativeView Alternative(Alternative alternative)
+    {
+        var lane = _lanes[alternative.LaneId];
+        return new AlternativeView(alternative.Id, alternative.Label, alternative.Country, lane.Origin, lane.ModeDefault, Illustrative: true);
     }
 
     private List<FactorLookup> Rows(params (FactorKind Kind, string Key)[] keys) =>

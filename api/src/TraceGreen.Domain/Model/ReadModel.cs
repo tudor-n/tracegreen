@@ -37,6 +37,13 @@ public sealed record LaneView(
     decimal? DistanceKm,
     bool Illustrative);
 
+/// <summary>
+/// A supplier the simulator can swap the node for (same category). Pass <see cref="Id"/> as <c>alternativeId</c> to
+/// <c>POST /api/simulate</c>; the cost, carbon and lead time come back from there. <see cref="Mode"/> is the default mode
+/// of the alternative's lane, which the swap uses; like every lane figure it is illustrative.
+/// </summary>
+public sealed record AlternativeView(string Id, string Label, string Country, string Origin, TransportMode Mode, bool Illustrative);
+
 public sealed record InvoiceSummary(Guid Id, string Number, DateOnly IssueDate, string Currency, decimal Total);
 
 /// <summary>
@@ -45,6 +52,7 @@ public sealed record InvoiceSummary(Guid Id, string Number, DateOnly IssueDate, 
 /// <see cref="CarbonFigure.Factors"/> carry source, year and row label. A PLACEHOLDER source is shown as is.
 /// <see cref="CostEur"/> and <see cref="LeadDays"/> derive from the lane and are illustrative like it.
 /// <see cref="Warnings"/> are derived from the supplier's answers on every read (D2: shown, never blocking).
+/// <see cref="Alternatives"/> are the suppliers of the same category the simulator offers for this node.
 /// </summary>
 public sealed record NodeView(
     Guid Id,
@@ -59,6 +67,7 @@ public sealed record NodeView(
     ClassificationView Classification,
     InvoiceSummary Invoice,
     LaneView Lane,
+    IReadOnlyList<AlternativeView> Alternatives,
     decimal? MassT,
     TransportMode? TransportMode,
     EnergySource? EnergySource,

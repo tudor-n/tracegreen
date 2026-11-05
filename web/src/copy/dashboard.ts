@@ -201,4 +201,8 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   AlreadyUsed: 'Link already used.',
   InvalidAnswer: 'Answer not accepted.',
   RateLimited: 'Too many attempts. Wait a minute.',
+  AlternativeNotFound: 'Alternative supplier not found.',
+  InvalidChange: 'Change not accepted.',
+  ModeNotAvailable: 'This lane has no such mode.',
+  MassUnknown: 'Mass unknown for this item.',
 }
