@@ -16,7 +16,7 @@ flowchart LR
 | Service | Owns | Never does |
 |---|---|---|
 | `api/` (C# .NET 10) | Parsing, every carbon number, the KPIs, links and verification, the audit chain, scenarios, the event stream, the OpenAPI contract | Trusts the AI with a number |
-| `ai/` (Python FastAPI) | Line-item classification and alternative suggestions (planned; today `GET /health` only) | Computes carbon; returns a category outside the allow-list |
+| `ai/` (Python FastAPI) | Line-item classification through the cache, then a stub, with the allow-list enforced; `/suggest` answers empty and a live model is not written yet (D4) | Computes carbon; returns a category outside the allow-list |
 | `web/` (Vite + React SPA) | Rendering the graph, the KPI bar, the drawer, the link card, the audit panel and the supplier page | Computes carbon or KPIs; hand-writes API types |
 
 The browser and the phone see one origin: in development the Vite server proxies `/api`, and in the demo image (`compose.demo.yml`) nginx serves the built SPA and proxies `/api` and `/openapi`. The phone reaches the laptop over the laptop's hotspot (`RUNBOOK.md`).
