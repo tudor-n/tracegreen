@@ -42,6 +42,7 @@ export function node(id: string, carbonKg: number, overrides: Partial<NodeView> 
       distanceKm: null,
       illustrative: true,
     },
+    alternatives: [],
     massT: null,
     transportMode: null,
     energySource: null,
