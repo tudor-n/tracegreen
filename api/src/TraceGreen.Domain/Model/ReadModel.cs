@@ -92,6 +92,12 @@ public enum PlausibilityCode
 /// <summary>A "please reconfirm" note; it never blocks a verification. <see cref="Detail"/> is English for logs and tooltips; UIs key on <see cref="Code"/>.</summary>
 public sealed record PlausibilityWarning(PlausibilityCode Code, string Detail);
 
+/// <summary>
+/// A supplier the simulator can swap a node to: one from <c>seed/alternatives.json</c> whose category is the node's.
+/// <see cref="Id"/> is what a scenario's <c>alternativeId</c> names. The figures behind a swap come from the simulator.
+/// </summary>
+public sealed record AlternativeView(string Id, string Label, string Country);
+
 /// <summary>A signed single-use verification link. The token exists only inside <see cref="Url"/>.</summary>
 public sealed record LinkGrant(Guid NodeId, string Url, DateTimeOffset ExpiresAt);
 

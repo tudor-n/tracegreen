@@ -172,4 +172,6 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   AlreadyUsed: 'Link already used.',
   InvalidAnswer: 'Answer not accepted.',
   RateLimited: 'Too many attempts. Wait a minute.',
+  AlternativeNotFound: 'Alternative supplier not found.',
+  InvalidChange: 'This change is not possible for this supplier.',
 }

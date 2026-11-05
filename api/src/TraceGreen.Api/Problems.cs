@@ -22,6 +22,8 @@ public enum ProblemCode
     [JsonStringEnumMemberName("AlreadyUsed")] AlreadyUsed,
     [JsonStringEnumMemberName("InvalidAnswer")] InvalidAnswer,
     [JsonStringEnumMemberName("RateLimited")] RateLimited,
+    [JsonStringEnumMemberName("AlternativeNotFound")] AlternativeNotFound,
+    [JsonStringEnumMemberName("InvalidChange")] InvalidChange,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -51,6 +53,8 @@ public static class Problems
             ProblemCode.AlreadyUsed => (StatusCodes.Status409Conflict, "Link already used"),
             ProblemCode.InvalidAnswer => (StatusCodes.Status422UnprocessableEntity, "Answer not accepted"),
             ProblemCode.RateLimited => (StatusCodes.Status429TooManyRequests, "Too many requests"),
+            ProblemCode.AlternativeNotFound => (StatusCodes.Status404NotFound, "Alternative supplier not found"),
+            ProblemCode.InvalidChange => (StatusCodes.Status422UnprocessableEntity, "Change not possible for this node"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

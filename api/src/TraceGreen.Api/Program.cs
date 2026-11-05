@@ -111,6 +111,7 @@ app.MapGraph();
 app.MapIngest();
 app.MapVerify();
 app.MapAudit();
+app.MapScenarios();
 app.MapDev();
 
 app.Run();
