@@ -7,7 +7,7 @@ import { devices, expect, test } from '@playwright/test'
 /** N1, the demo invoice's node; its id is fixed in seed/demo-state.json. */
 const N1 = '11111111-1111-4111-8111-000000000001'
 
-test('demo path: import, verify on the phone, live flip', async ({ page, browser }) => {
+test('demo path: import, verify on the phone, live flip, simulator, audit chain', async ({ page, browser }) => {
   const n1 = page.getByTestId(`node-${N1}`)
   let link = ''
 
@@ -44,7 +44,39 @@ test('demo path: import, verify on the phone, live flip', async ({ page, browser
       await expect(n1).toHaveAttribute('data-status', 'VERIFIED', { timeout: 2_000 })
       await expect(verifyPage).toHaveAttribute('data-result', 'thanks')
     })
+
+    await test.step('5. the same link opened again: already used', async () => {
+      const again = await phone.newPage()
+      await again.goto(link)
+      await expect(again.getByTestId('verify-page')).toHaveAttribute('data-result', 'alreadyUsed')
+    })
   } finally {
     await phone.close()
   }
+
+  await test.step('6. simulator: Sea is win-win, N1-alt is premium or below-ETS; Apply leaves N1 as it is', async () => {
+    const result = page.getByTestId('sim-result')
+    const ghost = page.getByTestId(`ghost-${N1}`)
+    await page.getByTestId('drawer-simulate').click()
+    await page.getByTestId('sim-mode-sea').click()
+    await expect(result).toHaveAttribute('data-badge', 'win-win')
+    await expect(ghost).toHaveAttribute('data-badge', 'win-win')
+
+    await page.getByTestId('sim-alt-N1-alt').click()
+    await expect(page.getByTestId('sim-alt-N1-alt')).toHaveAttribute('aria-pressed', 'true')
+    await expect(result).toHaveAttribute('data-badge', /^(premium|below-ets)$/)
+    await expect(ghost).toHaveAttribute('data-badge', /^(premium|below-ets)$/)
+
+    await page.getByTestId('sim-apply').click()
+    await expect(page.getByTestId('sim-apply')).toHaveAttribute('data-saved', 'true')
+    await expect(page.getByTestId(`ghost-${N1}-saved`)).toBeVisible()
+    await expect(n1).toHaveAttribute('data-status', 'VERIFIED')
+  })
+
+  await test.step('7. the audit panel shows the chain as valid', async () => {
+    await page.getByTestId('toolbar-audit').click()
+    await expect(page.getByTestId('audit-panel')).toBeVisible()
+    await page.getByTestId('audit-verify').click()
+    await expect(page.getByTestId('audit-chain')).toHaveAttribute('data-valid', 'true')
+  })
 })
