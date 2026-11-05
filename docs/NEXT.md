@@ -126,11 +126,37 @@ The M1 checklist of `docs/plan/README.md` §8. Dev B ran it on 2026-10-24 agains
 | `pnpm typecheck && pnpm lint`, `dotnet test`, `pnpm test` | Pass | B3: 206 .NET tests and 78 web tests. C4: 255 .NET tests (241 in memory mode; all 255 with `DATABASE_URL` on the scratch database `tracegreen_test`, never the dev database, see "Caveats") and 105 web tests |
 | A person records the screen | Pass | Dev C, 2026-10-29: `tracegreen-m1-postgres.mp4` (175 s) and `tracegreen-m1-memory.mp4` (102 s), shared in the team chat rather than committed |
 
+## M2 pre-check (2026-11-05)
+
+The part of the M2 checklist (`docs/plan/README.md` §8) that needs no phone, run by A (task A8) on the demo image (`compose.demo.yml`: nginx, built SPA, Production API) through the laptop's LAN address, `http://192.168.0.200:3000`, in both data modes. A script made the requests a phone would make and listened on `/api/events` like a dashboard. Each row gave the same result in both modes.
+
+| M2 item | Result | Detail |
+|---|---|---|
+| Base URL for links | Pass | `request-link` gives `http://<lan-ip>:3000/verify/…`, `loopback: false`, from the forwarded host |
+| Submit flips N1 to VERIFIED, and the event carries fresh KPIs | Pass | Air + grid → VERIFIED with `AIR_HEAVY`; `node.verified` with `kpis` reached the stream 25 ms after the submit (Postgres) and 8 ms (memory). This is the server's share of the 2 s budget; the phone, the hotspot and the browser are measured in the T16 run |
+| Same link again: "already used" | Pass | 409 `AlreadyUsed` on the context and on a second submit |
+| Bad signature | Pass | 401 `InvalidToken` |
+| Audit chain valid | Pass | `POST /api/audit/verify`: valid, length 6 |
+| Simulator | Pass | N1 air → sea `win-win`; N1 → N1-alt `premium` (322.71 €/t from the verified air figure) |
+| Rate limit | Pass | The 11th verify-route call in the minute is 429 |
+| No token in the logs | Pass | No `t=v1.` or token in the nginx or API container logs after the run |
+| Security headers | Pass | CSP, `nosniff` and `no-referrer` on the SPA |
+| Status mapping in integration tests (410 for expiry and invoice change included) | Pass | Covered since A6 |
+
+Fixed during the check:
+- **The demo image ignored `DATA_MODE`.** Its `environment: !override` dropped it, so `DATA_MODE=memory` still ran Postgres, which left the demo with no fallback without the database. `compose.demo.yml` now passes `DATA_MODE` through; empty keeps Postgres.
+- **`RUNBOOK.md`'s container test command reset the live demo workspace.** It now uses the scratch database.
+
+Still open for M2, all needing people or B5:
+- **The T16 run.** A phone on the laptop's hotspot scans the QR, submits, and someone times submit → flip on the dashboard. C drives the phone and writes `docs/run-log.md`.
+- **The simulator panel in the drawer (B5).** Until it merges, the simulator is checked through the API only.
+- **Setup on the day:** start the hotspot (`nmcli device wifi hotspot ifname wlp8s0 ssid TraceGreen password <8+ characters>`; the laptop is then usually `10.42.0.1`). Open the dashboard at `http://10.42.0.1:3000`, or set `PUBLIC_BASE_URL` in `.env.demo`, then press "Reset demo".
+
 ## What remains (in order)
 
 Current order, from the 2026-10-22 review's slice order (vertical slices toward the demo path F1 → F2 → F3 → F4; status by ID in `docs/ROADMAP.md`). Slices 1–3 are done, slice 4 is built, slice 5's backend is done:
 
-1. **Slice 4 check (M2, A8 with B and C):** the first timed two-device run-through over the hotspot (T16): the phone on the hotspot flips the node green in under 2 s. Measure import → node and submit → flip; log failures in the team's run log.
+1. **Slice 4 check (M2, A8 with B and C):** the API-level part passed on 2026-11-05 in both modes ("M2 pre-check" above). Left: the timed two-device run-through over the hotspot (T16), where the phone flips the node green in under 2 s. Measure import → node and submit → flip, and log failures in `docs/run-log.md` (people write it).
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** `pnpm e2e` passes against Compose; then add the e2e job to `.github/workflows/ci.yml`.
 4. **Slice 7, Python AI service (C7):** after 1–3. Every seed line is served from `seed/ai-cache.json` by the C# side, so the live service is not on the demo path; keep `/health` honest and `/classify` on the stub until there is time (D4: live provider in hackathon hours H1–H4).
