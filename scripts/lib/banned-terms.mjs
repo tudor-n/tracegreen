@@ -60,7 +60,6 @@ export const HASHED_TERMS = [
 /** Repo-relative paths that state the rules and may therefore name the terms. A trailing slash means a folder. */
 export const EXEMPT_PATHS = [
   'CLAUDE.md',
-  'docs/PRIORITY-CHANGES.md',
   'docs/plan/',
   '.claude/hooks/',
   'scripts/lib/banned-terms.mjs',
