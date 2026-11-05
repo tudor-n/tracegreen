@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createGraphStore, selectLoaded } from './graphStore'
-import { audit, auditEvent, kpis, node, nodeEvent, preview, resetEvent, snapshot } from './testFixtures'
+import {
+  audit,
+  auditEvent,
+  kpis,
+  node,
+  nodeEvent,
+  preview,
+  resetEvent,
+  savedScenario,
+  scenarioResult,
+  snapshot,
+} from './testFixtures'
 
 const ids = (store: ReturnType<typeof createGraphStore>) => Object.keys(store.getState().nodes).sort()
 
@@ -183,6 +194,41 @@ describe('scenario preview', () => {
     store.getState().setScenarioPreview(preview(a))
     store.getState().select('b')
     expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it("is marked saved with the server's result when the API saves the change it shows", () => {
+    const { store } = setup()
+    const recomputed = scenarioResult({ carbonKg: 7_400 })
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'sea', alternativeId: null }, recomputed))
+    expect(store.getState().scenarioPreview).toMatchObject({ savedId: 'scenario-1', result: recomputed })
+  })
+
+  it('ignores a save that is not of the change it shows, or that lands after it closed', () => {
+    const { store } = setup()
+    const before = store.getState().scenarioPreview
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'air', alternativeId: null }))
+    store.getState().markScenarioSaved(savedScenario('a', { mode: null, alternativeId: 'N1-alt' }))
+    store.getState().markScenarioSaved(savedScenario('b', { mode: 'sea', alternativeId: null }))
+    expect(store.getState().scenarioPreview).toBe(before)
+
+    store.getState().setScenarioPreview(null)
+    store.getState().markScenarioSaved(savedScenario('a', { mode: 'sea', alternativeId: null }))
+    expect(store.getState().scenarioPreview).toBeNull()
+  })
+
+  it('moves the sequence on a scenario.saved event and leaves the nodes and the preview alone', () => {
+    const { store, a } = setup()
+    const kept = store.getState().scenarioPreview
+    store.getState().applyEvent({
+      type: 'scenario.saved',
+      scenario: savedScenario('a', { mode: 'sea', alternativeId: null }),
+      seq: 2,
+      ts: '2026-11-05T10:00:00Z',
+      workspaceId: 'ws',
+    })
+    expect(store.getState().lastSeq).toBe(2)
+    expect(store.getState().nodes.a).toBe(a)
+    expect(store.getState().scenarioPreview).toBe(kept)
   })
 })
 

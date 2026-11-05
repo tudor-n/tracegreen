@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
-import { scenarioResult } from '@/store/testFixtures'
-import { failureMessage, requestLink, simulateChange, verifyAuditChain } from './dashboard-actions'
+import { savedScenario, scenarioResult } from '@/store/testFixtures'
+import { failureMessage, requestLink, saveScenario, simulateChange, verifyAuditChain } from './dashboard-actions'
 
 const problem = (status: number, code: string, detail: string) => ({
   type: 'about:blank',
@@ -136,6 +136,31 @@ describe('simulateChange', () => {
     expect(await simulateChange(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
       ok: false,
       message: "Can't reach the API. Check that it is running.",
+    })
+  })
+})
+
+describe('saveScenario', () => {
+  const nodeId = '11111111-1111-4111-8111-000000000001'
+  const answer = (status: number, body: { data?: unknown; error?: unknown }) =>
+    vi.spyOn(api, 'POST').mockResolvedValue({ ...body, response: new Response(null, { status }) } as never)
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the node with its change and returns the saved scenario', async () => {
+    const scenario = savedScenario(nodeId, { mode: null, alternativeId: 'N1-alt' })
+    const post = answer(201, { data: scenario })
+    expect(await saveScenario(nodeId, { mode: null, alternativeId: 'N1-alt' })).toEqual({ ok: true, data: scenario })
+    expect(post).toHaveBeenCalledWith('/api/scenarios', { body: { nodeId, mode: null, alternativeId: 'N1-alt' } })
+  })
+
+  it("shows the API's problem when the node is gone", async () => {
+    answer(404, { error: problem(404, 'NodeNotFound', 'No node on the graph.') })
+    expect(await saveScenario(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
+      ok: false,
+      message: 'Supplier not on the graph. No node on the graph.',
     })
   })
 })

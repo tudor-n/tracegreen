@@ -1,4 +1,13 @@
-import type { AuditEntry, DomainEvent, GraphSnapshot, Kpis, NodeView, ScenarioResult } from '@/api/client'
+import type {
+  AuditEntry,
+  DomainEvent,
+  GraphSnapshot,
+  Kpis,
+  NodeView,
+  Scenario,
+  ScenarioChange,
+  ScenarioResult,
+} from '@/api/client'
 import type { ScenarioPreview } from './graphStore'
 
 // Small builders for the store tests. Only the fields the store and selectors read are meaningful.
@@ -115,4 +124,19 @@ export const preview = (n: NodeView, result: ScenarioResult = scenarioResult()):
   change: { mode: 'sea', alternativeId: null },
   result,
   baseline: { carbonKg: n.carbonKg, costEur: n.costEur, leadDays: n.leadDays },
+})
+
+/** What POST /api/scenarios answers for a change on `nodeId`. */
+export const savedScenario = (
+  nodeId: string,
+  change: ScenarioChange,
+  result: ScenarioResult = scenarioResult(),
+): Scenario => ({
+  id: 'scenario-1',
+  workspaceId: 'ws',
+  nodeId,
+  kind: change.mode === null ? 'supplier' : 'mode',
+  change,
+  result,
+  createdAt: '2026-11-05T10:00:00Z',
 })

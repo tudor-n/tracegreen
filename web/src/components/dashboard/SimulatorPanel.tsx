@@ -6,7 +6,7 @@ import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
 import { Button } from '@/components/ui/button'
 import { scenarioCopy, simulatorCopy, transportModeCopy } from '@/copy/dashboard'
 import { ILLUSTRATIVE } from '@/copy/labels'
-import { simulateChange } from '@/lib/dashboard-actions'
+import { saveScenario, simulateChange } from '@/lib/dashboard-actions'
 import {
   DELTA_STEP,
   type DeltaDirection,
@@ -169,7 +169,59 @@ function ScenarioView({ preview, alternatives }: { preview: ScenarioPreview; alt
           {scenarioCopy.massUnknown}
         </p>
       ) : (
-        <Figures result={result} />
+        <>
+          <Figures result={result} />
+          <ApplyScenario key={`${change.mode}|${change.alternativeId}`} preview={preview} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * "Apply" saves the shown change as a scenario (POST /api/scenarios); the node is never changed. The store marks the
+ * preview saved from the API's answer, and ignores an answer that lands after another pick or after the panel closed.
+ */
+function ApplyScenario({ preview }: { preview: ScenarioPreview }) {
+  const markSaved = useGraphStore((s) => s.markScenarioSaved)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const saved = preview.savedId !== undefined
+
+  const onApply = async () => {
+    setSaving(true)
+    setError(null)
+    const answer = await saveScenario(preview.nodeId, preview.change)
+    setSaving(false)
+    if (answer.ok) markSaved(answer.data)
+    else setError(answer.message)
+  }
+
+  let label: string = simulatorCopy.apply
+  if (saved) label = simulatorCopy.applied
+  else if (saving) label = simulatorCopy.applying
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t pt-2">
+      <div className="flex items-center justify-between gap-3">
+        <p data-testid="sim-apply-note" className="text-xs text-muted-foreground">
+          {saved ? simulatorCopy.appliedNote : simulatorCopy.applyNote}
+        </p>
+        <Button
+          size="sm"
+          variant={saved ? 'outline' : 'default'}
+          disabled={saving || saved}
+          data-testid="sim-apply"
+          data-saved={saved}
+          onClick={() => void onApply()}
+        >
+          {label}
+        </Button>
+      </div>
+      {error !== null && (
+        <p role="alert" data-testid="sim-apply-error" className="text-xs text-destructive">
+          {error}
+        </p>
       )}
     </div>
   )

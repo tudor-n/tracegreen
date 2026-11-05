@@ -7,6 +7,7 @@ import type {
   GraphSnapshot,
   Kpis,
   NodeView,
+  Scenario,
   ScenarioChange,
   ScenarioResult,
 } from '@/api/client'
@@ -37,6 +38,8 @@ export interface ScenarioPreview {
   result: ScenarioResult
   /** The base node's figures when the simulation was asked for. */
   baseline: ScenarioBaseline
+  /** Set once "Apply" saved this change (POST /api/scenarios): the saved scenario's id. */
+  savedId?: string
 }
 
 export const baselineOf = (node: NodeView): ScenarioBaseline => ({
@@ -71,6 +74,11 @@ export interface GraphActions extends GraphStoreActions {
   select(nodeId: string | null): void
   setPanel(panel: Panel, open: boolean): void
   setScenarioPreview(preview: ScenarioPreview | null): void
+  /**
+   * Marks the preview as saved with the scenario the API answered "Apply" with, taking the server's result (it
+   * recomputes the change). Does nothing once the preview shows something else: another change, another node, or none.
+   */
+  markScenarioSaved(scenario: Scenario): void
 }
 
 export type GraphState = GraphDomain & GraphUi & GraphActions
@@ -121,7 +129,8 @@ export function applyEventState(state: GraphDomain, event: DomainEvent): GraphDo
       return { ...state, audit: listed ? state.audit : insertAudit(state.audit, event.entry), lastSeq: event.seq }
     }
     case 'scenario.saved':
-      // Saved scenarios are not rendered yet (B5); the sequence still moves on so later events stay in order.
+      // The dashboard that pressed "Apply" marks its preview from the API's answer (markScenarioSaved). The snapshot
+      // carries no scenarios, so the store keeps none; the sequence still moves on so later events stay in order.
       return { ...state, lastSeq: event.seq }
     case 'graph.reset':
       // Never forwarded by the sync, which refetches the snapshot instead (startGraphSync.ts). Ignored if it comes.
@@ -137,6 +146,16 @@ function insertAudit(audit: AuditEntry[], entry: AuditEntry): AuditEntry[] {
 function dedupeAudit(audit: AuditEntry[]): AuditEntry[] {
   const byId = new Map(audit.map((e) => [e.id, e]))
   return [...byId.values()].sort((a, b) => a.id - b.id)
+}
+
+/** Whether the preview is of the same node and the same change as the scenario. */
+function previewShows(preview: ScenarioPreview, scenario: Scenario): boolean {
+  const { change } = preview
+  return (
+    preview.nodeId === scenario.nodeId &&
+    change.mode === scenario.change.mode &&
+    change.alternativeId === scenario.change.alternativeId
+  )
 }
 
 /** False until the first snapshot has arrived. */
@@ -175,6 +194,12 @@ export function createGraphStore(): GraphStore {
         return { openPanels: { ...s.openPanels, [panel]: open }, scenarioPreview: preview }
       }),
     setScenarioPreview: (preview) => set({ scenarioPreview: preview }),
+    markScenarioSaved: (scenario) =>
+      set((s) => {
+        const preview = s.scenarioPreview
+        if (preview === null || !previewShows(preview, scenario)) return s
+        return { scenarioPreview: { ...preview, result: scenario.result, savedId: scenario.id } }
+      }),
   }))
 }
 

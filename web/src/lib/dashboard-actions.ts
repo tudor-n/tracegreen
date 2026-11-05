@@ -3,6 +3,7 @@ import {
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
+  type Scenario,
   type ScenarioChange,
   type ScenarioResult,
 } from '@/api/client'
@@ -126,6 +127,14 @@ export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
  */
 export function simulateChange(nodeId: string, change: ScenarioChange): Promise<Answer<ScenarioResult>> {
   return fetchBody(() => api.POST('/api/simulate', { body: { nodeId, ...change } }))
+}
+
+/**
+ * POST /api/scenarios, the simulator's "Apply": the API recomputes the change, saves it next to the node (never over
+ * it) and publishes scenario.saved. The node keeps its figures; the answer is the saved scenario.
+ */
+export function saveScenario(nodeId: string, change: ScenarioChange): Promise<Answer<Scenario>> {
+  return fetchBody(() => api.POST('/api/scenarios', { body: { nodeId, ...change } }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

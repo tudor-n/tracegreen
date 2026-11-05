@@ -7,8 +7,8 @@ import { ScenarioBadge } from './ScenarioBadge'
 
 // A simulated change (B5), drawn beside its supplier with a dashed outline and a dashed edge into it, to fill
 // NODE_SIZE.supplier. It shows the API's result as it is: the scenario's tonnes, the change against the supplier's
-// tonnes now, and the MAC badge; a result without a mass (`massUnknown`) has none of these and says so. Not
-// selectable: the supplier stays the node the drawer is about.
+// tonnes now, and the MAC badge; a result without a mass (`massUnknown`) has none of these and says so. Once "Apply"
+// saved the change it says so too. Not selectable: the supplier stays the node the drawer is about.
 
 function GhostNodeView({ data }: NodeProps<GhostRfNode>) {
   const { nodeId, change, result } = data.preview
@@ -21,7 +21,10 @@ function GhostNodeView({ data }: NodeProps<GhostRfNode>) {
         className="ghost-node flex size-full flex-col justify-between overflow-hidden rounded-lg px-2.5 py-2"
       >
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{scenarioCopy.whatIf}</p>
+          <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+            {scenarioCopy.whatIf}
+            {data.preview.savedId !== undefined && <span data-testid={`ghost-${nodeId}-saved`}> · {scenarioCopy.saved}</span>}
+          </p>
           {!result.massUnknown && <ScenarioBadge badge={result.badge} />}
         </div>
         <p className="truncate text-sm font-medium" title={title}>

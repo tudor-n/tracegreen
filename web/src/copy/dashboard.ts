@@ -86,6 +86,7 @@ export const scenarioCopy = {
   supplierSwapUnnamed: 'Switch supplier',
   versusNow: (delta: string) => `${delta} vs now`,
   massUnknownShort: 'Mass unknown',
+  saved: 'Saved',
   massUnknown: 'The invoice gives no mass for this item, so this change cannot be estimated.',
 } as const
 
@@ -106,6 +107,12 @@ export const simulatorCopy = {
   leadTime: 'Lead time',
   mac: 'Abatement cost',
   perTonne: (eur: string, unit: string) => `${eur} per ${unit}`,
+  /** "Apply" saves the change as a scenario next to the supplier (POST /api/scenarios); the supplier never changes. */
+  apply: 'Apply',
+  applying: 'Saving…',
+  applied: 'Saved',
+  applyNote: 'Saves this change as a scenario. The supplier itself stays as it is.',
+  appliedNote: 'Saved as a scenario. The supplier itself stays as it is.',
 } as const
 
 /**
