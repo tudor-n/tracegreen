@@ -58,7 +58,7 @@ const checks = [
     },
   },
   {
-    title: 'No banned term in a tracked file (PRIORITY-CHANGES.md §4)',
+    title: 'No banned term in a tracked file (CLAUDE.md, Copy rules)',
     run: () => {
       const { texts, skipped } = trackedTextFiles();
       return {

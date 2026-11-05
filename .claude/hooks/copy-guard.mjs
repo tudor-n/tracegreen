@@ -1,4 +1,4 @@
-// PreToolUse hook for Edit and Write: blocks banned terms (docs/PRIORITY-CHANGES.md §4)
+// PreToolUse hook for Edit and Write: blocks banned terms (CLAUDE.md, "Copy rules")
 // before they reach a file. Exit code 2 sends stderr back to Claude as the tool's error,
 // so it rewrites the text instead of writing it. No dependencies.
 
@@ -25,6 +25,6 @@ if (found.length === 0) process.exit(0);
 
 const lines = found.map(({ term, instead }) => `- "${term}": ${instead}`);
 process.stderr.write(
-  `copy-guard: ${repoPath} would contain banned terms (docs/PRIORITY-CHANGES.md §4). Rewrite the text:\n${lines.join('\n')}\n`,
+  `copy-guard: ${repoPath} would contain banned terms (CLAUDE.md, "Copy rules"). Rewrite the text:\n${lines.join('\n')}\n`,
 );
 process.exit(2);

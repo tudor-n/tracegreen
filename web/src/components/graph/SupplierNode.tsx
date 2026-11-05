@@ -10,7 +10,7 @@ import { FactorInfo } from './FactorInfo'
 // One supplier on the canvas, drawn to fill NODE_SIZE.supplier. Tone and pattern follow `data-status`, the ring follows
 // `data-hotspot` (index.css); the Playwright smoke reads the same attributes. It enters with a short slide on mount,
 // which for an existing id happens only once: React Flow keeps the component across updates. A number that rests on a
-// PLACEHOLDER factor says so on the node itself, not only in the "i" (PRIORITY-CHANGES.md §2).
+// PLACEHOLDER factor says so on the node itself, not only in the "i" (CLAUDE.md, Data rules).
 //
 // When the status turns VERIFIED the box flips from amber to green (`data-flip`). The status reaches the node the same
 // way whether it came as `node.verified` or in a fresh snapshot after polling or a reconnect, so both flip. The slide

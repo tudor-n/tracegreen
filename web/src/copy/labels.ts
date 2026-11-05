@@ -1,6 +1,6 @@
 import type { CarbonBasis, MacBadge, Uncertainty } from '@/api/client'
 
-// Labels a juror reads anywhere in the SPA: rulings 2–4 of docs/PRIORITY-CHANGES.md, the AI labels of CLAUDE.md, the
+// Labels a juror reads anywhere in the SPA: rulings R2–R4 of docs/DECISIONS.md, the AI labels of CLAUDE.md, the
 // MAC badge names and the audit words. Components import them from here instead of writing strings inline. Records are
 // keyed by the generated types, so a new value in the contract fails the typecheck until it has a label.
 

@@ -34,7 +34,7 @@ export function justVerified(previous: NodeStatus, next: NodeStatus): boolean {
   return previous !== 'VERIFIED' && next === 'VERIFIED'
 }
 
-/** A factor row the seed still marks as a placeholder. It stays visible on screen (PRIORITY-CHANGES.md §2). */
+/** A factor row the seed still marks as a placeholder. It stays visible on screen (CLAUDE.md, Data rules). */
 export function isPlaceholder(factor: FactorLookup): boolean {
   return factor.source.includes('PLACEHOLDER')
 }

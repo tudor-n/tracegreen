@@ -1,4 +1,4 @@
-// Terms that must not appear in anything a juror can read (docs/PRIORITY-CHANGES.md §4).
+// Terms that must not appear in anything a juror can read (CLAUDE.md, "Copy rules").
 // Shared by the copy-guard hook (.claude/hooks/copy-guard.mjs) and the preflight (C6),
 // so both always agree on what is banned and which files are exempt.
 //
