@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { NodeView, ScenarioChange, ScenarioResult } from '@/api/client'
+import type { AlternativeView, NodeView, ScenarioChange, ScenarioResult } from '@/api/client'
 import { Tag } from '@/components/dashboard/DrawerParts'
 import { FactorInfo } from '@/components/graph/FactorInfo'
 import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
@@ -7,7 +7,14 @@ import { Button } from '@/components/ui/button'
 import { scenarioCopy, simulatorCopy, transportModeCopy } from '@/copy/dashboard'
 import { ILLUSTRATIVE } from '@/copy/labels'
 import { simulateChange } from '@/lib/dashboard-actions'
-import { DELTA_STEP, type DeltaDirection, deltaDirection, modeOptions, scenarioTitle } from '@/lib/scenario-display'
+import {
+  DELTA_STEP,
+  type DeltaDirection,
+  deltaDirection,
+  modeOptions,
+  sameChange,
+  scenarioTitle,
+} from '@/lib/scenario-display'
 import { cn } from '@/lib/utils'
 import {
   baselineOf,
@@ -22,8 +29,8 @@ import {
   useGraphStore,
 } from '@/store'
 
-// The simulator (B5), at the top of the node drawer while "Simulate" is pressed. Picking a mode asks the API for the
-// change; the answer becomes the store's scenario preview, which this panel and the ghost node on the canvas both show.
+// The simulator (B5), at the top of the node drawer while "Simulate" is pressed. Picking a mode, or one of the node's
+// alternative suppliers, asks the API for the change; the answer becomes the store's scenario preview, which this panel and the ghost node on the canvas both show.
 // The base node is never touched. Every figure, delta, the MAC and its badge come from the API as they are; cost, lead
 // time and the MAC rest on illustrative lane figures and carry the label. A later pick wins over an earlier answer.
 
@@ -62,7 +69,10 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
     }
   }
 
-  const picked = pending?.mode ?? preview?.change.mode ?? null
+  // The change on screen: the one being asked for, else the one the preview shows.
+  const shown = pending ?? preview?.change ?? null
+  const alternatives = node.alternatives
+  const canPick = options.some((o) => o.available && !o.current) || alternatives.length > 0
 
   let body: ReactNode
   if (pending !== null) body = <Message>{simulatorCopy.simulating}</Message>
@@ -72,46 +82,86 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
         {error}
       </p>
     )
-  else if (preview !== null) body = <ScenarioView preview={preview} />
-  else if (options.some((o) => o.available && !o.current)) body = <Message>{simulatorCopy.pick}</Message>
-  else body = <Message>{simulatorCopy.onlyMode}</Message>
+  else if (preview !== null) body = <ScenarioView preview={preview} alternatives={alternatives} />
+  else if (canPick) body = <Message>{simulatorCopy.pick}</Message>
+  else body = <Message>{simulatorCopy.nothingToTry}</Message>
 
   return (
     <section ref={panel} data-testid="simulator" className="flex flex-col gap-3 rounded-lg border p-3">
       <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{simulatorCopy.title}</h3>
       <div className="flex flex-col gap-1.5">
+        <GroupLabel>{simulatorCopy.modes}</GroupLabel>
         <div role="group" aria-label={simulatorCopy.modes} className="grid grid-cols-4 gap-1.5">
-          {options.map(({ mode, available, current }) => (
-            <Button
-              key={mode}
-              size="sm"
-              variant={picked === mode ? 'default' : 'outline'}
-              aria-pressed={picked === mode}
-              disabled={!available || current}
-              data-testid={`sim-mode-${mode}`}
-              data-available={available}
-              className="h-auto flex-col gap-0 py-1"
-              onClick={() => void onPick({ mode, alternativeId: null })}
-            >
-              {transportModeCopy[mode]}
-              {current && <span className="text-[10px] font-normal">{simulatorCopy.current}</span>}
-            </Button>
-          ))}
+          {options.map(({ mode, available, current }) => {
+            const change: ScenarioChange = { mode, alternativeId: null }
+            const pressed = sameChange(shown, change)
+            return (
+              <Button
+                key={mode}
+                size="sm"
+                variant={pressed ? 'default' : 'outline'}
+                aria-pressed={pressed}
+                disabled={!available || current}
+                data-testid={`sim-mode-${mode}`}
+                data-available={available}
+                className="h-auto flex-col gap-0 py-1"
+                onClick={() => void onPick(change)}
+              >
+                {transportModeCopy[mode]}
+                {current && <span className="text-[10px] font-normal">{simulatorCopy.current}</span>}
+              </Button>
+            )
+          })}
         </div>
         {options.some((o) => !o.available) && <p className="text-xs text-muted-foreground">{simulatorCopy.noLeg}</p>}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <GroupLabel>{simulatorCopy.suppliers}</GroupLabel>
+        {alternatives.length === 0 ? (
+          <p data-testid="sim-no-alternatives" className="text-xs text-muted-foreground">
+            {simulatorCopy.noAlternatives}
+          </p>
+        ) : (
+          <div role="group" aria-label={simulatorCopy.suppliers} className="flex flex-col gap-1.5">
+            {alternatives.map((alternative) => {
+              const change: ScenarioChange = { mode: null, alternativeId: alternative.id }
+              const pressed = sameChange(shown, change)
+              return (
+                <Button
+                  key={alternative.id}
+                  size="sm"
+                  variant={pressed ? 'default' : 'outline'}
+                  aria-pressed={pressed}
+                  data-testid={`sim-alt-${alternative.id}`}
+                  className="h-auto justify-between gap-2 py-1.5"
+                  onClick={() => void onPick(change)}
+                >
+                  <span className="truncate">{alternative.label}</span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-normal">
+                    {simulatorCopy.alternativeVia(alternative.country, transportModeCopy[alternative.mode])}
+                    {alternative.illustrative && <Tag>{ILLUSTRATIVE}</Tag>}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
+        )}
       </div>
       <div aria-live="polite">{body}</div>
     </section>
   )
 }
 
-/** The API's result for the picked change. A result without a mass has no figures to show (`massUnknown`). */
-function ScenarioView({ preview }: { preview: ScenarioPreview }) {
+/**
+ * The API's result for the picked change, titled from the node's alternatives for a swap. A result without a mass has
+ * no figures to show (`massUnknown`).
+ */
+function ScenarioView({ preview, alternatives }: { preview: ScenarioPreview; alternatives: readonly AlternativeView[] }) {
   const { change, result } = preview
   return (
     <div data-testid="sim-result" data-badge={result.massUnknown ? undefined : result.badge} className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">{scenarioTitle(change)}</p>
+        <p className="text-sm font-medium">{scenarioTitle(change, alternatives)}</p>
         {!result.massUnknown && <ScenarioBadge badge={result.badge} />}
       </div>
       {result.massUnknown ? (
@@ -213,4 +263,8 @@ function DeltaRow({
 
 function Message({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground">{children}</p>
+}
+
+function GroupLabel({ children }: { children: ReactNode }) {
+  return <p className="text-xs font-medium text-muted-foreground">{children}</p>
 }

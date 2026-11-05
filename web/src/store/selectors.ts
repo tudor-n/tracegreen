@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { Buyer, NodeView } from '@/api/client'
+import type { AlternativeView, Buyer, NodeView } from '@/api/client'
 import type { GraphState, ScenarioPreview } from './graphStore'
 import { BUYER_NODE_ID, createLayoutMemo, ghostPosition, NODE_SIZE, type XY } from './layout'
 
@@ -8,7 +8,8 @@ import { BUYER_NODE_ID, createLayoutMemo, ghostPosition, NODE_SIZE, type XY } fr
 
 export type SupplierNodeData = { node: NodeView; hotspot: boolean }
 export type BuyerNodeData = { buyer: Buyer }
-export type GhostNodeData = { preview: ScenarioPreview }
+/** The supplier's `alternatives` ride along so the ghost can name the supplier a swap goes to. */
+export type GhostNodeData = { preview: ScenarioPreview; alternatives: readonly AlternativeView[] }
 export type SupplierRfNode = Node<SupplierNodeData, 'supplier'>
 export type BuyerRfNode = Node<BuyerNodeData, 'buyer'>
 export type GhostRfNode = Node<GhostNodeData, 'ghost'>
@@ -99,11 +100,13 @@ export const ghostId = (nodeId: string): string => `ghost-${nodeId}`
 
 /**
  * The scenario preview as a ghost node left of its supplier, with a dashed edge into the supplier. Null while the
- * supplier has no position. Built from the preview alone, so the supplier's own node, edge and figures stay as they are.
+ * supplier has no position. Built from the preview and the supplier's alternatives alone, so the supplier's own node,
+ * edge and figures stay as they are.
  */
 export function toGhost(
   preview: ScenarioPreview,
   positions: Map<string, XY>,
+  alternatives: readonly AlternativeView[] = [],
 ): { node: GhostRfNode; edge: GhostRfEdge } | null {
   const supplier = positions.get(preview.nodeId)
   if (supplier === undefined) return null
@@ -114,7 +117,7 @@ export function toGhost(
       type: 'ghost',
       position: ghostPosition(supplier),
       ...sized(NODE_SIZE.supplier),
-      data: { preview },
+      data: { preview, alternatives },
       selectable: false,
       focusable: false,
     },
@@ -159,7 +162,8 @@ export function createGraphViewSelector(): (state: GraphState) => GraphView {
     }
     const positions = layout(sorted.map((n) => n.id))
     const nodes = toRfNodes(state.buyer, sorted, positions, hotspots, state.selectedNodeId)
-    const ghost = state.scenarioPreview === null ? null : toGhost(state.scenarioPreview, positions)
+    const preview = state.scenarioPreview
+    const ghost = preview === null ? null : toGhost(preview, positions, state.nodes[preview.nodeId]?.alternatives)
     view = ghost === null ? { nodes, edges } : { nodes: [...nodes, ghost.node], edges: [...edges, ghost.edge] }
     nodesIn = state.nodes
     buyerIn = state.buyer

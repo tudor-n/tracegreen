@@ -12,7 +12,7 @@ import { ScenarioBadge } from './ScenarioBadge'
 
 function GhostNodeView({ data }: NodeProps<GhostRfNode>) {
   const { nodeId, change, result } = data.preview
-  const title = scenarioTitle(change)
+  const title = scenarioTitle(change, data.alternatives)
   return (
     <div className="size-full motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-6 motion-safe:duration-300">
       <div

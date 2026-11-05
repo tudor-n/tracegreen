@@ -81,7 +81,9 @@ export const drawerCopy = {
 export const scenarioCopy = {
   whatIf: 'What if',
   modeChange: (mode: string) => `Switch to ${mode}`,
-  supplierSwap: 'Switch supplier',
+  supplierSwap: (supplier: string) => `Switch to ${supplier}`,
+  /** A swap to an alternative the node no longer lists. */
+  supplierSwapUnnamed: 'Switch supplier',
   versusNow: (delta: string) => `${delta} vs now`,
   massUnknownShort: 'Mass unknown',
   massUnknown: 'The invoice gives no mass for this item, so this change cannot be estimated.',
@@ -92,8 +94,12 @@ export const simulatorCopy = {
   modes: 'Transport mode',
   current: 'now',
   noLeg: 'Greyed-out modes have no leg on this lane.',
-  pick: 'Pick a mode to see the change in emissions, cost and lead time.',
-  onlyMode: 'This lane has a leg for one mode only, so there is no other mode to try.',
+  suppliers: 'Alternative supplier',
+  /** An alternative's country and the mode its lane ships by, which the swap uses. */
+  alternativeVia: (country: string, mode: string) => `${country} · ${mode}`,
+  noAlternatives: 'No other supplier of this category in the alternatives list.',
+  pick: 'Pick a mode or a supplier to see the change in emissions, cost and lead time.',
+  nothingToTry: 'This lane has a leg for one mode only and no other supplier makes this item, so there is nothing to try.',
   simulating: 'Simulating…',
   emissions: 'Emissions',
   cost: 'Cost',

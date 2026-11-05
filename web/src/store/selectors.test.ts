@@ -181,6 +181,20 @@ describe('ghost node', () => {
     expect(toGhost(preview(node('gone', 10)), positions)).toBeNull()
   })
 
+  it("carries the supplier's alternatives, so a swap's ghost can name the new supplier", () => {
+    const alternatives = [
+      { id: 'N1-alt', label: 'Cluj Metal Works SRL', country: 'RO', origin: 'RO-CJ', mode: 'road', illustrative: true },
+    ] as const
+    const store = createGraphStore()
+    const a = node('a', 22_562, { alternatives: [...alternatives] })
+    store.getState().hydrate(snapshot(1, [a]))
+    store.getState().setScenarioPreview({ ...preview(a), change: { mode: null, alternativeId: 'N1-alt' } })
+
+    const ghost = createGraphViewSelector()(store.getState()).nodes.find((n) => n.type === 'ghost') as GhostRfNode
+    expect(ghost.data.alternatives).toEqual(alternatives)
+    expect(toGhost(preview(a), positions)?.node.data.alternatives).toEqual([])
+  })
+
   it('joins the view without moving or changing the base nodes', () => {
     const store = createGraphStore()
     const a = node('a', 22_562)

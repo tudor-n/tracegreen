@@ -1,12 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import { node } from '@/store/testFixtures'
-import { DELTA_STEP, deltaDirection, modeOptions, scenarioTitle } from './scenario-display'
+import { DELTA_STEP, deltaDirection, modeOptions, sameChange, scenarioTitle } from './scenario-display'
+
+const n1Alt = { id: 'N1-alt', label: 'Cluj Metal Works SRL', country: 'RO', origin: 'RO-CJ', mode: 'road', illustrative: true } as const
 
 describe('scenarioTitle', () => {
-  it('names a mode change by the mode, and a swap generically', () => {
+  it('names a mode change by the mode', () => {
     expect(scenarioTitle({ mode: 'sea', alternativeId: null })).toBe('Switch to Sea')
-    expect(scenarioTitle({ mode: 'rail', alternativeId: null })).toBe('Switch to Rail')
+    expect(scenarioTitle({ mode: 'rail', alternativeId: null }, [n1Alt])).toBe('Switch to Rail')
+  })
+
+  it("names a swap by the alternative's label, and generically when the node no longer lists it", () => {
+    expect(scenarioTitle({ mode: null, alternativeId: 'N1-alt' }, [n1Alt])).toBe('Switch to Cluj Metal Works SRL')
     expect(scenarioTitle({ mode: null, alternativeId: 'N1-alt' })).toBe('Switch supplier')
+    expect(scenarioTitle({ mode: null, alternativeId: 'N2-alt' }, [n1Alt])).toBe('Switch supplier')
+  })
+})
+
+describe('sameChange', () => {
+  it('matches the same mode or the same alternative, and nothing against no change', () => {
+    expect(sameChange({ mode: 'sea', alternativeId: null }, { mode: 'sea', alternativeId: null })).toBe(true)
+    expect(sameChange({ mode: null, alternativeId: 'N1-alt' }, { mode: null, alternativeId: 'N1-alt' })).toBe(true)
+    expect(sameChange({ mode: 'sea', alternativeId: null }, { mode: 'air', alternativeId: null })).toBe(false)
+    expect(sameChange({ mode: null, alternativeId: 'N1-alt' }, { mode: 'sea', alternativeId: null })).toBe(false)
+    expect(sameChange(null, { mode: 'sea', alternativeId: null })).toBe(false)
+    expect(sameChange(null, null)).toBe(false)
   })
 })
 
