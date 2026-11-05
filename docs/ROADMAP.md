@@ -1,0 +1,66 @@
+# Roadmap status
+
+Status of TraceGreen by roadmap ID, as of 2026-11-05. The strategy roadmap itself is kept outside the repository. Only its IDs and the parts that describe the product live here (ruling R7 in `DECISIONS.md`). Detail and the order of remaining work: `NEXT.md`. Team tasks (`A#`, `B#`, `C#`): `docs/plan/`.
+
+Legend: **done**; **built** (the code exists, but the milestone check that proves it has not been recorded); **partial**; **open**; **outside** (work that happens outside the repository, such as pitch, events and logistics).
+
+## Milestones
+
+| ID | Due | What | Status |
+|---|---|---|---|
+| M1 | 25 Oct | Import an XML from the browser, and an amber node appears with its KPIs | **done**: recorded 2026-10-24 (B3) and re-run 2026-10-29 (C4), in both data modes (`NEXT.md`, "M1 check") |
+| M2 | 1 Nov | Two-device verify loop: the phone flips the node green in under 2 s, then the simulator runs | **open**: the verify loop is built end to end, but the timed two-device run (T16, task A8) is not recorded and the simulator panel is not built |
+
+## Features
+
+| ID | Feature | Status | Where |
+|---|---|---|---|
+| F1 | e-Factura import (UBL 2.1, BT-158 classification code and BT-159 origin country, unit codes) | **done** | `Domain/Ubl`, `POST /api/ingest/ubl`; the seed XMLs pass ANAF's validator (`NEXT.md`) |
+| F2 | Supply-chain graph: status colours, hotspot ring, log-width edges, KPI bar | **done** | `web/src/store`, `components/graph`, `KpiBar`; KPIs from the API, labelled per ruling R2 |
+| F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; M2's timed run is still open |
+| F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **partial** | Backend done (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel in the drawer is open |
+| F5 | Audit log panel with chain check | **done** | `AuditPanel`, `POST /api/audit/verify` |
+| F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The live Python classifier is open; D4 places it in hackathon hours H1–H4 |
+| F7 | Plausibility check | **partial** | `AIR_HEAVY` on the answer and the node (D2); `SEA_TOO_FAST` is in the contract but not evaluated (D3) |
+| F8 | Optional mass confirmation | **partial** | `POST /api/verify` accepts `massT` and a confirmed mass replaces the invoice's; the supplier page does not ask for it yet |
+| F9 | PDF invoice drop | **open** | Hackathon, if time |
+| F10 | Scenario export | **open** | Only if everything else is done |
+| F11 | AI alternative suggester | **open** | The alternatives come from the curated `seed/alternatives.json` |
+
+## Controls
+
+| ID | Control | Status | Where |
+|---|---|---|---|
+| C1 | HMAC-signed link token | **done** | `HmacLinkSigner`; the layout is R5's, which differs from the roadmap's shorter form (`SECURITY.md`) |
+| C2 | Token bound to the invoice hash; a mismatch is 410 | **done** | `VerifyService`, `Hashing.InvoiceHash` |
+| C3 | Single use through a unique nonce; a second use is 409 | **done** | Both repositories; the context route answers 409 too |
+| C4 | Hash-chained audit log with an on-screen check | **done** | `AuditChain`, append-only trigger, `AuditPanel` |
+| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES` |
+| C6 | Untrusted text rendered as text; CSP header | **done** | `react/no-danger` lint; CSP in `web/nginx.conf` (demo image) |
+| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` |
+| C8 | RLS; secrets only on the server | **partial** | RLS is enabled with no policies yet (the app connects as owner); secrets are server-only; see "Known gaps" in `SECURITY.md` |
+| C9 | 7-day expiry with a countdown on the QR card | **done** | `LINK_TTL_SECONDS` default 604800; "expires in …" on the link card |
+
+## Tasks
+
+| ID | Due | Task | Status |
+|---|---|---|---|
+| T1 | 19 Oct | Team registration and dates | **outside** |
+| T2 | 20 Oct | Repository and CI | **done**: repo on the .NET / FastAPI / Vite stack; CI added in A9 (`.github/workflows/ci.yml`) |
+| T3 | 21 Oct | Database, tables, RLS, offline mode | **done**: Postgres with migrations `Init` and `Rls`, plus `DATA_MODE=memory` |
+| T4 | 22 Oct | Factor rows with source, year and row label, and a spend-factor source | **partial**: the spend source is decided (D1, US EPA v1.3) and `docs/factor-sources.md` exists. The freight and material rows and `ETS_PRICE_EUR_PER_T` are still placeholders; a person replaces them |
+| T5 | 23 Oct | UBL parser and seed XMLs validated at ANAF | **done** (`NEXT.md`, "Seed XML validation") |
+| T6 | 23 Oct | Carbon math with MAC guard tests | **done**: `Domain/Carbon` |
+| T7 | 24 Oct | Graph, status colours, KPI bar | **done** (M1) |
+| T8 | 25 Oct | Seed scenario loaded | **done** |
+| T9 | 25 Oct | Name, tagline, logo, colour tokens | **partial**: name, favicon and status tokens are done; the tagline is a team decision |
+| T10 | 27 Oct | Signed links and the QR card | **done** |
+| T11 | 28 Oct | Mobile supplier page with RO/EN and the rate limit | **done**: phone-tested in C5 |
+| T12 | 29 Oct | Live update to the node flip and KPIs; PARTIAL state | **built**: event stream, store and flip animation exist; the flip under 2 s over the hotspot is not measured yet (A8) |
+| T13 | 30 Oct | Audit log and panel | **done** |
+| T14 | 31 Oct | Simulator drawer with MAC badge states | **partial**: the math and the endpoints are done (A7), the drawer panel is open |
+| T15 | 1 Nov | Error, loading and empty states; CSP; environment hygiene | **partial**: CSP and environment hygiene done; the state coverage on the demo path is checked by the Playwright smoke (B6), which is open |
+| T16 | 1 Nov | First timed two-device run-through | **open** (A8) |
+| T17–T21, T23 | 3–5 Nov | Field visits, pitch deck, backup video, rehearsals, pack list | **outside** |
+| T22 | 5 Nov | Freeze scope and tag `v0.9-prehack` | **open**: `scripts/preflight.mjs` blocks the tag while any factor source says PLACEHOLDER or the ETS price has no source (T4) |
+| T24 | H12 | Scope freeze during the hackathon | **outside** (a team rule) |
