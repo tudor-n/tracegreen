@@ -1,0 +1,90 @@
+# Decisions
+
+The ledger of decisions you would not guess from the code. Each line reads **decision** — reason — cost if wrong. To override one, edit its line and add the date and the reason. Current status and the work still open: `docs/NEXT.md`.
+
+IDs: `F#` features, `C#` controls, `T#` tasks and `M#` milestones are the roadmap's (`docs/ROADMAP.md`); `R1`–`R8` are the rulings of the 2026-10-22 code review; `D1`–`D6` are the team's open questions from `docs/plan/README.md`; `A#`, `B#`, `C#` tasks are in `docs/plan/dev-{a,b,c}.md` (the C prefix is shared by controls and Dev C's tasks; the context says which).
+
+## Stack and shape
+
+- **C# .NET 10 API, Python FastAPI AI service, Vite + React SPA, one browser origin** — every carbon number stays in one typed, tested place; the AI service is replaceable; the browser and the phone talk to one origin — cost if wrong: a service rewrite.
+- **Carbon math is C# only; the simulator is a stateless endpoint** — the UI and the AI never compute carbon, so a number on screen always has a server-side source row — cost if wrong: none known.
+- **Postgres in Docker through EF Core, not a local Supabase stack; the migrations include row-level security** — one Compose file runs everything offline, and hosted Supabase stays possible — cost if wrong: a migration to a hosted database.
+- **Services live in `TraceGreen.Domain/Services` and read a Domain-side `ServiceOptions` record that `Program.cs` builds from `AppConfig`** — the Domain keeps no project or package reference and the services are testable without a web host — cost if wrong: moving a few classes.
+- **A `workspace_id` column and a `Ctx(WorkspaceId, Actor)` argument exist from day one** — authentication later is a policy, not a refactor — cost if wrong: one column.
+- **`dotnet watch` is not used in Docker** — its polling watcher crashes on Windows bind mounts; the API container runs `dotnet run`, and a C# edit needs `docker compose restart api` — cost if wrong: slower edit loop only.
+
+## Rulings of the 2026-10-22 review (R1–R8)
+
+- **R1 Activity formula: `transport + material × (1 − renewable_share × 0.5)`, as implemented** — the roadmap's §6.1.2 version is inverted (material vanishes on grid power and grows with renewables); the roadmap is corrected, the code is not "fixed back"; pinned by `RenewablePowerLowersActivityCarbonVsGrid` — cost if wrong: none.
+- **R2 KPI wording: the API field stays `primaryShare`; the UI label is "Supplier-confirmed share", subtitle "by emissions, not by node count", tooltip "share of total kgCO₂e from nodes the supplier confirmed — activity data from official factors, not externally verified PCFs"** — the figure is supplier-confirmed activity data, and a reader from automotive supplier management could otherwise take it for externally verified product footprints; the banned wording is enforced by `scripts/lib/banned-terms.mjs` — cost if wrong: one string.
+- **R3 Provenance label on every node: VERIFIED shows "Supplier-confirmed · <factor source> <year>"; ESTIMATED shows "Spend-based estimate · <factor source>"; lane cost and lead time stay "illustrative"** — the label says what each green node is, literally — cost if wrong: copy.
+- **R4 "Don't know" energy: `EnergySource.Unknown` still gives VERIFIED and is computed like grid; a derived `Uncertainty` is `High` for ESTIMATED and PARTIAL, `Medium` for VERIFIED with unknown energy or unknown mass, `Low` otherwise; shown as a label, never as ±%** — both questions were answered; the doubt is shown instead of hidden — cost if wrong: one enum.
+- **R5 Token layout `v1.<nodeId>.<expiresUnix>.<nonce>.<invoiceHash>.<sig>` and the status mapping 401 / 409 / 410 / 429 are final** — carrying the full invoice hash tells a tampered token (401) from a changed invoice (410); `docs/SECURITY.md` documents this layout, not the roadmap's shorter one — cost if wrong: a token version bump.
+- **R6 Demo hosting: the laptop runs the Compose stack and serves the laptop's hotspot; no tunnel before M2** — fewest moving parts on stage. Consequence: only phones on that hotspot can open a link, so the second team phone joins the hotspot as the fallback; `RUNBOOK.md` and the QR card's loopback warning say so — cost if wrong: a tunnel added after M2.
+- **R7 The roadmap copy in the repo is v1.1 and git-ignored; v1.2 lives outside the repo** — IDs are identical in both, so citing `F#`, `C#`, `T#`, `Q#`, `R#` is safe; citing anything else from the copy is not. The repo's `CLAUDE.md` supersedes the roadmap's starter file; `SEED_MODE` is only an alias for `DATA_MODE=memory` — cost if wrong: a stale fact in a doc.
+- **R8 `GET /api/health` carries `ai` and `baseUrl`** — the docs described them before they existed; added in slice 1 — cost if wrong: none.
+
+Order-of-work ruling (same review): build vertical slices toward the demo path F1 → F2 → F3 → F4 (ingest + graph, ANAF validation, verify backend, verify SPA, simulator, Playwright smoke, AI service, then scripts, docs and CI); no cloud deployment, tunnel or new dependency before slice 5. Data ruling: agents never invent factor values; a `PLACEHOLDER` source stays on screen until a human replaces the row, and `scripts/preflight.mjs` blocks the `v0.9-prehack` tag while any remains.
+
+## Team questions (D1–D6)
+
+- **D1 Spend factors are US EPA v1.3, converted on every import (decided 2026-10-23)** — `SpendConversion` turns the EUR total into 2022 USD with the ECB rate of the invoice date and CPI-U annual averages from `seed/spend-conversion.json`; each category has its own spend row; the spend figure's `factors` list the EPA row, the rate and the price adjustment. Details and the refresh caveat: `docs/factor-sources.md` — cost if wrong: one table and its conversion.
+- **D2 `AIR_HEAVY` (confirmed air, more than 2 t) is shown, never blocking** (the plan's proposed default; no other outcome was recorded by 25 Oct) — returned with the answer and on the node; no extra tap on the phone — cost if wrong: one rule's behaviour.
+- **D3 `SEA_TOO_FAST` is in the contract and the copy but not evaluated** (the plan's default) — no invoice carries delivery dates — cost if wrong: BT-72 extraction, which changes `ExtractedInvoice` and so every invoice hash (reset the demo after it).
+- **D4 Live AI classifier: contract, cache and stub before 5 Nov; the live provider in hackathon hours H1–H4** (the plan's proposed default; no other outcome recorded) — every seed line is served from `seed/ai-cache.json` by the C# side, so the live service is not on the demo path — cost if wrong: the classifier is built earlier.
+- **D5 If real factors change a demo badge, report it in `NEXT.md` and change what the demo script says, never the data** — demo numbers are never hand-tuned (roadmap §9). Open until T4 replaces the placeholder rows — cost if wrong: a demo line.
+- **D6 The four `grid.*` factor rows are deleted (decided 2026-10-23)** — no formula read them, and preflight fails on any placeholder; see `docs/factor-sources.md` — cost if wrong: four sourced rows added back.
+
+## Wire contract, slice 1 (A1–A3)
+
+- **`NodeView` is the one node shape on the wire**, in the snapshot and in every node event (`Domain/Model/ReadModel.cs`, built by `NodeViewMapper`): `carbonKg` with its `basis` (`spend` or `activity`), both figures with their `FactorLookup` rows (the "i" icon; a PLACEHOLDER source reaches the screen), R4's `uncertainty`, `classification` (source, confidence, `aiMapped`), an `invoice` summary and the `lane` (`illustrative: true`). PARTIAL stays on the spend figure; `carbonKg` switches to activity only when VERIFIED — one shape means one reducer in the store — cost if wrong: a second type.
+- **Event types reach the generated client by describing `/api/events` as `text/event-stream` of `DomainEvent`**, a union discriminated by `type` (`node.created`, `node.updated`, `node.verified`, `audit.appended`, `scenario.saved`, `graph.reset`), written first and equal to the SSE event name; `hello`, `resync` and `ping` carry no domain data; `node.verified` carries a `VerificationView` without nonce or address hash — nobody hand-writes API types — cost if wrong: hand-written event types.
+- **One JSON shape for responses and SSE (`ApiJson`)**: camelCase, enums as camelCase strings (error codes and node status keep their spelling), numbers never as strings, constructor parameters required, nullability as annotated — the generated types have no spurious optional fields — cost if wrong: client-side guards.
+- **Enum components hold only their values**: a schema transformer removes the `null` .NET folds into an enum the first time it meets it as nullable; nullable properties say so themselves — so `Record<EnergySource, string>` typechecks — cost if wrong: casts in the SPA.
+- **An optional request field needs a default (`= null`)** — `ApiJson` treats required constructor parameters as required for requests too, and an omitted one gets a bare 400 without an `ApiProblem` code — cost if wrong: a confusing 400.
+- **Errors are `ApiProblem`** (RFC 9457 fields plus a typed `code`); clients switch on `code`, never on titles — cost if wrong: brittle error handling.
+- **The snapshot reads `lastSeq` before the nodes, and the store applies events idempotently** (upsert by id, skip known audit entries, ignore `seq <= lastSeq`) — an event published while the snapshot is built is newer and applied on top, even when it repeats what the snapshot shows — cost if wrong: a missed or doubled update.
+- **An event that cannot be serialised becomes `resync`** on the stream — the client refetches instead of the stream breaking on every replay — cost if wrong: none.
+- **Client transport (A3)**: `openapi-fetch` typed by `schema.d.ts`; `useGraphEvents` runs the pure `graphSync` reducer: snapshot on every stream (re)open, on `resync`, on `graph.reset` and on a sequence gap; every new request drops the event buffer; stale `seq` is dropped; while the stream is down `/api/graph` is polled every 5 s; a request past 8 s counts as failed; after an API restart the snapshot's lower `lastSeq` wins — cost if wrong: a stuck dashboard.
+- **Factor rows on a node come from today's `factors.json`; stored kilograms are not recomputed** — after changing factors, reset the demo; a row that no longer exists is left out of the list instead of failing `/api/graph` — cost if wrong: persist rows on the node.
+- **Mass unknown means no activity figure** — the node stays on the spend figure, and a VERIFIED one shows `uncertainty: medium` — cost if wrong: a misleading 0 kg.
+- **`baseUrl` is a display hint, not a trusted value** — for forwarded headers the last value wins, but a direct caller can still choose them; it is never written into audit payloads — cost if wrong: a wrong link on the QR card, nothing more.
+- **Non-EUR invoices are rejected (`UnsupportedCurrency`); a supplier country without a lane is rejected (`NoLane`)** — the conversion table holds USD/EUR only, and lanes are never invented (CN → `CN-RO`, TW → `TW-RO`, DE → `DE-HH-SB`, RO → `RO-SB-SB`) — cost if wrong: two rows of data.
+- **Ingest refuses input it cannot estimate safely, with 422 `Schema`**: nesting deeper than 64 levels (checked by a streaming pass before any tree is built), a total not positive or above 10¹² EUR, a line amount above 10¹², a negative quantity or one above 10⁹ — the bounds keep every later sum inside `decimal`, so one hostile invoice cannot break `/api/graph` for everyone — cost if wrong: returns are rejected until supported.
+- **Duplicates are refused by the repository under the same lock as the insert** (raw XML hash, invoice id or node id) — two identical uploads at the same instant give one 201 and one 409 — cost if wrong: duplicate nodes.
+
+## Wire contract, slice 3 (A5–A6)
+
+- **A used link answers 409 on the context route too** — scanning it again shows "already used" before any tap; a submit checks the nonce before it validates answers; the repository's unique nonce stays the guarantee (five concurrent submits: one 200, four 409) — cost if wrong: a confusing second scan.
+- **Check order follows the signer: format → signature (401) → expiry (410 `LinkExpired`) → invoice hash recomputed from the stored extract (410 `InvoiceChanged`) → single use (409)**; the node id is read from the token first, unauthenticated, only to load that hash — a genuine link for a node a reset removed is 410; a forged token naming an unknown node still fails its signature — cost if wrong: a wrong status code.
+- **A verification rebuilds the node through `NodeFactory` with the answers** — the activity figure, cost and lead time follow the confirmed mode, and a confirmed `massT` replaces the invoice mass; a VERIFIED node can be answered again with a new link, each answer a new verification row — cost if wrong: stale cost and lead time.
+- **Audit payloads**: `link.requested {nodeId, expiresAt}` and `verification.submitted {nodeId, verificationId, status, transportMode, energySource, massTConfirmed, warnings}`; no token, nonce or address. The verification row stores an address hash keyed from `LINK_SECRET`, never the address — cost if wrong: personal data in an append-only log.
+- **Rate limit: ASP.NET Core's fixed one-minute window, `RATE_LIMIT_PER_MIN` (10) per client address on the context and submit routes; the 11th call is 429** — the address is `X-Forwarded-For` only when the peer is in `TRUSTED_PROXIES` (default loopback and `172.16.0.0/12`), `ForwardLimit = 1` — a phone on the hotspot cannot choose its bucket — cost if wrong: one config value.
+- **Tokens stay out of logs**: the hosting diagnostics logger is raised to Warning (its request line carries `?t=`), pinned by a test; nginx logs `$uri` without query or referrer, and `/api/verify/context` keeps only critical errors. Not fixed: the Vite dev server prints the full URL on a proxy error; the demo image uses nginx — cost if wrong: a token in a log.
+
+## Wire contract, slice 5 (A7)
+
+- **Alternatives ride on the node read model (`NodeView.alternatives`)** rather than a separate route — they match on category, the server does the matching, and the snapshot and events keep one node shape — cost if wrong: one route and one fetch in the drawer.
+- **The baseline is the node as it is now**: its activity figure once VERIFIED, its spend estimate before. With today's placeholders N1 air → sea is `win-win` before and after the air answer, and N1 → N1-alt is `premium` (about 284 €/t from the spend estimate, about 323 €/t from the verified air figure). A mode change keeps the node's confirmed energy (none counts as grid); a swap assumes grid for the alternative — cost if wrong: one comparison basis.
+- **A mode change on a node without a mass is 422 `MassUnknown`** — the activity figure would read 0 kg and show as a large saving; a supplier swap still works — cost if wrong: imports counted in pieces cannot be simulated by mode.
+- **Simulating the node's current mode is allowed** (it compares activity with spend); the SPA disables that button — cost if wrong: none.
+- **Saving a scenario writes no audit entry** — the audit log records invoices and supplier answers, and a what-if changes neither; `scenario.saved` is published; a demo reset wipes scenarios — cost if wrong: one audit action.
+- **The ETS price reaches the service through `ServiceOptions.EtsPriceEurPerT` (`ETS_PRICE_EUR_PER_T`, placeholder 70)** — cost if wrong: none.
+
+## Seed invoices at ANAF (C2, 2026-10-23)
+
+- **The three imports (N1 Shenzhen, N2 Taiwan, N5 Hamburg) are expected to fail only seller identification (`ERRIdentif`)** — ANAF identifies the seller by a Romanian CUI and these suppliers have none; `scripts/validate-seed-anaf.mjs` lists them in `EXPECTED_FAILURES` and fails them on any other message or if ANAF accepts them — cost if wrong: the three files get Romanian VAT registrations.
+- **The parser reads the classification scheme STI as CPV** — ANAF accepts CPV codes only under STI — cost if wrong: one line.
+- **RON VAT totals use the BNR rate published on the invoice's issue date** — BR-RO-030 and BR-53 require the figure; nothing in TraceGreen reads it — cost if wrong: two numbers in three files.
+- **The adversarial line's injected instruction moved from `cbc:Name` to `cbc:Description`**, so its parsed description reads "Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …" and `seed/ai-cache.json` is re-keyed — BR-RO-L100 caps the name at 100 characters; the injection itself stays (roadmap A3) — cost if wrong: shorten the text to fit the name and restore the old key. Open: raised for A's confirmation in C2, not yet recorded.
+
+## Data and audit
+
+- **The audit hash covers `{ts, actor, action, payload}` with timestamps normalised to UTC milliseconds**, chained from a genesis hash of 64 zeros; `audit_log` has an append-only trigger, so the demo reset uses TRUNCATE (single-tenant for now) — cost if wrong: a reset per workspace needs another mechanism.
+- **Seed nodes are stamped `2026-11-01T08:00Z`** — the layout must not depend on node order — cost if wrong: none.
+- **KPIs and events are published after the insert, outside any lock** — two actions within milliseconds can publish in reverse order; the next event or snapshot corrects it; serialise publishing if it ever shows — cost if wrong: a briefly stale KPI.
+
+## CI (A9)
+
+- **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.
+- **The e2e job waits for B6** (`web/e2e` does not exist yet) — cost if wrong: none.
