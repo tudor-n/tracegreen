@@ -14,7 +14,7 @@ function lineOf(lines, pattern, from = 0) {
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Factor rows whose `source` still says PLACEHOLDER (PRIORITY-CHANGES §2). */
+/** Factor rows whose `source` still says PLACEHOLDER (CLAUDE.md, Data rules). */
 export function placeholderFactors(factorsText, file) {
   const lines = factorsText.split('\n');
   return JSON.parse(factorsText)

@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-11-05 (CI, task A9 of `docs/plan/dev-a.md`, and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: `docs/PRIORITY-CHANGES.md` (private) and `docs/plan/`.
+Last updated: 2026-11-05 (the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
 
 ## What exists
 
@@ -44,24 +44,7 @@ The OpenAPI document at `/openapi/v1.json` is the contract; `web/src/api/schema.
 | `GET /api/health` | adds `ai` (provider name, or `error: …` after at most 1.5 s; never affects `ok`) and `baseUrl { url, loopback, source: configured \| forwarded \| request }` | 503 when the database is down |
 | `GET /api/events` | `text/event-stream`; each domain message's data is a `DomainEvent` | — |
 
-Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
-
-- **Services live in `TraceGreen.Domain/Services`** and take a Domain-side `ServiceOptions` record that `Program.cs` builds from `AppConfig` — reason: the Domain keeps no project or package reference and the services are testable without a web host — cost if wrong: moving a few classes.
-- **`NodeView` is the one node shape on the wire**, in the snapshot and in every node event (`TraceGreen.Domain/Model/ReadModel.cs`, built by `NodeViewMapper`). It carries `carbonKg` with its `basis` (`spend` or `activity`), the `spend` and `activity` figures each with the `FactorLookup` rows behind them (the "i" icon; a PLACEHOLDER source reaches the screen), the ruling-4 `uncertainty`, `classification` (source, confidence, `aiMapped` for the "AI-mapped" label, the dominant line's description), an `invoice` summary and the `lane` (current and default mode, available `modes`, distance, `illustrative: true`). Ruling-3 provenance line = `basis` + that figure's `factors[].source` and `year`. PARTIAL stays on the spend figure because `carbonKg` switches to activity only when VERIFIED.
-- **Event types reach the generated client by describing `/api/events`** as `text/event-stream` of `DomainEvent`, a union discriminated by `type` (`node.created`, `node.updated`, `node.verified`, `audit.appended`, `scenario.saved`, `graph.reset`). The discriminator is written first and equals the SSE event name. `hello`, `resync` and `ping` are control messages without domain data. `node.verified` carries a `VerificationView` without nonce or address hash.
-- **One JSON shape for responses and SSE** (`ApiJson`): camelCase, enums as camelCase strings (error codes and node status keep their own spelling), numbers never as strings, constructor parameters required and nullability as annotated, so the generated types have no spurious optional fields.
-- **The snapshot reads `lastSeq` before the nodes**, so an event published while it is built is newer than the snapshot and is applied on top; the store ignores events with `seq <= lastSeq`. An event newer than the snapshot can still repeat what the snapshot already shows (a `node.created` for a listed node, an `audit.appended` for a listed entry), so the store applies events idempotently: upsert nodes by id, skip audit entries it already has.
-- **Enum components hold only their values.** A schema transformer removes the `null` .NET folds into an enum component when it first meets the enum as a nullable property; nullable properties say so themselves (`oneOf [null, $ref]`). So `Record<EnergySource, string>` typechecks.
-- **Optional request fields need a default.** `ApiJson` respects required constructor parameters for requests too: a positional request record field that may be omitted must be declared `= null`, or the framework answers 400 without an `ApiProblem` code (matters for A5's skip → PARTIAL).
-- **An event that cannot be serialised becomes `resync`** on the stream (the client refetches the snapshot) instead of breaking the stream on every replay.
-- **Factor rows on a node come from today's `factors.json`;** stored kilograms are not recomputed. After changing `factors.json`, reset the demo so every node is rebuilt from the new rows; until then older nodes show the new rows, and a row that no longer exists is left out of the list rather than failing `/api/graph`. Persisting the rows on the node would remove this caveat if it ever matters.
-- **Mass unknown means no activity figure.** A node whose mass is unknown keeps `activity: null`, so it stays on the spend figure; a VERIFIED one shows `uncertainty: medium` (pinned by `NodeViewMapperTests`).
-- **`baseUrl` is a display hint, not a trusted value:** for forwarded headers the last value wins (an appending proxy adds its own after the client's), but a direct caller can still choose them. Never write it into audit payloads.
-- **Errors are `ApiProblem`** (RFC 9457 fields plus a typed `code`); clients switch on `code`, never on titles.
-- **Client transport (A3).** `web/src/api/client.ts` is the `openapi-fetch` client typed by `schema.d.ts` (same origin) and re-exports aliases of generated types (`NodeView`, `DomainEvent`, …). `web/src/hooks/useGraphEvents.ts` runs `startGraphSync` (`web/src/hooks/startGraphSync.ts`) for the component's lifetime, driving the store through `{ hydrate(snapshot), applyEvent(event) }`, and returns `connecting | live | polling | offline` for the badge (`connecting` only until the first snapshot; `offline` while snapshot requests fail, e.g. the API is down). The rules live in the pure reducer `web/src/hooks/graphSync.ts`: fetch the snapshot on every stream (re)open, on `resync`, on `graph.reset` (not forwarded to the store) and on a sequence gap; every new request drops the event buffer, because a snapshot requested after an event already contains it; events arriving while a request is in flight are applied afterwards if newer than its `lastSeq`; a `hello` or `resync` during an in-flight request queues one more; stale `seq` is dropped; the first stream error checks the API at once, then `/api/graph` is polled every 5 s while the stream is down; a request hanging past 8 s counts as failed; a new `EventSource` is opened when the browser gives up (a proxy 502). After an API restart the sequence starts again at 0 and the snapshot's lower `lastSeq` wins. The store seam (hydrate overwrites `lastSeq`, events are applied idempotently, no `graph.reset`) is written into `docs/plan/dev-b.md` B1.
-- **Spend factors are US EPA v1.3 (D1, decided 2026-10-23), converted on every import.** `SpendConversion` turns the EUR total into 2022 USD with the ECB rate of the invoice date and CPI-U annual averages from `seed/spend-conversion.json`; the spend figure's `factors` are the EPA row, the rate and the price adjustment. Each category has its own spend row. The demo badges do not move: the simulator starts from verified N1's activity figure, and from the spend estimate N1 → N1-alt is still `premium` (about 284 €/t). Details and the refresh caveat: `docs/factor-sources.md`.
-- **Non-EUR invoices are rejected with `UnsupportedCurrency`**: the conversion table holds USD/EUR only, and **a supplier country without a lane is rejected with `NoLane`** instead of inventing a lane (CN → `CN-RO`, TW → `TW-RO`, DE → `DE-HH-SB`, RO → `RO-SB-SB`).
-- **Ingest refuses input it cannot estimate safely, with 422 `Schema` and a detail:** elements nested deeper than 64 levels (checked by a streaming pass before any tree is built), a total that is not positive or above 10¹² EUR, a line amount above 10¹², a negative quantity (returns are not supported yet) or one above 10⁹. The bounds keep every later sum inside `decimal`'s range, so one hostile invoice cannot make `/api/graph` fail for everyone.
+Decisions behind it: `docs/DECISIONS.md`, "Wire contract, slice 1 (A1–A3)".
 
 ## Wire contract (slice 3)
 
@@ -75,15 +58,7 @@ Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
 
 `NodeView` gained `warnings: PlausibilityWarning[]` (`{ code: AIR_HEAVY | SEA_TOO_FAST, detail }`), derived on every read from the confirmed mode and mass, so the snapshot and every node event carry the dashboard marker.
 
-Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
-
-- **D2 and D3 took the plan's proposed defaults** (nobody recorded an outcome by 25 Oct) — `AIR_HEAVY` (confirmed air, more than 2 t) is returned with the answer and on the node, and never blocks or asks for an extra tap; `SEA_TOO_FAST` is in the contract and in `web/src/copy/verify.ts` but is not evaluated, because no invoice carries delivery dates — cost if wrong: one rule and its input (BT-72 extraction, which changes `ExtractedInvoice` and so every invoice hash; reset the demo after it).
-- **A used link answers 409 on the context route too**, so scanning it again shows "already used" before any tap. A submit also checks for a used nonce before it validates the answers. The repository's unique nonce stays the guarantee: five concurrent submits of one link give one 200 and four 409.
-- **Check order follows the signer:** format → signature (401) → expiry (410 `LinkExpired`) → invoice hash recomputed from the stored extract (410 `InvoiceChanged`) → single use (409). The node id is read from the token first, unauthenticated, only to load that hash. A genuine link for a node a reset removed is 410 `InvoiceChanged`; a forged token naming an unknown node still fails its signature (401).
-- **A verification rebuilds the node through `NodeFactory`** with the answers, so the activity figure, cost and lead time follow the confirmed mode (N1 confirmed by sea: 40 days, sea freight cost) and a confirmed `massT` replaces the invoice mass. `NodePatch` gained `costEur` and `leadDays` for this. A VERIFIED node can be answered again with a new link; each answer is a new verification row.
-- **Audit payloads:** `link.requested {nodeId, expiresAt}` and `verification.submitted {nodeId, verificationId, status, transportMode, energySource, massTConfirmed, warnings}`, as strings. No token, no nonce, no address. The verification row stores `Hashing.IpHash` keyed with a key derived from `LINK_SECRET` (`"ip-hash:" + secret`), never the address.
-- **Rate limit:** ASP.NET Core's limiter (shared framework, no package), fixed one-minute window of `RATE_LIMIT_PER_MIN` per client address on the context and submit routes; the 11th call is 429 `RateLimited`. The address is `X-Forwarded-For` only when the peer is in `TRUSTED_PROXIES` (new variable, default `127.0.0.0/8,::1/128,172.16.0.0/12`: Vite on the host, Vite or nginx in Docker), with `ForwardLimit = 1`, so a phone on the hotspot cannot choose its bucket. Only the address is taken from forwarded headers; `BaseUrlResolver` still reads the host headers itself.
-- **Tokens stay out of logs:** `Microsoft.AspNetCore.Hosting.Diagnostics` is raised to Warning (its request line carries `?t=`), pinned by a test that collects every log line. nginx (demo image) logs `$uri` without the query string or referrer, and `/api/verify/context` has its own location whose error log keeps only critical lines, because an upstream failure writes the whole request line there. Not fixed: the Vite dev server prints the full URL on a proxy error (`http proxy error: /api/verify/context?t=…`) while the API is down; the demo image uses nginx.
+Decisions behind it: `docs/DECISIONS.md`, "Wire contract, slice 3 (A5–A6)".
 
 Checked over HTTP in Postgres mode (`tracegreen_test`) and through `TestWebAppFactory` in memory mode: link → context → air answer on N1 → VERIFIED with `AIR_HEAVY`, `carbonKg` 20 700 on the activity basis, replay 409, context after use 409, chain valid, simulate-answer PARTIAL, the 11th verify call in a minute 429, no token in the API log.
 
@@ -96,14 +71,7 @@ Checked over HTTP in Postgres mode (`tracegreen_test`) and through `TestWebAppFa
 
 `NodeView` gained `alternatives: AlternativeView[]` (`{ id, label, country, origin, mode, illustrative }`): the seed alternatives of the node's category, so the drawer offers the swaps without another request. Pass `id` as `alternativeId`.
 
-Decisions behind it (fold into `docs/DECISIONS.md` when it exists):
-
-- **Alternatives ride on the node read model** rather than a separate route: alternatives match on category, the server does the matching, and the snapshot and events keep one node shape — cost if wrong: one route and one fetch in the drawer.
-- **The baseline is the node as it is now:** its activity figure once VERIFIED, its spend estimate before (`SupplierNode.CarbonKg`). With today's placeholders N1 air → sea is `win-win` both before and after the air answer, and N1 → N1-alt is `premium` (about 284 €/t from the spend estimate, about 323 €/t from the verified air figure). A mode change keeps the node's confirmed energy (none counts as grid); a swap assumes grid for the alternative.
-- **A mode change on a node without a mass is 422 `MassUnknown`**, because the activity figure would read 0 kg and show as a large saving. A supplier swap still works (the alternative carries its own mass). Every seed invoice gives a mass, so in practice this affects imports counted in pieces.
-- **Simulating the node's current mode is allowed** (it compares the activity figure with the spend estimate); the SPA disables that button anyway.
-- **Saving writes no audit entry:** the audit log records invoices and supplier answers, and a saved what-if changes neither. `scenario.saved` is published for other dashboards. Scenarios are wiped by a demo reset with the rest of the workspace.
-- **ETS price** reaches the service through `ServiceOptions.EtsPriceEurPerT` from `ETS_PRICE_EUR_PER_T` (placeholder 70).
+Decisions behind it: `docs/DECISIONS.md`, "Wire contract, slice 5 (A7)".
 
 Checked over HTTP in Postgres mode (`tracegreen_test`) and through `TestWebAppFactory` in memory mode: N1 imported (ESTIMATED) → sea `win-win`, N1-alt `premium`; after an air answer the same badges; a saved scenario stored and published; road on `CN-RO` 422; `alternatives` on N1 and none on N4.
 
@@ -138,15 +106,7 @@ What changed, by ANAF rule. Amounts, quantities, unit codes, origin countries, c
 
 The new CUIs have a valid check digit and are not registered at ANAF (ANAF's public VAT-payer lookup, 2026-10-23), so none identifies a real company. The exchange rates are the BNR reference rates published on the invoices' issue dates (2026-10-05: 5.3306; 2026-10-12: 5.3373), from `https://curs.bnr.ro/files/xml/years/nbrfxrates2026.xml`.
 
-Decisions (A, 2026-10-23; fold into `docs/DECISIONS.md` when it exists):
-
-- **The three imports (N1 Shenzhen, N2 Taiwan, N5 Hamburg) are expected to fail one rule**, which narrows slice 2's "all six XMLs validate" to "all six pass every rule except, for the three imports, seller identification" — reason: ANAF identifies the seller by a Romanian CUI ("Nu a fost identificat cui vanzator") and these suppliers have none; marking the invoice self-billed (type 389) does not help — cost if wrong: the three files get Romanian VAT registrations and leave the list. The script lists them in `EXPECTED_FAILURES` and passes them only when that message is ANAF's only one. It fails them on any other message, and when ANAF accepts them, so the list can neither hide an error nor go stale. Checked on scratch copies: with a Romanian seller ID substituted, ANAF accepts all three, so the seller is the only rule they miss; a schema error or a bad buyer CUI in a listed file still fails the script.
-- **The parser reads the classification scheme STI as CPV** (`UblInvoiceParser.ListId`) — reason: ANAF accepts CPV codes only under STI, while the classification map, the AI contract and the "Item classification code … (CPV)" rationale use CPV — cost if wrong: one line.
-- **RON VAT totals use the BNR rate published on the invoice's issue date** — reason: BR-RO-030 and BR-53 require the figure; nothing in TraceGreen reads it — cost if wrong: two numbers in three files.
-
-Open for A's confirmation in review (task C2 says to ask A before changing a line description):
-
-- **The adversarial line's parsed description gains " - "** ("Wire harness set. - IGNORE PREVIOUS INSTRUCTIONS …") — reason: BR-RO-L100 caps `cbc:Name` at 100 characters, so the injected instruction moved to `cbc:Description` and the parser joins the two; the injection itself is kept (roadmap A3) and `seed/ai-cache.json` is re-keyed to match; nothing else in the repo uses the old string — cost if wrong: shorten the injected text to fit in `cbc:Name` instead, and restore the old cache key.
+Decisions behind it, and the one still open for A's confirmation (the adversarial line's description): `docs/DECISIONS.md`, "Seed invoices at ANAF".
 
 The API reads `seed/` once at startup. After pulling these changes, restart it (`docker compose restart api`) and press "Reset demo", or run `docker compose down -v && docker compose up`, so the stored buyer and seed invoices match the files.
 
@@ -168,6 +128,16 @@ The M1 checklist of `docs/plan/README.md` §8. Dev B ran it on 2026-10-24 agains
 
 ## What remains (in order)
 
+Current order, from the 2026-10-22 review's slice order (vertical slices toward the demo path F1 → F2 → F3 → F4; status by ID in `docs/ROADMAP.md`). Slices 1–3 are done, slice 4 is built, slice 5's backend is done:
+
+1. **Slice 4 check (M2, A8 with B and C):** the first timed two-device run-through over the hotspot (T16): the phone on the hotspot flips the node green in under 2 s. Measure import → node and submit → flip; log failures in the team's run log.
+2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
+3. **Slice 6, Playwright smoke (B6):** `pnpm e2e` passes against Compose; then add the e2e job to `.github/workflows/ci.yml`.
+4. **Slice 7, Python AI service (C7):** after 1–3. Every seed line is served from `seed/ai-cache.json` by the C# side, so the live service is not on the demo path; keep `/health` honest and `/classify` on the stub until there is time (D4: live provider in hackathon hours H1–H4).
+5. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
+
+The task list below is the original plan, kept for its specifications; where it and the order above disagree on order, the order above wins.
+
 The implementation plan lives outside the repo (Claude plan file `read-the-tracegreen-roadmap-ala-validated-thunder.md`); the summary below is enough to continue without it.
 
 1. **Use-case services and endpoints (plan Task 9).** The slice-1 part is done (A1, A2): graph, ingest, demo import, reset and the health fields, checked over HTTP in both data modes. The SPA transport (A3) is done and unit-tested, and it passed the two-window and stop-the-API checks in the M1 run (see "M1 check (2026-10-24)"). The slice-3 backend (A5, A6) is done: link, verify context and submit, audit verify, rate limit, `AIR_HEAVY`, simulate-answer. The slice-5 backend (A7) is done: simulate, saved scenarios and the alternatives on each node. Next for the API: M2 (A8) and CI (A9). The original list: `Domain/Services/{Ingest,Graph,Link,Verify,Audit,Scenario,Demo}Service.cs` constructor-injecting `IRepository`, `IEventBus`, `ILinkSigner`, `IAiClient`, `TimeProvider`, `SeedBundle`, `AppConfig`. Endpoints: `GET /api/graph`, `POST /api/ingest/ubl` (multipart `file` or `text/xml`), `POST /api/ingest/demo` (ingests `seed/invoices/N1-shenzhen.xml` reusing N1's fixed ids from `demo-state.json`), `POST /api/request-link`, `GET /api/verify/context?t=`, `POST /api/verify`, `POST /api/audit/verify`, `POST /api/simulate`, `POST /api/scenarios`, `POST /api/dev/reset`, `POST /api/dev/simulate-answer` (dev endpoints 404 unless `DEMO_TOOLS=1`). Rate limiting on `/api/verify*` (10/min per client IP → 429). `BaseUrlResolver` (`PUBLIC_BASE_URL` → `X-Forwarded-Proto/Host` → request origin; flags loopback). Plausibility rules `SEA_TOO_FAST`, `AIR_HEAVY`. Node events must carry fresh `Kpis` (the SPA never computes carbon). Status mapping: replay 409, expired/hash mismatch 410, bad signature 401. Add `ai` and `baseUrl` to `/api/health`.
@@ -176,16 +146,9 @@ The implementation plan lives outside the repo (Claude plan file `read-the-trace
 4. **Playwright smoke (Task 12).** `web/e2e/demo-path.spec.ts` against the Compose stack: reset → load demo invoice → request link → phone context submits → node flips → replay shows "already used" → simulator badges → chain valid.
 5. **Scripts, docs, CI (Task 13).** `scripts/{preflight,demo-check,validate-seed-anaf}.mjs`, `scripts/firewall.ps1`; `docs/{ROADMAP,ARCHITECTURE,SECURITY,DECISIONS,factor-sources}.md`; final `CLAUDE.md`; `.github/workflows/ci.yml` (done in A9: api with Postgres service, ai, web, generated-types drift check; the compose + e2e job is still to add once B6 lands).
 
-## Decisions taken so far (the ones you would not guess from the code)
+## Decisions
 
-- Backend C#/.NET 10, AI service Python/FastAPI, frontend Vite + React SPA; carbon math exists only in C# and the simulator is a stateless endpoint.
-- Postgres in Docker via EF Core, not a local Supabase stack; migrations are plain SQL-compatible and include RLS so hosted Supabase stays an option.
-- The activity-based formula is `transport + material × (1 − renewable_share × process_electricity_share)` (the source document's version inverted the renewable effect; it is pinned by `RenewablePowerLowersActivityCarbonVsGrid`).
-- Verification tokens carry the full invoice hash so a tampered token (401) and a changed invoice (410) are distinguishable; single use is enforced by the repository's unique nonce, not the signer.
-- The audit hash covers `{ts, actor, action, payload}` with timestamps normalised to UTC milliseconds; `audit_log` has an append-only trigger, so the demo reset uses TRUNCATE (single-tenant for now).
-- `dotnet watch` is not used in Docker (its polling watcher crashes on Windows bind mounts); the API container runs `dotnet run` and C# edits need `docker compose restart api`. Web and AI services hot-reload.
-- A `workspace_id` column and a `Ctx(WorkspaceId, Actor)` argument exist from day one so authentication later is a policy, not a refactor.
-- Seed factor values are placeholders (`source` says so); replace them with sourced rows and update `docs/factor-sources.md` when it exists. The seed XMLs pass ANAF's validator, three of them with one expected exception (see "Seed XML validation (2026-10-23)").
+The ledger is `docs/DECISIONS.md` (decision — reason — cost if wrong): stack, the review rulings R1–R8, D1–D6, and the contract decisions of each slice.
 
 ## Caveats to know before continuing
 

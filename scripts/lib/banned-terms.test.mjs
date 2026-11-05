@@ -1,4 +1,4 @@
-// Run with `node --test scripts/lib/`. No dependencies.
+// Run with `node --test scripts/lib/*.test.mjs`. No dependencies.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { findBannedTerms, isExempt } from './banned-terms.mjs';

@@ -91,7 +91,7 @@ export const linkCopy = {
 
 /**
  * The audit panel around the words of ./labels.ts (its title and the chain results). It is a tamper-evident audit log
- * and is never called anything else (PRIORITY-CHANGES.md §4). Actions and actors the API adds later show as their raw
+ * and is never called anything else (CLAUDE.md, Copy rules). Actions and actors the API adds later show as their raw
  * names until they get a label here.
  */
 export const auditPanelCopy = {
