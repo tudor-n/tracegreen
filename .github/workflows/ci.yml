@@ -1,0 +1,129 @@
+# CI (task A9). Every action is pinned to the commit of a release tag (the tag is in the trailing comment); toolchains
+# match the Dockerfiles: .NET from api/global.json, Python 3.12 with uv 0.13.3, Node 24 with the pnpm of
+# web/package.json, Postgres 17. The e2e job (Compose + `pnpm e2e`) is added once B6 lands web/e2e.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api (.NET tests, memory + Postgres contract)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      db:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tracegreen
+          POSTGRES_PASSWORD: tracegreen
+          POSTGRES_DB: tracegreen_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tracegreen -d tracegreen_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: api/global.json
+      - run: dotnet build
+      # The scratch database only: the tests reset the demo workspace.
+      - run: dotnet test --no-build
+        env:
+          DATABASE_URL: postgres://tracegreen:tracegreen@localhost:5432/tracegreen_test
+
+  ai:
+    name: ai (pytest, ruff)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: 0.13.3
+          python-version: "3.12"
+          working-directory: ai
+      - run: uv sync --locked
+      - run: uv run pytest
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  web:
+    name: web (typecheck, lint, test, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  types-drift:
+    name: types drift (schema.d.ts matches the API's OpenAPI)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: api/global.json
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Start the API in memory mode on :8080
+        working-directory: api
+        env:
+          DATA_MODE: memory
+          ASPNETCORE_URLS: http://localhost:8080
+        run: |
+          dotnet build src/TraceGreen.Api
+          nohup dotnet run --no-build --project src/TraceGreen.Api > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/api/health > /dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/api.log"
+          exit 1
+      - working-directory: web
+        run: pnpm install --frozen-lockfile
+      - working-directory: web
+        run: pnpm gen:api
+      - name: Fail if the committed types differ from the generated ones
+        run: git diff --exit-code web/src/api/schema.d.ts
