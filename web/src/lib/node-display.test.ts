@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FactorLookup } from '@/api/client'
 import { node } from '@/store/testFixtures'
-import { aiMappedLabel, aiReason, isPlaceholder, justVerified, provenanceLine, shownFigure } from './node-display'
+import { aiMappedLabel, aiReason, classificationChip, isPlaceholder, justVerified, provenanceLine, shownFigure } from './node-display'
 
 const row = (source: string): FactorLookup => ({ value: 1, unit: 'kgCO2e/t', source, year: 2026, rowLabel: 'row' })
 
@@ -44,6 +44,26 @@ describe('aiMappedLabel', () => {
 
   it('shows nothing when the invoice itself classified the line', () => {
     expect(aiMappedLabel({ ...classification, source: 'invoice', aiMapped: false, confidence: 1 })).toBeNull()
+  })
+})
+
+describe('classificationChip', () => {
+  const classification = node('a', 1).classification
+
+  it('names an AI classification with its confidence and says what the number is', () => {
+    const chip = classificationChip({ ...classification, source: 'model', aiMapped: true, confidence: 0.86 })
+    expect(chip?.label).toBe('AI-mapped · 0.86')
+    expect(chip?.help).toMatch(/how sure it was/)
+  })
+
+  it('names a category the buyer set, in place of the AI label', () => {
+    const chip = classificationChip({ ...classification, source: 'correction', aiMapped: false, confidence: 1 })
+    expect(chip?.label).toBe('Buyer-corrected')
+    expect(chip?.help).toMatch(/every later import/)
+  })
+
+  it('shows nothing when the invoice code decided', () => {
+    expect(classificationChip({ ...classification, source: 'invoice', aiMapped: false, confidence: 1 })).toBeNull()
   })
 })
 

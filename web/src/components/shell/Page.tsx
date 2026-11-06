@@ -1,5 +1,6 @@
 import { Loader2Icon } from 'lucide-react'
 import type { ComponentProps, ReactNode } from 'react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 // The building blocks every v2 screen shares: the large title, the white grouped surface, a grouped list with
@@ -73,6 +74,20 @@ export function Chip({ tone = 'neutral', children }: { tone?: ChipTone; children
     <span className={cn('inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold', chipTone[tone])}>
       {children}
     </span>
+  )
+}
+
+/** A chip that says what it means on hover or focus: for labels a reader may not know, such as "AI-mapped · 0.86". */
+export function ExplainedChip({ tone, help, children }: { tone?: ChipTone; help: string; children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${String(children)}. ${help}`}>
+        <Chip tone={tone}>{children}</Chip>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs text-left">
+        {help}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

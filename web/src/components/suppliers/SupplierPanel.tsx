@@ -3,12 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import type { CarbonFigure, NodeView, RequestLinkResponse } from '@/api/client'
 import { LinkCard } from '@/components/dashboard/LinkCard'
 import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
-import { Chip, type ChipTone, Group, GroupRow } from '@/components/shell/Page'
+import { Chip, type ChipTone, ExplainedChip, Group, GroupRow } from '@/components/shell/Page'
+import { CategoryRow } from '@/components/suppliers/CategoryRow'
 import { Button } from '@/components/ui/button'
 import { drawerCopy, energySourceCopy, nodeCopy, suppliersCopy, transportModeCopy } from '@/copy/dashboard'
 import { AI_MAPPED, ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
 import { requestLink, requestPortalLink } from '@/lib/dashboard-actions'
-import { aiMappedLabel, aiReason, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
+import { aiReason, classificationChip, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
 import { cn } from '@/lib/utils'
 import {
   CO2E_UNIT,
@@ -41,7 +42,7 @@ const statusTone: Record<NodeView['status'], ChipTone> = {
 
 export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: boolean }) {
   const select = useGraphStore((s) => s.select)
-  const ai = aiMappedLabel(node.classification)
+  const source = classificationChip(node.classification)
   const panel = useRef<HTMLElement>(null)
 
   // Below the lg breakpoint the panel sits under the tree; bring it into view when another supplier is picked.
@@ -85,7 +86,7 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
           <Chip tone={statusTone[node.status]}>{nodeCopy.status[node.status]}</Chip>
         </span>
         {hotspot && <Chip tone="hotspot">{nodeCopy.hotspot}</Chip>}
-        {ai !== null && <Chip>{ai}</Chip>}
+        {source !== null && <ExplainedChip help={source.help}>{source.label}</ExplainedChip>}
       </div>
       <PanelBody key={node.id} node={node} />
     </aside>
@@ -251,7 +252,7 @@ function Details({ node }: { node: NodeView }) {
         <GroupRow label={drawerCopy.invoiceNumber}>{node.invoice.number}</GroupRow>
         <GroupRow label={drawerCopy.issued}>{formatDate(node.invoice.issueDate)}</GroupRow>
         <GroupRow label={drawerCopy.spend}>{formatEuros(node.spendEur)}</GroupRow>
-        <GroupRow label={drawerCopy.classification}>{node.classification.categoryLabel}</GroupRow>
+        <CategoryRow node={node} />
       </Group>
       <Group title={drawerCopy.invoiceLine}>
         {/* Invoice text is data: rendered as text, clamped (padding outside the clamp, so no fourth line peeks), in full on hover. */}

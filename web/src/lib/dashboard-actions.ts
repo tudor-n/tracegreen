@@ -1,8 +1,10 @@
 import {
   api,
+  type CategoryOption,
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
+  type NodeView,
   type Scenario,
   type ScenarioChange,
   type ScenarioResult,
@@ -143,6 +145,20 @@ export function simulateChange(nodeId: string, change: ScenarioChange): Promise<
  */
 export function saveScenario(nodeId: string, change: ScenarioChange): Promise<Answer<Scenario>> {
   return fetchBody(() => api.POST('/api/scenarios', { body: { nodeId, ...change } }))
+}
+
+/** GET /api/categories: the categories a buyer may set, which are the AI's allow-list. */
+export function fetchCategories(): Promise<Answer<CategoryOption[]>> {
+  return fetchBody(() => api.GET('/api/categories'))
+}
+
+/**
+ * PUT /api/nodes/{id}/classification: the buyer's category for this node (F6). The API recomputes the estimate, keeps
+ * the correction for the same invoice line text and publishes node.updated, which the sync applies; the answer is the
+ * recomputed node.
+ */
+export function correctCategory(nodeId: string, categoryId: string): Promise<Answer<NodeView>> {
+  return fetchBody(() => api.PUT('/api/nodes/{nodeId}/classification', { params: { path: { nodeId } }, body: { categoryId } }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

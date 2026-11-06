@@ -30,6 +30,8 @@ export const uncertaintyLabel = {
 
 /** CLAUDE.md: the label on every value an AI classification produced (cache or model). */
 export const AI_MAPPED = 'AI-mapped'
+/** The label on a category the buyer set (F6); it replaces "AI-mapped" on that node. */
+export const BUYER_CORRECTED = 'Buyer-corrected'
 /** CLAUDE.md: the label on every alternative the AI suggested. */
 export const AI_SUGGESTED = 'AI-suggested · illustrative'
 /** CLAUDE.md: the label on every field the AI read from a PDF. */

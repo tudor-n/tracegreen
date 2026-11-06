@@ -134,6 +134,13 @@ The "Fixed agreements" of the F6 plan (`docs/plan/ai-f6.md`), built in `ai/app`.
 - **A prefix matches the raw code from its first character (`InvoiceClassification.Match`), so HS codes are written without dots or spaces (`853669`, not `8536.69`)** — the parser does not normalise codes; ANAF accepts the scheme as `listID="HS"` (R2) — cost if wrong: a normalisation step in the parser.
 - **The Romanian invoices R1–R3 stay out of `demo-state.json` and `ai-cache.json`** — the demo path and the Playwright smoke stay as they are, and R1 and R3 must reach a model to show the AI path (R2 is classified by its HS codes alone) — cost if wrong: none.
 
+## Buyer corrections and the AI's reason (F6 follow-up, 2026-11-06)
+
+- **A buyer correction is kept per workspace by the dominant line's description key (`CacheKey`, the same key as `seed/ai-cache.json`) and wins over every other source on later imports: correction → invoice code → cache → AI → stub** — the buyer's explicit word about a description outranks a code that may be wrong on the invoice and any model; one correction per description, so a later one replaces it. Only categories on the allow-list count — cost if wrong: one ordering in `LineClassification`.
+- **A correction rebuilds the node through `NodeFactory` with everything else it had: status, the supplier's answers, a confirmed mass** — the spend figure follows the new sector factor; on a PARTIAL or VERIFIED node the activity figure follows the new material factor and the supplier's answers stay. The result is what an import with that category and the same answers would give, and the audit entry `classification.corrected` records the category, the source and the figure before and after — cost if wrong: refuse corrections on verified nodes instead (one check).
+- **A correction is not AI-derived, so it drops the "AI-mapped" label and shows "Buyer-corrected" in its place** — confidence 1, rationale "Set by the buyer for this line" — cost if wrong: copy only.
+- **The reason is shown only when the AI chose the category, and filtered by the copy rules before it is stored (`BannedTerms`, the C# copy of `scripts/lib/banned-terms.mjs`, kept equal by a test that reads the script)** — a model's words reach the reader; a reason that breaks the copy rules is dropped, not reworded — cost if wrong: none.
+
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.

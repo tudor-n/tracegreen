@@ -29,6 +29,20 @@ export const nodeCopy = {
   } satisfies Record<NodeStatus, string>,
 } as const
 
+/** The category of a node: what its source labels mean, and the buyer's correction in the Details tab (F6). */
+export const classificationCopy = {
+  aiMappedHelp: 'An AI chose this category from the invoice line. The number is how sure it was, from 0 to 1.',
+  correctedHelp: 'You set this category. It is used for this invoice line text on every later import.',
+  change: 'Change',
+  changeLabel: 'Change the category',
+  save: 'Save',
+  saving: 'Saving…',
+  cancel: 'Cancel',
+  loading: 'Loading the categories…',
+  /** Under the select: what saving does, so the reader knows the figure will move. */
+  note: 'The estimate is recomputed with the new category.',
+} as const
+
 export const canvasCopy = {
   label: 'Supplier graph',
   loading: 'Loading the supplier graph…',
@@ -171,6 +185,7 @@ export const auditPanelCopy = {
     'link.requested': 'Verification link requested',
     'portal.requested': 'Supplier page link requested',
     'verification.submitted': 'Supplier answered',
+    'classification.corrected': 'Category corrected',
   } as Readonly<Partial<Record<string, string>>>,
   actors: {
     seed: 'Seed data',
