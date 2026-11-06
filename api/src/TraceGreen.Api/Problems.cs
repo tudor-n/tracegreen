@@ -30,6 +30,7 @@ public enum ProblemCode
     [JsonStringEnumMemberName("DeliveryChanged")] DeliveryChanged,
     [JsonStringEnumMemberName("TermsNotAccepted")] TermsNotAccepted,
     [JsonStringEnumMemberName("CategoryNotAllowed")] CategoryNotAllowed,
+    [JsonStringEnumMemberName("InvalidQuestion")] InvalidQuestion,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -67,6 +68,7 @@ public static class Problems
             ProblemCode.DeliveryChanged => (StatusCodes.Status409Conflict, "Delivery changed since the page read it"),
             ProblemCode.TermsNotAccepted => (StatusCodes.Status422UnprocessableEntity, "Supplier terms not accepted"),
             ProblemCode.CategoryNotAllowed => (StatusCodes.Status422UnprocessableEntity, "Category not allowed"),
+            ProblemCode.InvalidQuestion => (StatusCodes.Status422UnprocessableEntity, "Question not accepted"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);
@@ -98,6 +100,12 @@ public static class Problems
     {
         ClassificationErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
         ClassificationErrorCode.CategoryNotAllowed => ProblemCode.CategoryNotAllowed,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
+    };
+
+    public static ProblemCode From(ChatErrorCode code) => code switch
+    {
+        ChatErrorCode.InvalidQuestion => ProblemCode.InvalidQuestion,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

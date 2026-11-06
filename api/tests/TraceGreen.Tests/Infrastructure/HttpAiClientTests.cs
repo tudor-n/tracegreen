@@ -52,6 +52,27 @@ public class HttpAiClientTests
     }
 
     [Fact]
+    public async Task ChatPostsTheQuestionHistoryAndFactsAndReadsTheAnswer()
+    {
+        var handler = new CapturingHandler(HttpStatusCode.OK,
+            """{"answerable":true,"text":"{{S1.name}} leads.","factIds":["S1.name"],"provider":"ollama:local"}""");
+        var assist = new HttpAiAssist(new HttpClient(handler) { BaseAddress = new Uri("http://ai:8000") });
+
+        var outcome = await assist.ChatAsync(
+            new ChatInput("Who leads?", ["Before?"], [new ChatFactInput("S1.name", "supplier S1: name", "Taiwan PCB Ltd.")]),
+            CancellationToken.None);
+
+        Assert.Equal("/chat", handler.Request!.RequestUri!.AbsolutePath);
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("Who leads?", body.RootElement.GetProperty("question").GetString());
+        Assert.Equal("Before?", body.RootElement.GetProperty("history")[0].GetString());
+        var fact = body.RootElement.GetProperty("facts")[0];
+        Assert.Equal(["id", "about", "value"], fact.EnumerateObject().Select(p => p.Name));
+        Assert.Equal((true, "{{S1.name}} leads.", "ollama:local"), (outcome.Answerable, outcome.Text, outcome.Provider));
+        Assert.Equal(["S1.name"], outcome.FactIds);
+    }
+
+    [Fact]
     public async Task ClassifyPostsTheContractAndParsesTheAnswer()
     {
         var handler = new CapturingHandler(HttpStatusCode.OK,

@@ -51,6 +51,23 @@ public sealed class FactPack
 
     public Fact? Find(string id) => _byId.GetValueOrDefault(id);
 
+    /// <summary>How many suppliers are numbered S1…Sn.</summary>
+    public int SupplierCount => Facts.Count(f => f.Field == "name" && f.Id.StartsWith('S'));
+
+    /// <summary>The rank n of a supplier fact <c>Sn.*</c>, or null for any other fact.</summary>
+    public static int? RankOf(string factId)
+    {
+        if (factId.Length < 2 || factId[0] != 'S')
+        {
+            return null;
+        }
+        var dot = factId.IndexOf('.');
+        return dot > 1 && int.TryParse(factId.AsSpan(1, dot - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
+    }
+
+    /// <summary>The status (VERIFIED, PARTIAL, ESTIMATED) of supplier <c>Sn</c>.</summary>
+    public string? StatusOf(int rank) => Find($"S{rank}.status")?.Value;
+
     public static FactPack Build(GraphSnapshot snapshot, IReadOnlyList<Scenario> scenarios)
     {
         var facts = new List<Fact>();
@@ -74,6 +91,14 @@ public sealed class FactPack
         }
         Add("share.confirmed", "confirmedShare", FactKind.Share, Raw((decimal)kpis.PrimaryShare),
             "supplier-confirmed share of total emissions (by emissions, not by node count)", Percent(kpis.PrimaryShare));
+        // The sets a "which suppliers are …" question asks for, so the model cites one fact instead of picking names.
+        foreach (var status in new[] { NodeStatus.Verified, NodeStatus.Partial, NodeStatus.Estimated })
+        {
+            var labels = ranked.Where(n => n.Status == status).Select(n => n.Label).Distinct(StringComparer.Ordinal).ToList();
+            var list = labels.Count == 0 ? "none" : string.Join(", ", labels);
+            Add($"list.{StatusKey(status)}", "list" + char.ToUpperInvariant(StatusKey(status)[0]) + StatusKey(status)[1..], FactKind.Text, list,
+                $"the suppliers whose deliveries are {StatusWords(status)}, largest first", list);
+        }
 
         for (var i = 0; i < shown.Count; i++)
         {

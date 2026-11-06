@@ -45,6 +45,9 @@ typed out: write {{S1.name}}, not the supplier's name, and {{S1.carbon}}, not th
 no digit at all.
 - Suppliers are numbered by emissions: S1 is the largest emitter, S2 the next. Totals, counts \
 and the supplier-confirmed share are facts of their own; use them instead of adding up.
+- To say which suppliers have a status, cite the list fact ({{list.estimated}}, \
+{{list.partial}} or {{list.confirmed}}); for one supplier's status, cite its {{S1.status}}. Never \
+call a supplier estimated or confirmed in your own words unless its status fact says so.
 - Cite only facts that answer the question. If the facts do not answer it, set answerable to \
 false and leave text empty.
 - factIds lists every id you cite.
@@ -111,7 +114,9 @@ class Chat:
             self.models, chat_messages(request), deadline, lambda out: _checked(out, ids)
         )
         if found is None:
-            return ChatResponse(answerable=False, text="", fact_ids=[], provider="stub")
+            # Models were asked and none gave an answer that passed: "none", not the stub, so
+            # the reader is told the question was not answered from the data.
+            return ChatResponse(answerable=False, text="", fact_ids=[], provider="none")
         (answerable, text, cited), model_id = found
         return ChatResponse(answerable=answerable, text=text, fact_ids=cited, provider=model_id)
 

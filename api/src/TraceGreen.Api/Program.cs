@@ -71,6 +71,7 @@ builder.Services.AddSingleton<ClassificationService>();
 builder.Services.AddScoped<IngestService>();
 builder.Services.AddScoped<DemoService>();
 builder.Services.AddScoped<SuggestionService>();
+builder.Services.AddScoped<ChatService>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -101,7 +102,12 @@ builder.Services.AddRateLimiter(options =>
     // Read per request, so tests can override AppConfig the way they do for DEMO_TOOLS.
     // The supplier page (F12) counts apart from the verify routes, so a supplier going through a list never uses up the
     // phone page's attempts from the same address, nor the other way round; its allowance is a multiple, as it holds a list.
-    foreach (var (policy, factor) in new[] { (VerifyEndpoints.RateLimitPolicy, 1), (PortalEndpoints.RateLimitPolicy, PortalEndpoints.RateLimitFactor) })
+    foreach (var (policy, factor) in new[]
+    {
+        (VerifyEndpoints.RateLimitPolicy, 1),
+        (PortalEndpoints.RateLimitPolicy, PortalEndpoints.RateLimitFactor),
+        (ChatEndpoints.RateLimitPolicy, ChatEndpoints.RateLimitFactor),
+    })
     {
         options.AddPolicy(policy, http => RateLimitPartition.GetFixedWindowLimiter(
             http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -137,6 +143,7 @@ app.MapAudit();
 app.MapScenarios();
 app.MapClassification();
 app.MapSuggestions();
+app.MapChat();
 app.MapDev();
 
 app.Run();

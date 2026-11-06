@@ -109,7 +109,7 @@ def test_an_unknown_fact_hands_over_and_no_valid_answer_is_not_answered() -> Non
         }
     )
 
-    assert ask(fakes) == {"answerable": False, "text": "", "factIds": [], "provider": "stub"}
+    assert ask(fakes) == {"answerable": False, "text": "", "factIds": [], "provider": "none"}
 
 
 def test_a_model_that_says_the_facts_do_not_answer_is_believed() -> None:
