@@ -27,7 +27,8 @@ public abstract class RepositoryContract
         prev => AuditChain.Build(prev, Ids.DemoWorkspace, Now, "test", action, payload ?? new JsonObject());
 
     private static Verification NewVerification(Guid nodeId, string nonce) => new(
-        Ids.NewId(), Ids.DemoWorkspace, nodeId, nonce, TransportMode.Road, EnergySource.Grid, 1.4m, Now, "iphash", Now);
+        Ids.NewId(), Ids.DemoWorkspace, nodeId, nonce, TransportMode.Road, EnergySource.Grid, 1.4m, Now, "iphash", Now,
+        "2026-11-06", "terms-sha256");
 
     private static readonly NodePatch VerifiedPatch = new(NodeStatus.Verified, 123m, TransportMode.Road, EnergySource.Grid, 1.4m, 4321m, 3);
 
@@ -160,7 +161,9 @@ public abstract class RepositoryContract
         Assert.Equal(TransportMode.Road, stored.TransportMode);
         Assert.Equal(4321m, stored.CostEur);
         Assert.Equal(3, stored.LeadDays);
-        Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
+        var verification = Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
+        Assert.Equal("2026-11-06", verification.TermsVersion);
+        Assert.Equal("terms-sha256", verification.TermsSha256);
         var audit = await AllAudit(repo);
         Assert.Equal(auditBefore + 1, audit.Count);
         Assert.True(AuditChain.Verify(audit).Valid);

@@ -2,9 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Security;
+using TraceGreen.Domain.Seed;
 
 namespace TraceGreen.Tests.Api;
 
@@ -63,8 +65,17 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
     private Task<HttpResponseMessage> Context(string token) =>
         _client.GetAsync($"/api/verify/context?t={Uri.EscapeDataString(token)}", Ct);
 
-    private Task<HttpResponseMessage> Submit(string token, string? mode = "road", string? energy = "grid", decimal? massT = null) =>
-        _client.PostAsJsonAsync("/api/verify", new { t = token, transportMode = mode, energySource = energy, massT }, Ct);
+    private SupplierTerms Terms => _factory.Services.GetRequiredService<SeedBundle>().SupplierTerms;
+
+    /// <summary>Stands for the current terms' SHA-256, which is known at run time.</summary>
+    private const string CurrentTerms = "<current>";
+
+    private Task<HttpResponseMessage> Submit(
+        string token, string? mode = "road", string? energy = "grid", decimal? massT = null, string? terms = CurrentTerms) =>
+        _client.PostAsJsonAsync(
+            "/api/verify",
+            new { t = token, transportMode = mode, energySource = energy, massT, acceptedTerms = terms == CurrentTerms ? Terms.Sha256 : terms },
+            Ct);
 
     [Fact]
     public async Task RequestLinkReturnsAUrlOnThePageRouteWithExpiryAndLoopbackFlag()
@@ -190,10 +201,92 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         await Reset();
         var token = await Token(N3);
 
-        var response = await _client.PostAsJsonAsync("/api/verify", new { t = token, energySource = "unknown" }, Ct);
+        var response = await _client.PostAsJsonAsync("/api/verify", new { t = token, energySource = "unknown", acceptedTerms = Terms.Sha256 }, Ct);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("PARTIAL", (await Json(response)).GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task TheContextCarriesTheSupplierTermsTheTermsRouteServes()
+    {
+        await Reset();
+        var token = await Token(N3);
+
+        var terms = (await Json(await Context(token))).GetProperty("terms");
+        var served = await _client.GetAsync("/api/terms/supplier", Ct);
+
+        Assert.Equal(HttpStatusCode.OK, served.StatusCode);
+        var page = await Json(served);
+        Assert.Equal(Terms.Version, terms.GetProperty("version").GetString());
+        Assert.Equal(Terms.Sha256, terms.GetProperty("sha256").GetString());
+        Assert.Equal(64, Terms.Sha256.Length);
+        Assert.Equal(terms.GetRawText(), page.GetRawText());
+        foreach (var lang in new[] { "ro", "en" })
+        {
+            var text = terms.GetProperty(lang);
+            Assert.False(string.IsNullOrWhiteSpace(text.GetProperty("acceptance").GetString()));
+            Assert.NotEmpty(text.GetProperty("keyPoints").EnumerateArray());
+            Assert.NotEmpty(text.GetProperty("sections").EnumerateArray());
+        }
+    }
+
+    [Fact]
+    public async Task ASubmitWithoutTheTermsIs422AndLeavesTheLinkUnused()
+    {
+        await Reset();
+        var token = await Token(N3);
+        var seq = Bus.LastSeq(Ids.DemoWorkspace);
+
+        await AssertProblem(await Submit(token, terms: null), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+        await AssertProblem(
+            await _client.PostAsJsonAsync("/api/verify", new { t = token, transportMode = "road" }, Ct),
+            HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+
+        Assert.Empty(await Repo.ListVerificationsAsync(Ctx, N3, Ct));
+        Assert.Equal(NodeStatus.Estimated, (await Repo.GetNodeAsync(Ctx, N3, Ct))!.Status);
+        Assert.Equal(seq, Bus.LastSeq(Ids.DemoWorkspace));
+        // The link still works once the terms are accepted.
+        Assert.Equal(HttpStatusCode.OK, (await Submit(token)).StatusCode);
+    }
+
+    [Fact]
+    public async Task ASubmitWithOtherTermsIs422()
+    {
+        await Reset();
+        var token = await Token(N3);
+
+        await AssertProblem(await Submit(token, terms: new string('0', 64)), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+        await AssertProblem(await Submit(token, terms: Terms.Version), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+        Assert.Empty(await Repo.ListVerificationsAsync(Ctx, N3, Ct));
+    }
+
+    [Fact]
+    public async Task AUsedLinkIs409EvenWithoutTheTerms()
+    {
+        await Reset();
+        var token = await Token(N3);
+        Assert.Equal(HttpStatusCode.OK, (await Submit(token)).StatusCode);
+
+        await AssertProblem(await Submit(token, terms: null), HttpStatusCode.Conflict, "AlreadyUsed");
+    }
+
+    [Fact]
+    public async Task TheAcceptedTermsAreRecordedOnTheVerificationAndInTheAuditEntry()
+    {
+        await Reset();
+        var token = await Token(N3);
+
+        Assert.Equal(HttpStatusCode.OK, (await Submit(token)).StatusCode);
+
+        var verification = Assert.Single(await Repo.ListVerificationsAsync(Ctx, N3, Ct));
+        Assert.Equal(Terms.Version, verification.TermsVersion);
+        Assert.Equal(Terms.Sha256, verification.TermsSha256);
+        var entry = (await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Last();
+        Assert.Equal("verification.submitted", entry.Action);
+        Assert.Equal(Terms.Version, entry.Payload["termsVersion"]!.GetValue<string>());
+        Assert.Equal(Terms.Sha256, entry.Payload["termsSha256"]!.GetValue<string>());
+        Assert.True(AuditChain.Verify(await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Valid);
     }
 
     [Fact]
@@ -399,6 +492,8 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         Assert.Equal("VERIFIED", (await Json(response)).GetProperty("status").GetString());
         var audit = await Repo.ListAuditAsync(Ctx, 0, 1000, Ct);
         Assert.Equal(["link.requested", "verification.submitted"], audit.Skip(before).Select(a => a.Action));
+        // The demo tool accepts the current terms on the simulated supplier's behalf.
+        Assert.Equal(Terms.Sha256, audit[^1].Payload["termsSha256"]!.GetValue<string>());
     }
 
     [Fact]

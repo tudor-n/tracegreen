@@ -112,6 +112,7 @@ app.MapEvents();
 app.MapGraph();
 app.MapIngest();
 app.MapVerify();
+app.MapTerms();
 app.MapAudit();
 app.MapScenarios();
 app.MapDev();

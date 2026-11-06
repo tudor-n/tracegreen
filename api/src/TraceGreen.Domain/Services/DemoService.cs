@@ -22,7 +22,8 @@ public sealed class DemoService(IRepository repo, IEventBus bus, SeedBundle seed
 
     /// <summary>
     /// Answers for a supplier without a phone: mints a link and submits it through <see cref="VerifyService"/>, so the
-    /// audit rows (<c>link.requested</c>, <c>verification.submitted</c>) and events are those of a real answer.
+    /// audit rows (<c>link.requested</c>, <c>verification.submitted</c>) and events are those of a real answer. It accepts
+    /// the current supplier terms on the simulated supplier's behalf; the route exists with <c>DEMO_TOOLS=1</c> alone.
     /// </summary>
     public async Task<Result<VerifyOutcome, VerifyError>> SimulateAnswerAsync(
         Ctx ctx, Guid nodeId, TransportMode? mode, EnergySource? energy, decimal? massT, string? clientAddress, CancellationToken ct)
@@ -32,7 +33,7 @@ public sealed class DemoService(IRepository repo, IEventBus bus, SeedBundle seed
         {
             return Result<VerifyOutcome, VerifyError>.Fail(new VerifyError(VerifyErrorCode.NodeNotFound, minted.Error.Message));
         }
-        return await verify.SubmitAsync(new VerifyAnswer(minted.Value.Token, mode, energy, massT), clientAddress, ct);
+        return await verify.SubmitAsync(new VerifyAnswer(minted.Value.Token, mode, energy, massT, seed.SupplierTerms.Sha256), clientAddress, ct);
     }
 
     public async Task ResetAsync(Ctx ctx, CancellationToken ct)

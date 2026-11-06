@@ -39,7 +39,8 @@ public sealed record SeedBundle(
     IReadOnlyList<ClassificationMapEntry> ClassificationMap,
     IReadOnlyDictionary<string, CachedClassification> AiCache,
     DemoStateSpec DemoState,
-    SpendConversionSpec SpendConversion)
+    SpendConversionSpec SpendConversion,
+    SupplierTerms SupplierTerms)
 {
     private IReadOnlySet<string>? _allowList;
 

@@ -1,0 +1,219 @@
+{
+  "version": "2026-11-06",
+  "ro": {
+    "title": "Termeni pentru furnizori privind răspunsul la o cerere de confirmare",
+    "keyPoints": [
+      "Răspunsurile dumneavoastră sunt declarații ale furnizorului pe care îl reprezentați, date după cunoștințele dumneavoastră. Furnizorul răspunde pentru ele.",
+      "TraceGreen înregistrează răspunsurile așa cum le dați. Nu le verifică, nu le auditează și nu le certifică.",
+      "În limitele permise de lege, operatorul TraceGreen nu răspunde pentru prejudiciile cauzate de răspunsuri inexacte, incomplete sau false.",
+      "Acești termeni sunt guvernați de legea română."
+    ],
+    "acceptance": "Confirm că sunt autorizat(ă) să răspund în numele furnizorului de mai sus și că răspunsurile mele sunt exacte și complete, după cunoștințele mele. Am citit Termenii pentru furnizori și îi accept în mod expres, inclusiv secțiunea 6 (răspunderea pentru răspunsuri și limitarea răspunderii), secțiunea 7 (despăgubirea) și secțiunea 10 (legea aplicabilă și instanțele competente).",
+    "sections": [
+      {
+        "number": 1,
+        "heading": "Părțile și domeniul de aplicare",
+        "paragraphs": [
+          "TraceGreen este un serviciu operat de [PLACEHOLDER: denumirea operatorului, cod unic de înregistrare (CUI), sediul social] („operatorul”).",
+          "Acești termeni constituie un acord între operator și furnizorul în numele căruia răspundeți („furnizorul”). Se aplică răspunsurilor trimise prin această pagină pentru livrarea și factura afișate pe ea.",
+          "Compania care v-a trimis acest link („cumpărătorul”) nu este parte la acești termeni."
+        ]
+      },
+      {
+        "number": 2,
+        "heading": "Ce vi se cere și de ce",
+        "paragraphs": [
+          "Cumpărătorul vă roagă să confirmați cum a fost transportată livrarea afișată și ce fel de energie alimentează producția dumneavoastră. Dacă pagina o cere, puteți confirma și masa transportului.",
+          "TraceGreen folosește răspunsurile pentru a înlocui o estimare a emisiilor de gaze cu efect de seră ale livrării, bazată pe valoarea facturii, cu o estimare bazată pe activitate, pe care o arată cumpărătorului.",
+          "Răspunsul este voluntar. Puteți sări peste o întrebare; estimarea pentru acea parte rămâne atunci bazată pe valoarea facturii. Această pagină nu cere nimic în afara acestor întrebări."
+        ]
+      },
+      {
+        "number": 3,
+        "heading": "Declarațiile dumneavoastră",
+        "paragraphs": [
+          "Prin trimitere, furnizorul declară că: (a) răspunsurile sunt exacte și complete, după cunoștințele sale, pe baza informațiilor de care dispune la momentul răspunsului; (b) persoana care trimite răspunsurile este autorizată să răspundă în numele său; și (c) răspunsurile privesc livrarea și factura afișate pe această pagină.",
+          "Dacă furnizorul află că un răspuns a fost inexact, îl va anunța pe cumpărător fără întârzieri nejustificate. Fiecare link funcționează o singură dată; cumpărătorul poate trimite unul nou."
+        ]
+      },
+      {
+        "number": 4,
+        "heading": "Ce face și ce nu face TraceGreen",
+        "paragraphs": [
+          "TraceGreen înregistrează răspunsurile așa cum au fost date, împreună cu momentul trimiterii. Nu le verifică, nu le auditează, nu le certifică și nu le compară cu alte surse.",
+          "Notele automate, de exemplu „transportul aerian este neobișnuit pentru o livrare atât de grea”, sunt indicii pentru cumpărător, nu verificări.",
+          "Cifrele afișate de TraceGreen sunt estimări calculate cu factori de emisie publicați. Nu reprezintă o amprentă de carbon a produsului verificată extern și nici o opinie de audit."
+        ]
+      },
+      {
+        "number": 5,
+        "heading": "Relația cu cumpărătorul",
+        "paragraphs": [
+          "Răspunsurile sunt transmise cumpărătorului prin TraceGreen. Acești termeni nu modifică niciun contract dintre furnizor și cumpărător, iar dacă și cum se bazează cumpărătorul pe răspunsuri este o chestiune între aceștia.",
+          "Operatorul nu este parte la relația dintre furnizor și cumpărător și nu acționează ca mandatar al niciunuia dintre ei."
+        ]
+      },
+      {
+        "number": 6,
+        "heading": "Răspunderea pentru răspunsuri și limitarea răspunderii",
+        "paragraphs": [
+          "Furnizorul răspunde pentru conținutul răspunsurilor sale.",
+          "În limitele permise de lege, operatorul nu răspunde față de furnizor pentru niciun prejudiciu rezultat din: (a) răspunsuri inexacte, incomplete, înșelătoare sau false; (b) deciziile luate de cumpărător sau de altcineva pe baza răspunsurilor ori a estimărilor derivate din acestea; sau (c) indisponibilitatea, întreruperea sau funcționarea lentă a acestei pagini.",
+          "Nicio prevedere a acestor termeni nu exclude și nu limitează răspunderea pentru prejudiciile cauzate cu intenție sau din culpă gravă, pentru prejudiciile aduse vieții, integrității fizice sau sănătății ori orice altă răspundere care nu poate fi exclusă sau limitată potrivit legii (articolul 1355 din Codul civil)."
+        ]
+      },
+      {
+        "number": 7,
+        "heading": "Despăgubirea",
+        "paragraphs": [
+          "Furnizorul va despăgubi operatorul pentru pretențiile, daunele și costurile rezonabile, inclusiv onorariile rezonabile de avocat, formulate de cumpărător sau de terți împotriva operatorului, în măsura în care acestea rezultă din: (a) răspunsuri despre care furnizorul știa sau ar fi trebuit în mod rezonabil să știe că sunt inexacte sau false; sau (b) o trimitere făcută fără autorizarea furnizorului.",
+          "Operatorul va anunța furnizorul despre o astfel de pretenție fără întârzieri nejustificate și îi va da posibilitatea de a participa la apărare."
+        ]
+      },
+      {
+        "number": 8,
+        "heading": "Datele cu caracter personal",
+        "paragraphs": [
+          "Această pagină nu vă cere numele, adresa de e-mail sau numărul de telefon și nu plasează cookie-uri.",
+          "La trimitere, operatorul stochează răspunsurile, momentul trimiterii și o amprentă criptografică (hash cu cheie) a adresei de rețea (IP) folosite de dispozitivul dumneavoastră. Amprenta servește la protejarea linkului împotriva abuzurilor și ca evidență a trimiterii; adresa propriu-zisă nu este stocată.",
+          "Temeiul este interesul legitim al operatorului de a securiza serviciul și de a putea dovedi o trimitere (articolul 6 alineatul (1) litera (f) din Regulamentul (UE) 2016/679, RGPD). Amprenta este păstrată cât este necesar în acest scop și cel mult trei ani de la trimitere, termenul general de prescripție din dreptul român.",
+          "Puteți cere operatorului accesul la date, rectificarea sau ștergerea lor ori restricționarea prelucrării și vă puteți opune prelucrării, scriind la [PLACEHOLDER: adresa de contact a operatorului]. Puteți depune și o plângere la Autoritatea Națională de Supraveghere a Prelucrării Datelor cu Caracter Personal (ANSPDCP)."
+        ]
+      },
+      {
+        "number": 9,
+        "heading": "Evidența și proba",
+        "paragraphs": [
+          "Operatorul păstrează, pentru fiecare trimitere, o intrare într-un jurnal de audit în care orice modificare ulterioară devine detectabilă. Fiecare intrare înregistrează răspunsurile, momentul trimiterii, versiunea și amprenta SHA-256 a acestor termeni, așa cum au fost acceptați.",
+          "Operatorul și furnizorul convin că această evidență poate fi folosită ca probă a trimiterii, a conținutului ei și a acceptării acestor termeni. Oricare parte poate face dovada contrară."
+        ]
+      },
+      {
+        "number": 10,
+        "heading": "Legea aplicabilă și instanțele competente",
+        "paragraphs": [
+          "Acești termeni sunt guvernați de legea română.",
+          "Litigiile vor fi soluționate de instanțele competente de la sediul social al operatorului, [PLACEHOLDER: localitatea]. Aceasta nu împiedică niciuna dintre părți să solicite măsuri provizorii acolo unde legea permite."
+        ]
+      },
+      {
+        "number": 11,
+        "heading": "Limba, versiunile și alte prevederi",
+        "paragraphs": [
+          "Acești termeni sunt disponibili în română și în engleză. Dacă cele două versiuni diferă, prevalează versiunea în limba română.",
+          "Fiecare trimitere este guvernată de versiunea acestor termeni afișată la momentul trimiterii. O versiune nouă se aplică trimiterilor ulterioare și nu le modifică pe cele anterioare. Versiunea în vigoare poate fi citită, tipărită și salvată la adresa /terms/supplier a acestui serviciu.",
+          "Dacă o prevedere a acestor termeni este nulă sau inaplicabilă, celelalte prevederi rămân în vigoare, iar prevederea respectivă este înlocuită cu una valabilă, cât mai apropiată de scopul ei.",
+          "Întrebări despre acești termeni: [PLACEHOLDER: adresa de contact a operatorului]."
+        ]
+      }
+    ]
+  },
+  "en": {
+    "title": "Supplier Terms for answering a confirmation request",
+    "keyPoints": [
+      "Your answers are statements of the supplier you represent, given to the best of your knowledge. The supplier is responsible for them.",
+      "TraceGreen records your answers as you give them. It does not check, audit or certify them.",
+      "To the extent the law allows, the operator of TraceGreen is not liable for loss caused by answers that are inaccurate, incomplete or false.",
+      "These terms are governed by Romanian law."
+    ],
+    "acceptance": "I confirm that I am authorised to answer for the supplier shown above and that my answers are accurate and complete to the best of my knowledge. I have read the Supplier Terms and expressly accept them, including section 6 (responsibility for answers and limitation of liability), section 7 (indemnity) and section 10 (governing law and courts).",
+    "sections": [
+      {
+        "number": 1,
+        "heading": "Parties and scope",
+        "paragraphs": [
+          "TraceGreen is a service operated by [PLACEHOLDER: operator legal name, registration number (CUI), registered seat] (the \"operator\").",
+          "These terms are an agreement between the operator and the supplier on whose behalf you answer (the \"supplier\"). They apply to the answers sent through this page for the delivery and invoice shown on it.",
+          "The company that sent you this link (the \"buyer\") is not a party to these terms."
+        ]
+      },
+      {
+        "number": 2,
+        "heading": "What you are asked, and why",
+        "paragraphs": [
+          "The buyer asks you to confirm how the delivery shown was transported and what kind of energy powers your production. Where the page asks for it, you may also confirm the shipment's mass.",
+          "TraceGreen uses the answers to replace an estimate of the delivery's greenhouse-gas emissions based on the invoice amount with an estimate based on activity, which it shows to the buyer.",
+          "Answering is voluntary. You may skip a question; the estimate for that part then stays based on the invoice amount. This page asks for nothing beyond these questions."
+        ]
+      },
+      {
+        "number": 3,
+        "heading": "Your statements",
+        "paragraphs": [
+          "By submitting, the supplier states that: (a) the answers are accurate and complete to the best of its knowledge, based on the information available to it when answering; (b) the person submitting is authorised to answer for it; and (c) the answers concern the delivery and invoice shown on this page.",
+          "If the supplier learns that an answer was inaccurate, it will tell the buyer without undue delay. Each link works once; the buyer can send a new one."
+        ]
+      },
+      {
+        "number": 4,
+        "heading": "What TraceGreen does and does not do",
+        "paragraphs": [
+          "TraceGreen records the answers as given, together with the time of the submission. It does not check, audit or certify them, and it does not compare them with other sources.",
+          "Automatic notes, such as \"air freight is unusual for a shipment this heavy\", are hints for the buyer, not checks.",
+          "The figures TraceGreen shows are estimates calculated with published emission factors. They are not an externally verified product carbon footprint and not an audit opinion."
+        ]
+      },
+      {
+        "number": 5,
+        "heading": "Relationship with the buyer",
+        "paragraphs": [
+          "The answers are given to the buyer through TraceGreen. These terms do not change any contract between the supplier and the buyer, and whether and how the buyer relies on the answers is a matter between them.",
+          "The operator is not a party to the relationship between the supplier and the buyer and does not act as the agent of either."
+        ]
+      },
+      {
+        "number": 6,
+        "heading": "Responsibility for answers and limitation of liability",
+        "paragraphs": [
+          "The supplier is responsible for the content of its answers.",
+          "To the extent permitted by law, the operator is not liable to the supplier for any loss arising from: (a) answers that are inaccurate, incomplete, misleading or false; (b) decisions the buyer or anyone else takes on the basis of the answers or of estimates derived from them; or (c) this page being unavailable, interrupted or slow.",
+          "Nothing in these terms excludes or limits liability for harm caused intentionally or through gross negligence, for harm to life, physical integrity or health, or any other liability that cannot be excluded or limited by law (Article 1355 of the Romanian Civil Code)."
+        ]
+      },
+      {
+        "number": 7,
+        "heading": "Indemnity",
+        "paragraphs": [
+          "The supplier will indemnify the operator against claims, damages and reasonable costs, including reasonable legal fees, brought against the operator by the buyer or by third parties, to the extent they result from: (a) answers the supplier knew, or should reasonably have known, to be inaccurate or false; or (b) a submission made without the supplier's authority.",
+          "The operator will tell the supplier about such a claim without undue delay and give it the opportunity to take part in the defence."
+        ]
+      },
+      {
+        "number": 8,
+        "heading": "Personal data",
+        "paragraphs": [
+          "This page does not ask for your name, email address or telephone number, and it sets no cookies.",
+          "When you submit, the operator stores the answers, the time of the submission and a keyed cryptographic hash of the network (IP) address your device used. The hash protects the link against misuse and serves as a record of the submission; the address itself is not stored.",
+          "The legal basis is the operator's legitimate interest in securing the service and being able to prove a submission (Article 6(1)(f) of Regulation (EU) 2016/679, the GDPR). The hash is kept for as long as that purpose requires and at most three years from the submission, the general limitation period under Romanian law.",
+          "You may ask the operator for access to your data, its rectification or erasure, or the restriction of its processing, and you may object to the processing, by writing to [PLACEHOLDER: operator contact address]. You may also lodge a complaint with the Romanian data protection authority (ANSPDCP)."
+        ]
+      },
+      {
+        "number": 9,
+        "heading": "Records and evidence",
+        "paragraphs": [
+          "For each submission, the operator keeps an entry in a tamper-evident audit log. Each entry records the answers, the time of the submission, and the version and SHA-256 fingerprint of these terms as accepted.",
+          "The operator and the supplier agree that this record may be used as evidence of the submission, its content and the acceptance of these terms. Either party may prove the contrary."
+        ]
+      },
+      {
+        "number": 10,
+        "heading": "Governing law and courts",
+        "paragraphs": [
+          "These terms are governed by Romanian law.",
+          "Disputes will be settled by the competent courts at the operator's registered seat, [PLACEHOLDER: city]. This does not prevent either party from seeking interim measures where the law allows."
+        ]
+      },
+      {
+        "number": 11,
+        "heading": "Language, versions and other provisions",
+        "paragraphs": [
+          "These terms are available in Romanian and English. If the two versions differ, the Romanian version prevails.",
+          "Each submission is governed by the version of these terms shown when it was made. A new version applies to later submissions and does not change earlier ones. The current version can be read, printed and saved at this service's /terms/supplier address.",
+          "If a provision of these terms is invalid or unenforceable, the other provisions remain in force, and the invalid provision is replaced by a valid one that comes as close as possible to its purpose.",
+          "Questions about these terms: [PLACEHOLDER: operator contact address]."
+        ]
+      }
+    ]
+  }
+}
