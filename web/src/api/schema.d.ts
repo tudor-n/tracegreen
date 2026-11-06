@@ -583,6 +583,11 @@ export interface components {
             ro: components["schemas"]["TermsText"];
             en: components["schemas"]["TermsText"];
         };
+        TermsAcceptance: {
+            before: string;
+            link: string;
+            after: string;
+        };
         TermsSection: {
             /** Format: int32 */
             number: number;
@@ -592,7 +597,7 @@ export interface components {
         TermsText: {
             title: string;
             keyPoints: string[];
-            acceptance: string;
+            acceptance: components["schemas"]["TermsAcceptance"];
             sections: components["schemas"]["TermsSection"][];
         };
         /** @enum {unknown} */

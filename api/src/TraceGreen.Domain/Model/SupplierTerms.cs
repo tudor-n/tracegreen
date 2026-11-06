@@ -4,10 +4,16 @@ namespace TraceGreen.Domain.Model;
 public sealed record TermsSection(int Number, string Heading, IReadOnlyList<string> Paragraphs);
 
 /// <summary>
-/// The supplier terms in one language. <see cref="Acceptance"/> is the statement next to the checkbox the supplier ticks
-/// before submitting, and <see cref="KeyPoints"/> are shown above it; both are part of the hashed document.
+/// The statement next to the checkbox, in three parts so the page can make <see cref="Link"/> the link to the full terms:
+/// <c>Before + Link + After</c> is the sentence the supplier accepts. <see cref="Before"/> or <see cref="After"/> may be empty.
 /// </summary>
-public sealed record TermsText(string Title, IReadOnlyList<string> KeyPoints, string Acceptance, IReadOnlyList<TermsSection> Sections);
+public sealed record TermsAcceptance(string Before, string Link, string After);
+
+/// <summary>
+/// The supplier terms in one language. <see cref="Acceptance"/> is the statement the supplier ticks before submitting;
+/// <see cref="KeyPoints"/> open the printable page. Both are part of the hashed document.
+/// </summary>
+public sealed record TermsText(string Title, IReadOnlyList<string> KeyPoints, TermsAcceptance Acceptance, IReadOnlyList<TermsSection> Sections);
 
 /// <summary>
 /// The terms a supplier accepts before answering (<c>seed/supplier-terms.json</c>). <see cref="Sha256"/> is the SHA-256

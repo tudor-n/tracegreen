@@ -50,8 +50,10 @@ test('demo path: import, verify on the phone, live flip, terms, simulator, audit
       await expect(verifyPage).toHaveAttribute('data-phase', 'ready')
       await supplier.getByTestId('verify-transport-air').click()
       await supplier.getByTestId('verify-energy-grid').click()
-      // The terms start unticked, and nothing can be sent until the supplier ticks them.
+      // The terms start unticked, their statement links to the full text without the token, and nothing can be sent
+      // until the supplier ticks them.
       await expect(supplier.getByTestId('verify-terms')).not.toBeChecked()
+      await expect(supplier.getByTestId('verify-terms-link')).toHaveAttribute('href', /^\/terms\/supplier\?lang=(ro|en)$/)
       await expect(supplier.getByTestId('verify-submit')).toBeDisabled()
       await supplier.getByTestId('verify-terms').check()
       await supplier.getByTestId('verify-submit').click()

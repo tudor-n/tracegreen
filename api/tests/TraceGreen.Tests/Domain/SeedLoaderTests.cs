@@ -96,12 +96,15 @@ public class SeedLoaderTests
         Assert.False(string.IsNullOrWhiteSpace(terms.Version));
         Assert.Equal(terms.Ro.Sections.Select(s => s.Number), terms.En.Sections.Select(s => s.Number));
         // The checkbox statement names the clauses that need express acceptance (Civil Code art. 1203).
+        static string Statement(TermsAcceptance a) => a.Before + a.Link + a.After;
         foreach (var number in new[] { 6, 7, 10 })
         {
             Assert.Contains(terms.Ro.Sections, s => s.Number == number);
-            Assert.Contains($"{number} (", terms.En.Acceptance, StringComparison.Ordinal);
-            Assert.Contains($"{number} (", terms.Ro.Acceptance, StringComparison.Ordinal);
+            Assert.Contains($"§{number} (", Statement(terms.En.Acceptance), StringComparison.Ordinal);
+            Assert.Contains($"§{number} (", Statement(terms.Ro.Acceptance), StringComparison.Ordinal);
         }
+        Assert.False(string.IsNullOrWhiteSpace(terms.En.Acceptance.Link));
+        Assert.False(string.IsNullOrWhiteSpace(terms.Ro.Acceptance.Link));
     }
 
     [Fact]
@@ -133,7 +136,7 @@ public class SeedLoaderTests
         var path = Path.Combine(bad, SeedLoader.TermsFile);
         var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
         doc.Remove("en");
-        doc["ro"]!["acceptance"] = "";
+        doc["ro"]!["acceptance"]!["link"] = "";
         File.WriteAllText(path, doc.ToJsonString());
         try
         {

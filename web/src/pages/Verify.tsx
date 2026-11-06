@@ -21,8 +21,8 @@ import {
 } from '@/lib/verify-state'
 
 // The supplier's phone page. It reads the token from ?t= and the language from ?lang=, loads the link's context,
-// offers both questions pre-selected, shows the supplier terms with an unticked checkbox, and sends the answers with
-// the terms' SHA-256 once the supplier ticked it. No cookies, storage, login, email, camera, clipboard or
+// offers both questions pre-selected, asks for the supplier terms with an unticked checkbox whose statement links to
+// the full text, and sends the answers with the terms' SHA-256 once the supplier ticked it. No cookies, storage, login, email, camera, clipboard or
 // personal data, and nothing here logs the URL or the token. Strings come from web/src/copy/verify.ts, the decisions
 // from web/src/lib/verify-state.ts and the requests from web/src/lib/verify-api.ts; this page performs and renders them.
 
@@ -147,7 +147,6 @@ export default function Verify() {
 
           <TermsConsent
             terms={state.context.terms[lang]}
-            version={state.context.terms.version}
             lang={lang}
             accepted={state.accepted}
             disabled={state.phase === 'submitting'}

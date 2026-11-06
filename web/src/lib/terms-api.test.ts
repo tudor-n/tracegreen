@@ -7,7 +7,7 @@ import { createTermsApi } from './terms-api'
 const text = {
   title: 'Supplier Terms',
   keyPoints: ['Your answers are your responsibility.'],
-  acceptance: 'I accept the Supplier Terms.',
+  acceptance: { before: 'I accept the ', link: 'Supplier Terms', after: '.' },
   sections: [{ number: 1, heading: 'Parties', paragraphs: ['The operator and the supplier.'] }],
 }
 const terms: SupplierTerms = { version: '2026-11-06', sha256: 'a'.repeat(64), ro: text, en: text }

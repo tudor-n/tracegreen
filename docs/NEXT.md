@@ -107,11 +107,11 @@ Checked on 2026-11-05 against Compose: passes in Postgres mode and in memory mod
 
 ## Supplier terms (F3)
 
-Before submitting, the supplier ticks the Supplier Terms: the text is `seed/supplier-terms.json` (RO and EN, version `2026-11-06`), and the reasons and the lawyer's checklist are in `docs/legal/README.md`. The page shows the key points, the full text in a "read the full terms" panel, a link to the printable copy, and an unticked checkbox whose statement names sections 6 (liability), 7 (indemnity) and 10 (law and courts). Submit stays disabled until it is ticked.
+Before submitting, the supplier ticks the Supplier Terms: the text is `seed/supplier-terms.json` (RO and EN, version `2026-11-06`), and the reasons and the lawyer's checklist are in `docs/legal/README.md`. The page shows one unticked checkbox above Submit. Its statement names §6 (liability), §7 (indemnity) and §10 (law and courts), and its words "Supplier Terms" link to the full text at `/terms/supplier` in a new tab (dev A asked for the terms behind a link, to keep the phone page short). Submit stays disabled until the box is ticked.
 
 | Route | Success | Errors |
 |---|---|---|
-| `GET /api/verify/context?t=` | `VerifyContext` gained `terms: SupplierTerms { version, sha256, ro, en }`, each language `{ title, keyPoints, acceptance, sections[{ number, heading, paragraphs }] }` | as before |
+| `GET /api/verify/context?t=` | `VerifyContext` gained `terms: SupplierTerms { version, sha256, ro, en }`, each language `{ title, keyPoints, acceptance { before, link, after }, sections[{ number, heading, paragraphs }] }` | as before |
 | `POST /api/verify {t, transportMode?, energySource?, massT?, acceptedTerms?}` | as before; the verification row and the `verification.submitted` payload carry `termsVersion` and `termsSha256` | `TermsNotAccepted` → 422 when `acceptedTerms` is missing or is not the current `terms.sha256`, checked after single use and before the answers; the link stays unused |
 | `GET /api/terms/supplier` | 200 `SupplierTerms`, the same object as in the context; no token, not rate limited | — |
 

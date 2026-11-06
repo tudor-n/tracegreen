@@ -9,8 +9,8 @@ import { type Lang, verifyCopy } from '@/copy/verify'
 import { termsApi } from '@/lib/terms-api'
 import { resolveLang } from '@/lib/verify-state'
 
-// The supplier terms at a stable address without a token (/terms/supplier, ?lang= as on the supplier page), so a
-// supplier can read, print and save them before accepting. It shows the version and the SHA-256 the audit log records.
+// The supplier terms at a stable address without a token (/terms/supplier, ?lang= as on the supplier page), opened from
+// the link in the supplier page's checkbox statement, so a supplier can read, print and save them before accepting. It shows the version and the SHA-256 the audit log records.
 // The text comes from the API and is rendered as text.
 
 type Load = { phase: 'loading' } | { phase: 'ready'; terms: Terms } | { phase: 'failed' }

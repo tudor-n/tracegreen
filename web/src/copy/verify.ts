@@ -44,13 +44,13 @@ export interface VerifyStrings {
   /** The "please reconfirm" banner for plausibility warnings. It never blocks (D2). */
   reconfirm: { title: string; warnings: Record<PlausibilityCode, string> }
   /**
-   * The frame around the supplier terms. The terms themselves (title, key points, the checkbox statement and the
-   * sections) come from the API, which hashes exactly that text, so none of it is written here.
+   * The frame around the supplier terms. The terms themselves (title, key points, the checkbox statement with its link,
+   * and the sections) come from the API, which hashes exactly that text, so none of it is written here.
    */
   terms: {
     version: (version: string) => string
-    read: string
-    printable: string
+    /** Read by screen readers after the link in the checkbox statement. */
+    opensInNewTab: string
     /** Shown under the submit button while the terms are not ticked. */
     tickToSubmit: string
   }
@@ -128,9 +128,8 @@ export const verifyCopy = {
     },
     terms: {
       version: (version: string) => `Versiunea ${version}`,
-      read: 'Citiți termenii integral',
-      printable: 'Versiune de tipărit',
-      tickToSubmit: 'Bifați caseta de mai sus pentru a accepta termenii și a trimite răspunsurile.',
+      opensInNewTab: 'se deschide într-o filă nouă',
+      tickToSubmit: 'Bifați caseta de mai sus pentru a trimite răspunsurile.',
     },
     termsPage: {
       loading: 'Se încarcă termenii…',
@@ -206,9 +205,8 @@ export const verifyCopy = {
     },
     terms: {
       version: (version: string) => `Version ${version}`,
-      read: 'Read the full terms',
-      printable: 'Printable version',
-      tickToSubmit: 'Tick the box above to accept the terms and send your answers.',
+      opensInNewTab: 'opens in a new tab',
+      tickToSubmit: 'Tick the box above to send your answers.',
     },
     termsPage: {
       loading: 'Loading the terms…',

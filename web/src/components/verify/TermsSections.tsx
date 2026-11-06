@@ -1,7 +1,6 @@
 import type { TermsSection } from '@/api/client'
 
-// The numbered sections of the supplier terms, as plain text from the API. Shared by the supplier page's "read the full
-// terms" panel and the printable page /terms/supplier, so both show the same words the server hashed.
+// The numbered sections of the supplier terms, as plain text from the API, on the printable page /terms/supplier.
 
 export function TermsSections({ sections }: { sections: TermsSection[] }) {
   return (

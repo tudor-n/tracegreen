@@ -8,7 +8,11 @@
       "În limitele permise de lege, operatorul TraceGreen nu răspunde pentru prejudiciile cauzate de răspunsuri inexacte, incomplete sau false.",
       "Acești termeni sunt guvernați de legea română."
     ],
-    "acceptance": "Confirm că sunt autorizat(ă) să răspund în numele furnizorului de mai sus și că răspunsurile mele sunt exacte și complete, după cunoștințele mele. Am citit Termenii pentru furnizori și îi accept în mod expres, inclusiv secțiunea 6 (răspunderea pentru răspunsuri și limitarea răspunderii), secțiunea 7 (despăgubirea) și secțiunea 10 (legea aplicabilă și instanțele competente).",
+    "acceptance": {
+      "before": "Sunt autorizat(ă) să răspund în numele acestui furnizor, iar răspunsurile mele sunt exacte și complete, după cunoștințele mele. Accept în mod expres ",
+      "link": "Termenii pentru furnizori",
+      "after": ", inclusiv §6 (răspunderea), §7 (despăgubirea) și §10 (legea și instanța competentă)."
+    },
     "sections": [
       {
         "number": 1,
@@ -116,7 +120,11 @@
       "To the extent the law allows, the operator of TraceGreen is not liable for loss caused by answers that are inaccurate, incomplete or false.",
       "These terms are governed by Romanian law."
     ],
-    "acceptance": "I confirm that I am authorised to answer for the supplier shown above and that my answers are accurate and complete to the best of my knowledge. I have read the Supplier Terms and expressly accept them, including section 6 (responsibility for answers and limitation of liability), section 7 (indemnity) and section 10 (governing law and courts).",
+    "acceptance": {
+      "before": "I am authorised to answer on behalf of this supplier, and my answers are accurate and complete to the best of my knowledge. I expressly accept the ",
+      "link": "Supplier Terms",
+      "after": ", including §6 (liability), §7 (indemnity) and §10 (law and courts)."
+    },
     "sections": [
       {
         "number": 1,

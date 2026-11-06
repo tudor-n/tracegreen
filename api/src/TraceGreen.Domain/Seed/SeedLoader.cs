@@ -155,7 +155,10 @@ public static class SeedLoader
                 continue;
             }
             if (string.IsNullOrWhiteSpace(text.Title)) v.Add($"{TermsFile} {lang}: no title");
-            if (string.IsNullOrWhiteSpace(text.Acceptance)) v.Add($"{TermsFile} {lang}: no acceptance statement");
+            if (text.Acceptance is not { Before: not null, After: not null } || string.IsNullOrWhiteSpace(text.Acceptance.Link))
+            {
+                v.Add($"{TermsFile} {lang}: no acceptance statement (before, link and after; the link text not empty)");
+            }
             if (text.KeyPoints is not { Count: > 0 } || text.KeyPoints.Any(string.IsNullOrWhiteSpace)) v.Add($"{TermsFile} {lang}: key points missing or empty");
             if (text.Sections is not { Count: > 0 })
             {

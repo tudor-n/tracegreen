@@ -52,7 +52,7 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 | Node drawer | `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate` |
 | Simulator | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
 | Audit panel | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
-| Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-submit` |
+| Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-terms-link` (its link to `/terms/supplier`), `verify-submit` |
 | Terms page | `terms-page` with `data-phase` and `data-version` |
 
 ## Demo laptop (production images)

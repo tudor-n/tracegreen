@@ -225,7 +225,7 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         foreach (var lang in new[] { "ro", "en" })
         {
             var text = terms.GetProperty(lang);
-            Assert.False(string.IsNullOrWhiteSpace(text.GetProperty("acceptance").GetString()));
+            Assert.False(string.IsNullOrWhiteSpace(text.GetProperty("acceptance").GetProperty("link").GetString()));
             Assert.NotEmpty(text.GetProperty("keyPoints").EnumerateArray());
             Assert.NotEmpty(text.GetProperty("sections").EnumerateArray());
         }
