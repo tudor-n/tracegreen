@@ -41,7 +41,9 @@ The node id is read from the token before the signature is checked, unauthentica
 
 ## Supplier page (C7)
 
-`/verify/:nodeId` asks two questions (transport mode, energy source) and an optional mass. It sets no cookies and has no login, email field, camera or clipboard access. The context it receives holds the supplier and buyer names, the invoice number and date, the dominant line's description, the lane and the answer options. It holds nothing personal, no nonce and no address.
+`/verify/:nodeId` asks two questions (transport mode, energy source) and an optional mass. It sets no cookies and has no login, email field, camera or clipboard access. The context it receives holds the supplier and buyer names, the invoice number and date, the dominant line's description, the lane, the answer options and the Supplier Terms. It holds nothing personal, no nonce and no address.
+
+Before submitting, the supplier ticks the Supplier Terms (`seed/supplier-terms.json`; reasoning in `docs/legal/README.md`). The submit carries the terms' SHA-256 from the context, and anything else is 422 `TermsNotAccepted`. The version and SHA-256 are stored on the verification row and in its audit entry. The printable copy at `/terms/supplier` (`GET /api/terms/supplier`) is public text: no token, no rate limit, nothing personal. The supplier page links to it in a new tab, so a printout never carries the link's token.
 
 All text from an invoice is untrusted. React renders it as text, and `dangerouslySetInnerHTML` is a lint error (`react/no-danger` in oxlint).
 
@@ -70,7 +72,7 @@ All text from an invoice is untrusted. React renders it as text, and `dangerousl
 - **Row-level security** is enabled on `invoices`, `nodes`, `verifications`, `scenarios` and `audit_log` (migration `Rls`). The application connects as the table owner and bypasses it. Any other role, such as a hosted anon role, sees nothing until policies exist.
 - **Append-only audit log**: a trigger rejects every `UPDATE` and `DELETE` on `audit_log`. The demo reset uses `TRUNCATE`, which row triggers do not see; the demo is single-tenant.
 - **Hash chain** (`Domain/Audit/AuditChain.cs`): each entry's hash is `SHA-256(prevHash + canonicalJson({ts, actor, action, payload}))`, chained from a genesis hash of 64 zeros, with timestamps normalised to UTC milliseconds. Editing, reordering or deleting an entry breaks every later hash. `POST /api/audit/verify` recomputes the chain and returns `{ valid, length, brokenAt }`, and the audit panel shows the result. Postgres also keeps `(workspace_id, prev_hash)` unique, so two writers cannot fork the chain.
-- **Audit payloads** hold ids, the expiry, the answers and the warnings. They hold no token, nonce or address.
+- **Audit payloads** hold ids, the expiry, the answers, the warnings and the accepted terms' version and SHA-256. They hold no token, nonce or address.
 - **Client address**: a verification row stores `Hashing.IpHash`, keyed with a key derived from `LINK_SECRET` (`"ip-hash:" + secret`), never the address itself.
 
 ## Browser headers (C6)
