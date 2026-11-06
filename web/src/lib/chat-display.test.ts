@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ChatFactView } from '@/api/client'
-import { factLabel, factLink, factValue } from './chat-display'
+import type { ChatAnswer, ChatFactView } from '@/api/client'
+import { answerTag, factLabel, factLink, factValue } from './chat-display'
 
 const fact = (overrides: Partial<ChatFactView>): ChatFactView => ({
   id: 'S1.carbon',
@@ -61,5 +61,15 @@ describe('factLink', () => {
     })
     expect(factLink(fact({ nodeId: null, subject: null, auditId: 7 }))?.kind).toBe('audit')
     expect(factLink(fact({ nodeId: null, subject: null }))).toBeNull()
+  })
+})
+
+describe('answerTag', () => {
+  const answer = (facts: ChatFactView[]): ChatAnswer => ({ status: 'answered', segments: [], facts, provider: 'ollama:m' })
+
+  it('labels a fixed sentence, an AI sentence with values from the data, and a general AI answer', () => {
+    expect(answerTag(answer([]), true)).toMatchObject({ kind: 'fromData', label: 'From your data' })
+    expect(answerTag(answer([fact({})]), false)).toMatchObject({ kind: 'aiData', label: 'AI-written · values from your data' })
+    expect(answerTag(answer([]), false)).toMatchObject({ kind: 'aiGeneral', label: 'AI-written · general, no values from your data' })
   })
 })

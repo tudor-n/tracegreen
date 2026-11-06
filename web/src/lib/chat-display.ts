@@ -1,6 +1,7 @@
-import type { ChatFactView, NodeStatus, TransportMode } from '@/api/client'
+import type { ChatAnswer, ChatFactView, NodeStatus, TransportMode } from '@/api/client'
 import { chatCopy } from '@/copy/chat'
 import { auditPanelCopy, nodeCopy, transportModeCopy } from '@/copy/dashboard'
+import { AI_GENERAL, AI_WRITTEN, FROM_YOUR_DATA } from '@/copy/labels'
 import {
   formatDate,
   formatDays,
@@ -57,4 +58,14 @@ export function factLink(fact: ChatFactView): FactLink {
   if (fact.nodeId !== null) return { kind: 'node', nodeId: fact.nodeId, label: chatCopy.openSupplier(fact.subject ?? '') }
   if (fact.auditId !== null) return { kind: 'audit', label: chatCopy.openAudit }
   return null
+}
+
+/** How an answer is labelled: a fixed sentence from the data, the AI's sentence with values from the data, or general. */
+export type AnswerKind = 'fromData' | 'aiData' | 'aiGeneral'
+
+/** The tag over an answer and what it means on hover; an AI answer with no value from the data is general. */
+export function answerTag(answer: ChatAnswer, fromData: boolean): { kind: AnswerKind; label: string; help: string } {
+  if (fromData) return { kind: 'fromData', label: FROM_YOUR_DATA, help: chatCopy.fromDataHelp }
+  if (answer.facts.length === 0) return { kind: 'aiGeneral', label: AI_GENERAL, help: chatCopy.generalHelp }
+  return { kind: 'aiData', label: AI_WRITTEN, help: chatCopy.aiWrittenHelp }
 }

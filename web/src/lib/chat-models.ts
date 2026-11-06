@@ -2,9 +2,9 @@ import type { ChatModels, ChatModelView } from '@/api/client'
 import { chatCopy } from '@/copy/chat'
 
 // The chat's model choice (F13). "Automatic" sends no model, so the server asks its chat models in order (AI_CHAT_MODELS,
-// else AI_MODELS); a chosen model answers alone. The list is the server's: a model without its key is listed but cannot
-// be chosen, and says why; the local Ollama server's other models follow, asked only when picked. Whichever model writes
-// the sentence, the API fills every value in from the data.
+// else AI_MODELS), or its first local model while none of those is ready; a chosen model answers alone. The list is the
+// server's: a model without its key is listed but cannot be chosen, and says why; the local Ollama server's other
+// models follow, asked only when picked. Whichever model writes the sentence, the API fills every value in from the data.
 
 /** The select's value for "Automatic". */
 export const AUTO = 'auto'
@@ -56,14 +56,17 @@ export function modelToSend(selected: string, list: ChatModels | null): string |
   return list.models.some((m) => m.id === selected && m.ready) ? selected : null
 }
 
-/** The line under the picker: what the choice does, or why Automatic has nothing to ask. */
+/**
+ * The line under the picker: which models Automatic asks, by name, or why it has nothing to ask. While no model of the
+ * server's own is ready, the server marks the first local model for Automatic, so it is named here.
+ */
 export function modelNote(list: ChatModels | null, sent: string | null): string {
   if (list === null) return chatCopy.models.loading
   if (!list.available) return chatCopy.models.serviceDown
   if (sent !== null) return chatCopy.models.aloneHelp
   const automatic = list.models.filter((m) => m.automatic)
-  if (automatic.some((m) => m.ready)) return chatCopy.models.autoHelp
-  if (list.models.some((m) => !m.automatic && m.ready)) return chatCopy.models.pickLocal
+  const ready = automatic.filter((m) => m.ready).map(modelName)
+  if (ready.length > 0) return chatCopy.models.autoHelp(ready)
   return automatic.length === 0 ? chatCopy.models.none : chatCopy.models.noneReady
 }
 

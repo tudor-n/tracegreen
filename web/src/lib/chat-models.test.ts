@@ -30,7 +30,7 @@ describe('modelOptions', () => {
       auto,
       groups: [
         {
-          label: 'Set up for Automatic',
+          label: 'Used by Automatic',
           options: [
             { value: 'anthropic:claude-x', label: 'Anthropic · claude-x (not set up: ANTHROPIC_API_KEY not set)', disabled: true },
             { value: 'ollama:ministral-3:3b', label: 'Ollama (local) · ministral-3:3b', disabled: false },
@@ -63,14 +63,16 @@ describe('modelToSend', () => {
 })
 
 describe('modelNote', () => {
-  it('says what the choice does', () => {
-    expect(modelNote(list, null)).toMatch(/^Automatic asks each ready model/)
-    expect(modelNote(list, 'ollama:qwen2.5:14b')).toMatch(/^Only this model is asked/)
+  it('names what Automatic asks, or says a picked model is asked alone', () => {
+    expect(modelNote(list, null)).toBe('Automatic asks Ollama (local) · ministral-3:3b.')
+    const two = { available: true, models: [model({ id: 'openai:a', provider: 'openai', model: 'a' }), configuredLocal] }
+    expect(modelNote(two, null)).toBe('Automatic asks OpenAI · a, then Ollama (local) · ministral-3:3b, until one answers.')
+    expect(modelNote(list, 'ollama:qwen2.5:14b')).toBe('Only this model is asked.')
   })
 
-  it('points to the local models when Automatic has nothing ready', () => {
-    expect(modelNote({ available: true, models: [found] }, null)).toMatch(/^Automatic has no model set up yet.*Pick a local model/)
-    expect(modelNote({ available: true, models: [cloud, found] }, null)).toMatch(/Pick a local model/)
+  it('names the local model the server marked for Automatic while no model of its own is ready', () => {
+    const fallback = { ...found, automatic: true }
+    expect(modelNote({ available: true, models: [cloud, fallback] }, null)).toBe('Automatic asks Ollama (local) · qwen2.5:14b.')
   })
 
   it('says why there is nothing to choose', () => {

@@ -7,8 +7,7 @@ import { ExplainedTag, PageMessage } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { chatCopy, type TemplateId } from '@/copy/chat'
-import { AI_WRITTEN, FROM_YOUR_DATA } from '@/copy/labels'
-import { factLabel, factLink, factValue } from '@/lib/chat-display'
+import { answerTag, factLabel, factLink, factValue } from '@/lib/chat-display'
 import { AUTO, answeredBy, modelToSend } from '@/lib/chat-models'
 import { chatReducer, historyOf, initialChat, isPending, type Turn } from '@/lib/chat-state'
 import { templateAnswer } from '@/lib/chat-templates'
@@ -182,7 +181,7 @@ function TurnView({
         <AnswerView answer={state.answer} fromData={state.fromData} onLink={onLink} by={answeredBy(state.answer.provider, models)} />
       )}
       {state.phase === 'notAnswered' && (
-        <Suggestions heading={chatCopy.notAnswered} sub={chatCopy.tryThese} onPick={onPick} disabled={pending} />
+        <Suggestions heading={chatCopy.notAnswered} sub={chatCopy.notAnsweredSub} onPick={onPick} disabled={pending} />
       )}
       {state.phase === 'unavailable' && <Suggestions heading={chatCopy.unavailable} onPick={onPick} disabled={pending} />}
       {state.phase === 'error' && (
@@ -207,10 +206,11 @@ function AnswerView({
   by: string | null
 }) {
   const byId = new Map(answer.facts.map((f) => [f.id, f]))
+  const tag = answerTag(answer, fromData)
   return (
-    <div data-testid="chat-answer" data-provider={answer.provider} className="flex flex-col gap-2.5 rounded-2xl bg-grouped p-3.5">
+    <div data-testid="chat-answer" data-provider={answer.provider} data-kind={tag.kind} className="flex flex-col gap-2.5 rounded-2xl bg-grouped p-3.5">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <ExplainedTag help={fromData ? chatCopy.fromDataHelp : chatCopy.aiWrittenHelp}>{fromData ? FROM_YOUR_DATA : AI_WRITTEN}</ExplainedTag>
+        <ExplainedTag help={tag.help}>{tag.label}</ExplainedTag>
         {!fromData && by !== null && <span className="text-[11px] text-muted-foreground">{chatCopy.models.writtenBy(by)}</span>}
       </div>
       <p className="text-sm leading-relaxed break-words">

@@ -5,8 +5,9 @@ export const chatCopy = {
   open: 'Ask',
   title: 'Ask about your data',
   close: 'Close the chat',
-  intro: 'Answers come from the data in this workspace. Every value is filled in from your data, never by the AI.',
-  placeholder: 'Ask about suppliers, emissions or the audit log',
+  intro:
+    'Ask about your suppliers and emissions, or for help with TraceGreen. Every value in an answer is filled in from your data, never by the AI.',
+  placeholder: 'Ask anything about your suppliers and emissions',
   inputLabel: 'Your question',
   send: 'Ask',
   sending: 'Checking your data…',
@@ -15,7 +16,11 @@ export const chatCopy = {
   aiWrittenHelp:
     'An AI wrote this sentence. Every value in it was filled in from your data, and its claims were checked against the data before it was shown.',
   fromDataHelp: 'Answered from your data with a fixed sentence; no AI was involved.',
-  notAnswered: "I couldn't answer that from the data.",
+  generalHelp:
+    'An AI wrote this from what TraceGreen does and general knowledge. It holds no value from your data; ask about a supplier or a figure to get one.',
+  /** When no model gave an answer that passed the checks, even after being told why: what to do instead. */
+  notAnswered: 'Here is what I can show you from your data right away:',
+  notAnsweredSub: 'Or ask it another way, for example about one supplier.',
   unavailable: "The AI isn't available right now. These questions are answered from your data:",
   tooLong: (max: number) => `Ask in ${max} characters or fewer.`,
   /** The chip's accessible name and tooltip: what the value is and whose. */
@@ -79,14 +84,14 @@ export const chatCopy = {
     label: 'Model',
     auto: 'Automatic',
     loading: 'Looking for models…',
-    autoHelp: 'Automatic asks each ready model in turn until one answers.',
-    aloneHelp: 'Only this model is asked; if it cannot answer, the question is not answered.',
+    /** What Automatic asks, by name: one model, or several in turn. */
+    autoHelp: (names: readonly string[]) =>
+      names.length === 1 ? `Automatic asks ${names[0]}.` : `Automatic asks ${names.join(', then ')}, until one answers.`,
+    aloneHelp: 'Only this model is asked.',
     none: 'No AI model is set up or found on this server (AI_CHAT_MODELS, AI_MODELS or Ollama). The suggested questions still work.',
     noneReady: 'No model has its key on this server yet. The suggested questions still work.',
-    /** Nothing ready for Automatic, but the local model server has models to pick. */
-    pickLocal: 'Automatic has no model set up yet (AI_CHAT_MODELS or AI_MODELS). Pick a local model, or ask a suggested question.',
     /** The picker's groups: the models Automatic asks, in its order, and the local server's others, asked only when picked. */
-    autoGroup: 'Set up for Automatic',
+    autoGroup: 'Used by Automatic',
     localGroup: 'Local models (Ollama)',
     serviceDown: "The AI service isn't answering. The suggested questions still work.",
     /** A listed model that cannot answer yet, with the server's reason (e.g. its key is not set). */

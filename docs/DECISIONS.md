@@ -185,6 +185,14 @@ The dashboard side (ticket 2, on `b/f6-review-dashboard`):
 - **The suggested questions are answered in the SPA from the store, without the AI**, labelled "From your data": instant, exact, and still there when no model is — cost if wrong: none.
 - **The panel sits where the side panel sits and covers it**; closing it brings the side panel back as it was, and picking a supplier from an answer closes it. The conversation lives while the app is open and is never stored — cost if wrong: none.
 - **Separate budgets for the longer calls** (`AI_CHAT_TIMEOUT_MS` 20 s in the API, `AI_CHAT_TIMEOUT_S` 15 s and `AI_LONG_MODEL_TIMEOUT_S` 12 s per model in the service, on their own HTTP client), so the 10 s classification path stays as it is — cost if wrong: env values.
+- **A free chat, data first (2026-11-06, the user's choice over facts-only answers).** The chat answers every message: the buyer's data first, and also help ("I need help", "hello"), how TraceGreen works, what a term means and general advice. It no longer says "I couldn't answer that from the data". What stays: no figure or name from the data passes through a model. Values and names are still `{{factId}}` placeholders the API fills in, and every rule of `AnswerCheck` still holds. The changes:
+  - **General answers.** An answer may cite no fact when it is general. It is labelled "AI-written · general, no values from your data", and it may type no digit (CO2e and Scope 1–3 excepted), no name from the data and no company.
+  - **Uncited claims.** A sentence that claims something about the buyer's data in its own words ("your largest supplier…", "most of it…", "your suppliers are estimated") must cite a fact. That keeps the old refusal of "Most of it is estimated."
+  - **Two retries.** An answer that breaks a rule goes back to the same model once with the rule and what to do instead, in the AI service for its cheap checks and in the API for the rest. A long answer that still fails is shown without its one false sentence when that is enough. Only then does the reader get the suggested questions.
+  - **Rank claims read as meant.** "Second largest" means S2, "the next largest" the one after the supplier named before, and "the largest estimated emitter" the largest of that status. A status after the verb ("…, which is estimated") is checked as said of that supplier.
+  - **Automatic needs no setup.** While no model of the chat's own is ready, Automatic asks the first local Ollama model, so the facts stay on the machine.
+
+  Cost if wrong: back to facts-only answers by restoring the "no fact cited" rule; the rest stays.
 
 ## PDF invoice import (F9, 2026-11-06)
 

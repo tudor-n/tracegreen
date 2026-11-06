@@ -32,6 +32,8 @@ export const uncertaintyLabel = {
 export const AI_MAPPED = 'AI-mapped'
 /** The label on a chat answer the AI wrote (F13): the sentence is the AI's, every value in it is the data's. */
 export const AI_WRITTEN = 'AI-written · values from your data'
+/** The label on a chat answer the AI wrote with no value from the data in it: help, a term, general advice. */
+export const AI_GENERAL = 'AI-written · general, no values from your data'
 /** The label on a chat answer given with a fixed sentence, without the AI. */
 export const FROM_YOUR_DATA = 'From your data'
 /** CLAUDE.md: the label on every alternative the AI suggested. */
