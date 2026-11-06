@@ -31,6 +31,8 @@ The Postgres repository contract runs only when `DATABASE_URL` is set. Create a 
 
 `web/e2e/demo-path.spec.ts` walks the demo path against the running stack: reset → load the demo invoice (N1 ESTIMATED) → request a link → a phone-sized page answers Air + Grid → N1 is VERIFIED on the dashboard within 2 s of the submit → the same link says "already used" → simulator: Sea is `win-win`, N1-alt is `premium` or `below-ets`, Apply leaves N1 as it is → the audit chain is valid → no Content Security Policy violation on either page. It starts no server, and it resets the demo workspace first, so do not run it while someone is using the stack.
 
+Since the classification review (F6), a step between the simulator and the audit chain: the Overview counts 3 categories to check (N3, N4 and N5 come from the AI cache), the counter opens the filtered list, N4 shows the flag, "Change category" → Printed circuit boards clears it, names the buyer as the category's source, and moves N4's figure and the Overview's total, and the counter drops to 2. The audit check after it covers the review's `classification.reviewed` entry.
+
 1. Bring the stack up (`docker compose up`, see above) and wait until `curl -s localhost:8080/api/health` answers.
 2. Once per machine: `cd web && pnpm exec playwright install chromium` (a browser download, not a package).
 3. `cd web && pnpm e2e`. A run takes about 7 s.
@@ -56,6 +58,7 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 | Audit log screen (`/audit`) | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
 | Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-terms-link` (its link to `/terms/supplier`), `verify-submit` |
 | Terms page | `terms-page` with `data-phase` and `data-version` |
+| Classification review (F6) | `nav-overview` (the sidebar's Overview link); `overview-checks` with `data-count` (the Overview's counter); `suppliers-filter` and `suppliers-filter-clear` (the filtered list); `node-<id>-check` (the flag on a tree row); `drawer-check` (the flag in the side panel), `drawer-figure`, `drawer-category-source`; `review-control` with `data-review`, `review-line`, `review-confirm`, `review-change`, `review-option-<categoryId>`, `review-error` |
 | Supplier page list (F12) | `supplier-page` with `data-phase` and `data-result`; `delivery-<nodeId>` with `data-status`; `delivery-<nodeId>-open`, `delivery-<nodeId>-transport-<mode>` and `delivery-<nodeId>-energy-<source>` with `aria-pressed`, `delivery-<nodeId>-confirm`; `supplier-terms` (the page's one terms checkbox, shown while a delivery is open for answers) and `supplier-terms-link` |
 
 ## Demo laptop (production images)
