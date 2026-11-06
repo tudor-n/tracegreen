@@ -23,5 +23,50 @@
     "listId": "CPV",
     "prefix": "3122",
     "categoryId": "connectors"
+  },
+  {
+    "listId": "HS",
+    "prefix": "7907",
+    "categoryId": "zinc_diecast"
+  },
+  {
+    "listId": "HS",
+    "prefix": "8534",
+    "categoryId": "pcb"
+  },
+  {
+    "listId": "HS",
+    "prefix": "854430",
+    "categoryId": "wire_harness"
+  },
+  {
+    "listId": "HS",
+    "prefix": "854442",
+    "categoryId": "wire_harness"
+  },
+  {
+    "listId": "HS",
+    "prefix": "481910",
+    "categoryId": "packaging_paper"
+  },
+  {
+    "listId": "HS",
+    "prefix": "481920",
+    "categoryId": "packaging_paper"
+  },
+  {
+    "listId": "HS",
+    "prefix": "853669",
+    "categoryId": "connectors"
+  },
+  {
+    "listId": "HS",
+    "prefix": "853670",
+    "categoryId": "connectors"
+  },
+  {
+    "listId": "HS",
+    "prefix": "392690",
+    "categoryId": "plastics"
   }
 ]
