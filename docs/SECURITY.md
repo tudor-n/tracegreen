@@ -41,7 +41,9 @@ The node id is read from the token before the signature is checked, unauthentica
 
 ## Supplier page (C7)
 
-`/verify/:nodeId` asks two questions (transport mode, energy source) and an optional mass. It sets no cookies and has no login, email field, camera or clipboard access. The context it receives holds the supplier and buyer names, the invoice number and date, the dominant line's description, the lane and the answer options. It holds nothing personal, no nonce and no address.
+`/verify/:nodeId` asks two questions (transport mode, energy source) and an optional mass. It sets no cookies and has no login, email field, camera or clipboard access. The context it receives holds the supplier and buyer names, the invoice number and date, the dominant line's description, the lane, the answer options and the Supplier Terms' checkbox statement with their version and SHA-256. It holds nothing personal, no nonce and no address.
+
+Before submitting, the supplier ticks the Supplier Terms (`seed/supplier-terms.json`; reasoning in `docs/legal/README.md`). The submit carries the terms' SHA-256 from the context, and anything else is 422 `TermsNotAccepted`. The version and SHA-256 are stored on the verification row and in its audit entry. The printable copy at `/terms/supplier` (`GET /api/terms/supplier`) is public text: no token, no rate limit, nothing personal. The supplier page links to it in a new tab, so a printout never carries the link's token.
 
 All text from an invoice is untrusted. React renders it as text, and `dangerouslySetInnerHTML` is a lint error (`react/no-danger` in oxlint).
 
@@ -53,6 +55,7 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - **Reusable until it expires** (`LINK_TTL_SECONDS`, 7 days by default), because it opens a list rather than one answer. Each answer sent from the page mints a fresh single-use `v1.` link for that delivery and submits it through `VerifyService`. Single use, the invoice-hash check, the verification row and the audit entries (`link.requested` by actor `portal`, then `verification.submitted`) are therefore those of the phone page.
 - **No overwrite:** an answer for a delivery that is already VERIFIED is 409 `AlreadyConfirmed`, so a forwarded link cannot change supplier-confirmed data. The page also passes the delivery's status and answers as it read them, and the repository compares them under the same lock or transaction as the write (`NodeAnswerState`, both adapters). Of several answers sent at once, one lands and the others get 409 `DeliveryChanged` with nothing written (tested with 8 concurrent answers over HTTP and 10 against each repository).
 - **Answers only accumulate:** a question skipped on this page keeps the answer the delivery already has, so a PARTIAL delivery cannot lose its confirmed half through the reusable link. The phone page is unchanged: each of its submits is a whole answer set.
+- **Supplier Terms:** the page asks for them as the phone page does, with one unticked checkbox above the list (the same statement and link to `/terms/supplier`, which opens in a new tab without the token). The supplier ticks it once per page visit; every answer carries the terms' SHA-256 from the view, anything else is 422 `TermsNotAccepted` before a link is minted, and the verification row and its audit entry record the version and SHA-256. The page never ticks the box, and a reloaded page or a list with other terms starts unticked.
 - **Scope:** "the supplier" is every node in the anchor node's workspace whose invoice carries the anchor invoice's seller tax id (compared within its country, or by name when an invoice has no tax id). Another supplier's delivery answers 404 `NodeNotFound`, exactly like one that does not exist.
 - **The risk it leaves:** whoever holds the link can answer that supplier's open deliveries until it expires, just as whoever holds a phone link can answer its one delivery. The expiry, the 409, the audit trail of every answer and the rate limit below bound it.
 - **Where the token travels:** in request bodies (`POST /api/portal/view`, `POST /api/portal/answer`), so no API URL carries it. The page URL carries it the way `/verify` does, and nginx logs `$uri` alone. `portal.requested` names the node and the expiry, never the token. A test checks that the signature reaches no log line, response body or audit payload.
@@ -66,6 +69,7 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 | A delivery that is not this supplier's | 404 | `NodeNotFound` |
 | A delivery that is already VERIFIED | 409 | `AlreadyConfirmed` |
 | Another answer to the same delivery landed between the page's read and this write | 409 | `DeliveryChanged` |
+| The answer does not carry the current Supplier Terms' SHA-256 | 422 | `TermsNotAccepted` |
 | More than 3 × `RATE_LIMIT_PER_MIN` calls a minute from one address | 429 | `RateLimited` |
 
 ## Rate limiting and forwarded headers (C5)
@@ -94,7 +98,7 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - **Row-level security** is enabled on `invoices`, `nodes`, `verifications`, `scenarios` and `audit_log` (migration `Rls`). The application connects as the table owner and bypasses it. Any other role, such as a hosted anon role, sees nothing until policies exist.
 - **Append-only audit log**: a trigger rejects every `UPDATE` and `DELETE` on `audit_log`. The demo reset uses `TRUNCATE`, which row triggers do not see; the demo is single-tenant.
 - **Hash chain** (`Domain/Audit/AuditChain.cs`): each entry's hash is `SHA-256(prevHash + canonicalJson({ts, actor, action, payload}))`, chained from a genesis hash of 64 zeros, with timestamps normalised to UTC milliseconds. Editing, reordering or deleting an entry breaks every later hash. `POST /api/audit/verify` recomputes the chain and returns `{ valid, length, brokenAt }`, and the audit panel shows the result. Postgres also keeps `(workspace_id, prev_hash)` unique, so two writers cannot fork the chain.
-- **Audit payloads** hold ids, the expiry, the answers and the warnings. They hold no token, nonce or address.
+- **Audit payloads** hold ids, the expiry, the answers, the warnings and the accepted terms' version and SHA-256 (with `simulated: true` when the demo tool answered). They hold no token, nonce or address.
 - **Client address**: a verification row stores `Hashing.IpHash`, keyed with a key derived from `LINK_SECRET` (`"ip-hash:" + secret`), never the address itself.
 
 ## Browser headers (C6)

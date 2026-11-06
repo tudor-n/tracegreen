@@ -2,22 +2,31 @@ import { useEffect, useReducer } from 'react'
 import { useSearchParams } from 'react-router'
 import { DeliveryCard } from '@/components/supplier/DeliveryCard'
 import { Button } from '@/components/ui/button'
+import { LanguageHeader } from '@/components/verify/LanguageHeader'
 import { ResultMessage } from '@/components/verify/ResultMessage'
-import { dashboardTitle } from '@/copy/dashboard'
+import { TermsConsent } from '@/components/verify/TermsConsent'
 import { supplierCopy } from '@/copy/supplier'
 import { type Lang, verifyCopy } from '@/copy/verify'
 import { supplierApi } from '@/lib/supplier-api'
-import { answerBody, confirmedCount, initialSupplierState, supplierReducer } from '@/lib/supplier-state'
+import {
+  answerBody,
+  confirmedCount,
+  initialSupplierState,
+  isOpenForAnswers,
+  supplierReducer,
+  termsAccepted,
+} from '@/lib/supplier-state'
 import { resolveLang } from '@/lib/verify-state'
 
 // The supplier page (F12): one link, every delivery from this supplier to the buyer who sent it, each confirmed with the
-// two questions of /verify. It reads the token from ?t= and the language from ?lang=. Like /verify it sets no cookies
+// two questions of /verify and sent once the supplier ticked the supplier terms: one box above the list, never ticked
+// for them, as on /verify. It reads the token from ?t= and the language from ?lang=. Like /verify it sets no cookies
 // and uses no storage, login, email, camera, clipboard or personal data, and nothing here logs the URL or the token.
 // Strings come from web/src/copy/supplier.ts (and the questions from ./verify.ts), the decisions from
 // web/src/lib/supplier-state.ts and the requests from web/src/lib/supplier-api.ts; this page performs and renders them.
 
 export default function Supplier() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const token = params.get('t')
   const lang = resolveLang(params.get('lang'))
   const copy = supplierCopy[lang]
@@ -42,13 +51,15 @@ export default function Supplier() {
     }
   }, [wantsList, token])
 
-  // The open delivery's answers, once per send: the reducer marks the draft as sending once and ignores taps until it ends.
+  // The open delivery's answers, once per send: the reducer marks the draft as sending once and ignores taps until it ends,
+  // and sends nothing unless the box is ticked for the terms on screen, whose SHA-256 goes with the answers.
   const sending = state.phase === 'ready' && state.draft?.sending === true ? state.draft : null
+  const accepted = state.phase === 'ready' ? state.accepted : null
   useEffect(() => {
-    if (sending === null || token === null) return
+    if (sending === null || token === null || accepted === null) return
     let current = true
     const { nodeId } = sending
-    void supplierApi.answer(answerBody(token, sending)).then((reply) => {
+    void supplierApi.answer(answerBody(token, sending, accepted)).then((reply) => {
       if (!current) return
       dispatch(
         reply.ok
@@ -59,18 +70,9 @@ export default function Supplier() {
     return () => {
       current = false
     }
-  }, [sending, token])
+  }, [sending, token, accepted])
 
-  const other: Lang = lang === 'ro' ? 'en' : 'ro'
-  const switchLanguage = () =>
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        next.set('lang', other)
-        return next
-      },
-      { replace: true },
-    )
+  const ticked = state.phase === 'ready' && termsAccepted(state)
 
   return (
     <main
@@ -79,17 +81,7 @@ export default function Supplier() {
       data-result={state.phase === 'failed' ? state.failure : undefined}
       className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-4 py-5"
     >
-      <header className="flex items-center justify-between gap-3">
-        <span className="text-base font-semibold tracking-wide">{dashboardTitle}</span>
-        <button
-          type="button"
-          onClick={switchLanguage}
-          className="min-h-12 rounded-xl border-2 border-border px-4 text-base font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <span className="sr-only">{questions.language.switchLabel}: </span>
-          <span lang={other}>{questions.language.switchTo}</span>
-        </button>
-      </header>
+      <LanguageHeader lang={lang} />
 
       {state.phase === 'loading' && (
         <p role="status" aria-busy="true" className="py-16 text-center text-lg text-muted-foreground">
@@ -106,6 +98,19 @@ export default function Supplier() {
             </p>
             <p className="text-base">{copy.intro}</p>
           </div>
+
+          {/* One box for the page, shown while a delivery is still open for answers; each answer carries its SHA-256. */}
+          {state.view.items.some(isOpenForAnswers) && (
+            <TermsConsent
+              acceptance={state.view.terms[lang]}
+              lang={lang}
+              accepted={ticked}
+              disabled={state.draft?.sending === true}
+              copy={questions.terms}
+              onChange={(value) => dispatch({ kind: 'terms', accepted: value })}
+              testId="supplier-terms"
+            />
+          )}
 
           {state.view.items.length === 0 ? (
             <p role="status" className="rounded-xl border bg-card p-6 text-center text-lg text-muted-foreground">
@@ -124,6 +129,7 @@ export default function Supplier() {
                     questions={questions}
                     draft={draft}
                     busy={state.draft?.sending === true}
+                    termsAccepted={ticked}
                     warnings={state.warnings[item.nodeId]}
                     onOpen={() => dispatch({ kind: 'open', nodeId: item.nodeId })}
                     onClose={() => dispatch({ kind: 'close' })}

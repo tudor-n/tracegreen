@@ -3,8 +3,10 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
+using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
+using TraceGreen.Domain.Seed;
 
 namespace TraceGreen.Tests.Api;
 
@@ -83,8 +85,15 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
         return await Json(response);
     }
 
-    private Task<HttpResponseMessage> Answer(string? token, Guid nodeId, string? mode = "road", string? energy = "grid") =>
-        _client.PostAsJsonAsync("/api/portal/answer", new { t = token, nodeId, transportMode = mode, energySource = energy }, Ct);
+    private SupplierTerms Terms => _factory.Services.GetRequiredService<SeedBundle>().SupplierTerms;
+
+    /// <summary>Sends the current terms' SHA-256 unless <paramref name="acceptTerms"/> is false; <paramref name="terms"/> sends another value.</summary>
+    private Task<HttpResponseMessage> Answer(
+        string? token, Guid nodeId, string? mode = "road", string? energy = "grid", bool acceptTerms = true, string? terms = null) =>
+        _client.PostAsJsonAsync(
+            "/api/portal/answer",
+            new { t = token, nodeId, transportMode = mode, energySource = energy, acceptedTerms = terms ?? (acceptTerms ? Terms.Sha256 : null) },
+            Ct);
 
     private static JsonElement ItemOf(JsonElement view, Guid nodeId) =>
         view.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("nodeId").GetGuid() == nodeId);
@@ -297,6 +306,57 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
 
         await AssertProblem(await Answer(token, N2, "sea", "renewable"), HttpStatusCode.Conflict, "AlreadyConfirmed");
         Assert.Equal(EnergySource.Grid, (await Repo.GetNodeAsync(Ctx, N2, Ct))!.EnergySource);
+    }
+
+    [Fact]
+    public async Task TheViewCarriesTheSupplierTermsLikeThePhonePage()
+    {
+        await Reset();
+        var terms = (await ViewOk(await Token(N3))).GetProperty("terms");
+
+        Assert.Equal(Terms.Version, terms.GetProperty("version").GetString());
+        Assert.Equal(Terms.Sha256, terms.GetProperty("sha256").GetString());
+        Assert.Equal(Terms.Ro.Acceptance.Link, terms.GetProperty("ro").GetProperty("link").GetString());
+        Assert.Equal(Terms.En.Acceptance.Before, terms.GetProperty("en").GetProperty("before").GetString());
+    }
+
+    [Fact]
+    public async Task AnAnswerRecordsTheAcceptedTermsAsAPersonsAcceptance()
+    {
+        await Reset();
+        var token = await Token(N3);
+
+        Assert.Equal(HttpStatusCode.OK, (await Answer(token, N3, "road", "renewable")).StatusCode);
+
+        var verification = Assert.Single(await Repo.ListVerificationsAsync(Ctx, N3, Ct));
+        Assert.Equal(Terms.Version, verification.TermsVersion);
+        Assert.Equal(Terms.Sha256, verification.TermsSha256);
+        var audit = await Repo.ListAuditAsync(Ctx, 0, 1000, Ct);
+        var entry = audit[^1];
+        Assert.Equal("verification.submitted", entry.Action);
+        Assert.Equal(Terms.Version, entry.Payload["termsVersion"]!.GetValue<string>());
+        Assert.Equal(Terms.Sha256, entry.Payload["termsSha256"]!.GetValue<string>());
+        Assert.Null(entry.Payload["simulated"]);
+        Assert.True(AuditChain.Verify(audit).Valid);
+    }
+
+    [Fact]
+    public async Task AnAnswerWithoutTheCurrentTermsIs422AndRecordsNothing()
+    {
+        await Reset();
+        var token = await Token(N3);
+        var length = (await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Count;
+        var seq = Bus.LastSeq(Ids.DemoWorkspace);
+
+        await AssertProblem(await Answer(token, N3, acceptTerms: false), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+        await AssertProblem(await Answer(token, N3, terms: new string('0', 64)), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+
+        Assert.Equal(NodeStatus.Estimated, (await Repo.GetNodeAsync(Ctx, N3, Ct))!.Status);
+        Assert.Empty(await Repo.ListVerificationsAsync(Ctx, N3, Ct));
+        Assert.Equal(length, (await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Count);
+        Assert.Equal(seq, Bus.LastSeq(Ids.DemoWorkspace));
+        // The terms are asked after "already confirmed", as the phone page asks them after "already used".
+        await AssertProblem(await Answer(await Token(N2), N2, acceptTerms: false), HttpStatusCode.Conflict, "AlreadyConfirmed");
     }
 
     [Fact]

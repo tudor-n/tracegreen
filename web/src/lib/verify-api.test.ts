@@ -2,6 +2,7 @@ import createClient from 'openapi-fetch'
 import { describe, expect, it } from 'vitest'
 import type { VerifyContext } from '@/api/client'
 import type { paths } from '@/api/schema'
+import { verifyTerms } from './test-fixtures'
 import { createVerifyApi } from './verify-api'
 
 const context: VerifyContext = {
@@ -19,6 +20,7 @@ const context: VerifyContext = {
   defaultEnergy: 'grid',
   massT: 2.3,
   expiresAt: '2026-11-05T12:00:00Z',
+  terms: verifyTerms,
 }
 
 /** A client whose fetch is `handler`, recording every request it sends. */
@@ -88,7 +90,7 @@ describe('submit', () => {
     const outcome = { nodeId: context.nodeId, status: 'PARTIAL', warnings: [] }
     const { verify, sent } = apiWith(() => json(200, outcome))
 
-    const body = { t: 'v1.abc', transportMode: 'sea' as const, energySource: null }
+    const body = { t: 'v1.abc', transportMode: 'sea' as const, energySource: null, acceptedTerms: verifyTerms.sha256 }
     expect(await verify.submit(body)).toEqual({ ok: true, data: outcome })
     expect(sent[0].method).toBe('POST')
     expect(new URL(sent[0].url).pathname).toBe('/api/verify')
@@ -103,6 +105,13 @@ describe('submit', () => {
     expect(await apiWith(() => problem(422, 'InvalidAnswer')).verify.submit({ t: 'v1.abc' })).toEqual({
       ok: false,
       failure: 'invalid',
+    })
+  })
+
+  it('maps refused terms to "the terms have been updated"', async () => {
+    expect(await apiWith(() => problem(422, 'TermsNotAccepted')).verify.submit({ t: 'v1.abc' })).toEqual({
+      ok: false,
+      failure: 'termsChanged',
     })
   })
 })

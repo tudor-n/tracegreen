@@ -3,9 +3,10 @@ import type { DeliveryFailure, PageFailure } from '@/lib/supplier-state'
 import { type Lang, verifyCopy } from './verify'
 
 // Every string the supplier reads on /supplier (F12), in Romanian (the default) and English. The questions, their
-// answers, "skip" and the "please reconfirm" lines are those of /verify (./verify.ts), so a supplier who used the phone
-// page reads the same words here. Both languages are typed by SupplierStrings, so a string missing in either one fails
-// `pnpm typecheck`; the status record is keyed by the generated enum, so a new status does too.
+// answers, "skip", the frame around the supplier terms and the "please reconfirm" lines are those of /verify
+// (./verify.ts; the terms' own text comes from the API), so a supplier who used the phone page reads the same words
+// here. Both languages are typed by SupplierStrings, so a string missing in either one fails `pnpm typecheck`; the
+// status record is keyed by the generated enum, so a new status does too.
 
 interface Message {
   title: string
@@ -56,6 +57,7 @@ export const supplierCopy = {
     },
     deliveryFailures: {
       changed: 'Această livrare s-a schimbat între timp. Reîncărcați lista.',
+      termsChanged: 'Termenii au fost actualizați. Citiți versiunea nouă și bifați din nou caseta de mai sus, apoi trimiteți.',
       rateLimited: ro.results.rateLimited.body,
       offline: ro.results.offline.body,
     },
@@ -83,6 +85,7 @@ export const supplierCopy = {
     },
     deliveryFailures: {
       changed: 'This delivery changed in the meantime. Reload the list.',
+      termsChanged: 'The terms have been updated. Read the new version and tick the box above again, then send.',
       rateLimited: en.results.rateLimited.body,
       offline: en.results.offline.body,
     },

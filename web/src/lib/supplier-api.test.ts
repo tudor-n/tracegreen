@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest'
 import type { PortalView } from '@/api/client'
 import type { paths } from '@/api/schema'
 import { createSupplierApi } from './supplier-api'
+import { verifyTerms } from './test-fixtures'
 
 const view: PortalView = {
   supplierLabel: 'Oradea Harness SRL',
   buyerName: 'Transilvania Electro-Assembly SRL',
   expiresAt: '2026-11-13T12:00:00Z',
   items: [],
+  terms: verifyTerms,
 }
 
 /** A client whose fetch is `handler`, recording every request it sends. */
@@ -69,9 +71,15 @@ describe('view', () => {
 })
 
 describe('answer', () => {
-  const body = { t: 'p1.abc', nodeId: '11111111-1111-4111-8111-000000000003', transportMode: 'road', energySource: null } as const
+  const body = {
+    t: 'p1.abc',
+    nodeId: '11111111-1111-4111-8111-000000000003',
+    transportMode: 'road',
+    energySource: null,
+    acceptedTerms: verifyTerms.sha256,
+  } as const
 
-  it('posts the answers and returns the outcome with the list as it now is', async () => {
+  it('posts the answers with the accepted terms and returns the outcome with the list as it now is', async () => {
     const result = { outcome: { nodeId: body.nodeId, status: 'PARTIAL', warnings: [] }, view }
     const { supplier, sent } = apiWith(() => json(200, result))
 
@@ -85,6 +93,7 @@ describe('answer', () => {
     [409, 'DeliveryChanged', 'changed'],
     [404, 'NodeNotFound', 'changed'],
     [422, 'InvalidAnswer', 'changed'],
+    [422, 'TermsNotAccepted', 'termsChanged'],
     [401, 'InvalidToken', 'invalid'],
   ])('maps %i %s to %s', async (status, code, failure) => {
     const { supplier } = apiWith(() => problem(status, code))

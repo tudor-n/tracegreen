@@ -12,9 +12,12 @@ namespace TraceGreen.Domain.Services;
 /// <summary>
 /// Mapped to HTTP by the portal endpoints: <see cref="InvalidToken"/> 401, <see cref="Expired"/> and
 /// <see cref="SupplierGone"/> 410, <see cref="NodeNotFound"/> 404, <see cref="AlreadyConfirmed"/> and
-/// <see cref="DeliveryChanged"/> 409, <see cref="InvalidAnswer"/> 422.
+/// <see cref="DeliveryChanged"/> 409, <see cref="InvalidAnswer"/> and <see cref="TermsNotAccepted"/> 422.
 /// </summary>
-public enum PortalErrorCode { InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, DeliveryChanged, InvalidAnswer }
+public enum PortalErrorCode
+{
+    InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, DeliveryChanged, InvalidAnswer, TermsNotAccepted,
+}
 
 public sealed record PortalError(PortalErrorCode Code, string Message);
 
@@ -24,7 +27,9 @@ public sealed record PortalError(PortalErrorCode Code, string Message);
 /// anchored on one node, and "the supplier" is everyone with the anchor invoice's seller tax id in the anchor's workspace.
 /// An answer goes the way <see cref="DemoService.SimulateAnswerAsync"/> goes: a fresh single-use verification link for
 /// that node, submitted through <see cref="VerifyService"/>. So validation, status, plausibility, the verification row,
-/// the audit entries and the <c>node.verified</c> event are those of an answer from the phone page.
+/// the audit entries and the <c>node.verified</c> event are those of an answer from the phone page, and so is the rule
+/// that an answer carries the SHA-256 of the supplier terms the supplier ticked (the view carries them, as the phone
+/// page's context does); the verification row records their version and SHA-256.
 /// Two rules keep a reusable link from undoing what a supplier confirmed: a question skipped here keeps the answer the
 /// delivery already has, and the answer is recorded only if the delivery is still as this page read it (checked under the
 /// repository's lock), so of two answers sent at once the second gets <see cref="PortalErrorCode.DeliveryChanged"/>.
@@ -86,9 +91,11 @@ public sealed class PortalService(
     /// elsewhere. A skipped question keeps the delivery's earlier answer; the verification row records the answers the
     /// delivery rests on after this one.
     /// </summary>
+    /// <param name="acceptedTerms">The <see cref="SupplierTerms.Sha256"/> of the terms the supplier ticked on the page.</param>
     /// <param name="clientAddress">Passed on to <see cref="VerifyService.SubmitAsync"/>, which stores only its hash.</param>
     public async Task<Result<PortalAnswerResult, PortalError>> AnswerAsync(
-        string? token, Guid nodeId, TransportMode? mode, EnergySource? energy, string? clientAddress, CancellationToken ct)
+        string? token, Guid nodeId, TransportMode? mode, EnergySource? energy, string? acceptedTerms, string? clientAddress,
+        CancellationToken ct)
     {
         var opened = await OpenAsync(token, ct);
         if (!opened.IsOk)
@@ -109,7 +116,16 @@ public sealed class PortalService(
         {
             return Fail(new PortalError(PortalErrorCode.AlreadyConfirmed, "This delivery is already confirmed."));
         }
-        // Checked before a link is minted, so a refused answer leaves no link.requested entry behind.
+        // Checked before a link is minted, so a refused answer leaves no link.requested entry behind. The terms come first,
+        // as on the phone page; VerifyService checks them again for the record.
+        if (!string.Equals(acceptedTerms, seed.SupplierTerms.Sha256, StringComparison.Ordinal))
+        {
+            return Fail(new PortalError(
+                PortalErrorCode.TermsNotAccepted,
+                acceptedTerms is null
+                    ? "Accept the supplier terms before sending."
+                    : $"These are not the current supplier terms (version {seed.SupplierTerms.Version}); reload the page."));
+        }
         if (mode is null && energy is null)
         {
             return Fail(new PortalError(PortalErrorCode.InvalidAnswer, "Answer at least one question."));
@@ -128,7 +144,7 @@ public sealed class PortalService(
             return Fail(new PortalError(PortalErrorCode.NodeNotFound, minted.Error.Message));
         }
         var submitted = await verify.SubmitAsync(
-            new VerifyAnswer(minted.Value.Token, keptMode, keptEnergy, null), clientAddress, NodeAnswerState.Of(node), ct);
+            new VerifyAnswer(minted.Value.Token, keptMode, keptEnergy, null, acceptedTerms), clientAddress, NodeAnswerState.Of(node), ct);
         return submitted.IsOk
             ? Result<PortalAnswerResult, PortalError>.Ok(new PortalAnswerResult(submitted.Value, await BuildViewAsync(supplier, ct)))
             : Fail(From(submitted.Error));
@@ -189,7 +205,7 @@ public sealed class PortalService(
             .ThenByDescending(i => i.IssueDate)
             .ThenBy(i => i.InvoiceNumber, StringComparer.Ordinal)
             .ToList();
-        return new PortalView(supplier.Anchor.Label, buyer.Name, supplier.ExpiresAt, items);
+        return new PortalView(supplier.Anchor.Label, buyer.Name, supplier.ExpiresAt, items, VerifyTerms.From(seed.SupplierTerms));
     }
 
     private async Task<List<Delivery>> DeliveriesAsync(Supplier supplier, CancellationToken ct)
@@ -259,6 +275,7 @@ public sealed class PortalService(
             VerifyErrorCode.InvoiceChanged => PortalErrorCode.SupplierGone,
             VerifyErrorCode.AlreadyUsed => PortalErrorCode.AlreadyConfirmed,
             VerifyErrorCode.NodeChanged => PortalErrorCode.DeliveryChanged,
+            VerifyErrorCode.TermsNotAccepted => PortalErrorCode.TermsNotAccepted,
             _ => PortalErrorCode.InvalidToken,
         },
         error.Message);

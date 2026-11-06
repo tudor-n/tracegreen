@@ -8,28 +8,31 @@ import type {
   ProblemCode,
   TransportMode,
 } from '@/api/client'
+import type { Result } from './api-reply'
 import { type Answers, canSubmit, offeredEnergy, offeredModes, preselect } from './verify-state'
 
 // Pure decision logic behind the supplier page /supplier (F12): what each API answer means, which delivery is open, the
 // answers pre-selected for it, and what happens after a send. The page performs the requests the state asks for (the
 // list while loading or stale, the open delivery's answers while sending) and renders the rest, so every rule here is
-// unit-tested without a browser. The questions, their order and their rules are those of /verify (./verify-state.ts).
-// An answer comes back with the list as it now is, so confirming a delivery is one request.
+// unit-tested without a browser. The questions, their order and their rules are those of /verify (./verify-state.ts),
+// and so is the supplier terms checkbox: one box on the page, unticked until the supplier ticks it, and no answer is sent
+// without it. An answer comes back with the list as it now is, so confirming a delivery is one request.
 
 /**
  * What a failed request means. `invalid`, `expired` and `gone` end the link; `changed` means the one delivery moved on
  * (already confirmed, answered from elsewhere a moment earlier, no longer listed) and the list should be loaded again;
- * `rateLimited` and `offline` can be retried.
+ * `termsChanged` means the supplier terms changed on the server since the page read them, so they are read and ticked
+ * again; `rateLimited` and `offline` can be retried.
  */
-export type SupplierFailure = 'invalid' | 'expired' | 'gone' | 'changed' | 'rateLimited' | 'offline'
+export type SupplierFailure = 'invalid' | 'expired' | 'gone' | 'changed' | 'termsChanged' | 'rateLimited' | 'offline'
 
 /** The page-wide failures: the link itself, or no list to show. */
-export type PageFailure = Exclude<SupplierFailure, 'changed'>
+export type PageFailure = Exclude<SupplierFailure, 'changed' | 'termsChanged'>
 
 /** The failures shown on the open delivery, which leave the rest of the list usable. */
-export type DeliveryFailure = Extract<SupplierFailure, 'changed' | 'rateLimited' | 'offline'>
+export type DeliveryFailure = Extract<SupplierFailure, 'changed' | 'termsChanged' | 'rateLimited' | 'offline'>
 
-export type SupplierReply<T> = { ok: true; data: T } | { ok: false; failure: SupplierFailure }
+export type SupplierReply<T> = Result<T, SupplierFailure>
 
 /** The two requests the page makes. */
 export interface SupplierApi {
@@ -51,6 +54,9 @@ export function supplierFailureFor(status: number | null, code: ProblemCode | nu
       return 'gone'
     case 'RateLimited':
       return 'rateLimited'
+    // The page sends the terms it showed, so this means they changed on the server since the page loaded.
+    case 'TermsNotAccepted':
+      return 'termsChanged'
     case 'AlreadyConfirmed':
     case 'DeliveryChanged':
     case 'NodeNotFound':
@@ -91,6 +97,11 @@ export type SupplierState =
       warnings: Record<string, PlausibilityWarning[]>
       /** True when the supplier asked to reload the list (a delivery changed meanwhile): it is fetched again. */
       stale: boolean
+      /**
+       * The SHA-256 of the terms the supplier ticked on this page, or null. Only the supplier's tick sets it, so the box
+       * starts unticked (Civil Code art. 1203); terms that changed meanwhile carry another SHA-256 and read as unticked.
+       */
+      accepted: string | null
     }
   | { phase: 'failed'; failure: PageFailure; retryable: boolean }
 
@@ -101,6 +112,7 @@ export type SupplierInput =
   | { kind: 'close' }
   | { kind: 'transport'; value: TransportMode | null }
   | { kind: 'energy'; value: EnergySource | null }
+  | { kind: 'terms'; accepted: boolean }
   | { kind: 'send' }
   | { kind: 'answered'; nodeId: string; result: PortalAnswerResult }
   | { kind: 'answerFailed'; nodeId: string; failure: SupplierFailure }
@@ -112,8 +124,9 @@ export function initialSupplierState(token: string | null): SupplierState {
 }
 
 function pageFailed(failure: SupplierFailure): SupplierState {
-  // A list that cannot be read for "changed" reasons (a 404) means the link no longer fits.
-  const page: PageFailure = failure === 'changed' ? 'invalid' : failure
+  // A list that cannot be read for "changed" reasons (a 404) means the link no longer fits. Reading the list never asks
+  // for the terms, so a terms refusal there is the same kind of mismatch.
+  const page: PageFailure = failure === 'changed' || failure === 'termsChanged' ? 'invalid' : failure
   return { phase: 'failed', failure: page, retryable: PAGE_RETRYABLE[page] }
 }
 
@@ -135,9 +148,28 @@ export function draftFor(item: PortalItem): Draft {
   }
 }
 
-/** The body of `POST /api/portal/answer`. A skipped answer is sent as null. */
-export function answerBody(token: string, draft: Draft): PortalAnswerRequest {
-  return { t: token, nodeId: draft.nodeId, transportMode: draft.answers.transport, energySource: draft.answers.energy }
+/** True when the supplier ticked the terms the list on screen carries. */
+export function termsAccepted(state: Extract<SupplierState, { phase: 'ready' }>): boolean {
+  return state.accepted !== null && state.accepted === state.view.terms.sha256
+}
+
+/** The tick stays only while the list carries the terms it was given for. */
+function keptTick(accepted: string | null, view: PortalView): string | null {
+  return accepted === view.terms.sha256 ? accepted : null
+}
+
+/**
+ * The body of `POST /api/portal/answer`. A skipped answer is sent as null. `acceptedTerms` is the SHA-256 of the terms
+ * the supplier ticked, from the list, so the server records exactly what was accepted.
+ */
+export function answerBody(token: string, draft: Draft, acceptedTerms: string): PortalAnswerRequest {
+  return {
+    t: token,
+    nodeId: draft.nodeId,
+    transportMode: draft.answers.transport,
+    energySource: draft.answers.energy,
+    acceptedTerms,
+  }
 }
 
 /** "1 of 2 confirmed": PARTIAL deliveries still have an answer left, so they do not count. */
@@ -153,12 +185,14 @@ function itemOf(view: PortalView, nodeId: string): PortalItem | undefined {
 export function supplierReducer(state: SupplierState, input: SupplierInput): SupplierState {
   switch (input.kind) {
     case 'loaded': {
-      if (state.phase === 'loading') return { phase: 'ready', view: input.view, draft: null, warnings: {}, stale: false }
+      if (state.phase === 'loading') {
+        return { phase: 'ready', view: input.view, draft: null, warnings: {}, stale: false, accepted: null }
+      }
       if (state.phase !== 'ready' || !state.stale) return state
       // A fresh list keeps the open delivery while it is still there to answer.
       const kept = state.draft === null ? undefined : itemOf(input.view, state.draft.nodeId)
       const draft = kept !== undefined && isOpenForAnswers(kept) ? state.draft : null
-      return { ...state, view: input.view, draft, stale: false }
+      return { ...state, view: input.view, draft, stale: false, accepted: keptTick(state.accepted, input.view) }
     }
     case 'loadFailed':
       if (state.phase === 'loading') return pageFailed(input.failure)
@@ -183,8 +217,17 @@ export function supplierReducer(state: SupplierState, input: SupplierInput): Sup
       const key = input.kind === 'transport' ? 'transport' : 'energy'
       return { ...state, draft: { ...state.draft, answers: { ...state.draft.answers, [key]: input.value } } }
     }
+    case 'terms':
+      if (state.phase !== 'ready' || state.draft?.sending) return state
+      return { ...state, accepted: input.accepted ? state.view.terms.sha256 : null }
     case 'send':
-      if (state.phase !== 'ready' || state.draft === null || state.draft.sending || !canSubmit(state.draft.answers)) {
+      if (
+        state.phase !== 'ready' ||
+        state.draft === null ||
+        state.draft.sending ||
+        !canSubmit(state.draft.answers) ||
+        !termsAccepted(state)
+      ) {
         return state
       }
       return { ...state, draft: { ...state.draft, sending: true, failure: null } }
@@ -196,12 +239,18 @@ export function supplierReducer(state: SupplierState, input: SupplierInput): Sup
         view: input.result.view,
         draft: null,
         warnings: { ...state.warnings, [input.nodeId]: input.result.outcome.warnings },
+        accepted: keptTick(state.accepted, input.result.view),
       }
     }
     case 'answerFailed': {
       if (state.phase !== 'ready' || state.draft?.nodeId !== input.nodeId || !state.draft.sending) return state
       const { failure } = input
       if (failure === 'invalid' || failure === 'expired' || failure === 'gone') return pageFailed(failure)
+      // New terms are read before anything is sent again: the list is fetched again with the box unticked, and the
+      // supplier's answers stay on the open delivery.
+      if (failure === 'termsChanged') {
+        return { ...state, draft: { ...state.draft, sending: false, failure }, stale: true, accepted: null }
+      }
       return { ...state, draft: { ...state.draft, sending: false, failure } }
     }
     case 'reload':

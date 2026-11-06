@@ -7,8 +7,13 @@ namespace TraceGreen.Api.Endpoints;
 /// <summary><see cref="T"/> is the token from the supplier page's <c>?t=</c>.</summary>
 public sealed record PortalViewRequest(string? T);
 
-/// <summary>Leave a question's field out (or null) to skip it; skipping one makes the delivery PARTIAL.</summary>
-public sealed record PortalAnswerRequest(string? T, Guid NodeId, TransportMode? TransportMode = null, EnergySource? EnergySource = null);
+/// <summary>
+/// Leave a question's field out (or null) to skip it; skipping one makes the delivery PARTIAL. <see cref="AcceptedTerms"/>
+/// is <c>terms.sha256</c> from the view, sent once the supplier ticked the terms; without it, or with another value, the
+/// answer is refused with 422 <c>TermsNotAccepted</c> and nothing is recorded.
+/// </summary>
+public sealed record PortalAnswerRequest(
+    string? T, Guid NodeId, TransportMode? TransportMode = null, EnergySource? EnergySource = null, string? AcceptedTerms = null);
 
 /// <summary>
 /// The supplier page (F12): one signed link per supplier, reusable until it expires, listing that supplier's deliveries
@@ -16,7 +21,8 @@ public sealed record PortalAnswerRequest(string? T, Guid NodeId, TransportMode? 
 /// appears in a response body, an audit payload or a log line. Statuses: malformed or bad signature → 401
 /// <c>InvalidToken</c>; expired → 410 <c>LinkExpired</c>; the link's delivery gone → 410 <c>InvoiceChanged</c>; a delivery
 /// that is not this supplier's → 404 <c>NodeNotFound</c>; already confirmed → 409 <c>AlreadyConfirmed</c>; answered by
-/// someone else between the page's read and this write (two answers at once) → 409 <c>DeliveryChanged</c>; over
+/// someone else between the page's read and this write (two answers at once) → 409 <c>DeliveryChanged</c>; terms not
+/// accepted → 422 <c>TermsNotAccepted</c>; over
 /// <see cref="RateLimitFactor"/> × <c>RATE_LIMIT_PER_MIN</c> per client address → 429 <c>RateLimited</c>, counted apart
 /// from the verify routes.
 /// </summary>
@@ -51,7 +57,7 @@ public static class PortalEndpoints
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("GetPortalView")
             .WithTags("Portal")
-            .WithSummary("What the supplier page shows: the supplier's deliveries to the buyer, open ones first, with the answers to pre-select")
+            .WithSummary("What the supplier page shows: the supplier's deliveries to the buyer, open ones first, with the answers to pre-select and the supplier terms")
             .Produces<PortalView>()
             .ProducesApiProblem(
                 StatusCodes.Status401Unauthorized,
@@ -59,12 +65,13 @@ public static class PortalEndpoints
                 StatusCodes.Status429TooManyRequests);
 
         app.MapPost("/api/portal/answer", async (PortalAnswerRequest body, HttpContext http, PortalService portal, CancellationToken ct) =>
-                (await portal.AnswerAsync(body.T, body.NodeId, body.TransportMode, body.EnergySource, VerifyEndpoints.ClientAddress(http), ct))
+                (await portal.AnswerAsync(
+                    body.T, body.NodeId, body.TransportMode, body.EnergySource, body.AcceptedTerms, VerifyEndpoints.ClientAddress(http), ct))
                     .Match(TypedResults.Ok, ToProblem))
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("SubmitPortalAnswer")
             .WithTags("Portal")
-            .WithSummary("Confirm one delivery from the supplier page: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is")
+            .WithSummary("Confirm one delivery from the supplier page with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is")
             .Produces<PortalAnswerResult>()
             .ProducesApiProblem(
                 StatusCodes.Status401Unauthorized,
@@ -86,6 +93,7 @@ public static class PortalEndpoints
             PortalErrorCode.AlreadyConfirmed => ProblemCode.AlreadyConfirmed,
             PortalErrorCode.DeliveryChanged => ProblemCode.DeliveryChanged,
             PortalErrorCode.InvalidAnswer => ProblemCode.InvalidAnswer,
+            PortalErrorCode.TermsNotAccepted => ProblemCode.TermsNotAccepted,
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, null),
         },
         error.Message);

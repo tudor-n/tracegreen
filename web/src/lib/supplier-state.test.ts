@@ -10,7 +10,9 @@ import {
   type SupplierState,
   supplierFailureFor,
   supplierReducer,
+  termsAccepted,
 } from './supplier-state'
+import { verifyTerms } from './test-fixtures'
 
 const item = (overrides: Partial<PortalItem> = {}): PortalItem => ({
   nodeId: '11111111-1111-4111-8111-000000000003',
@@ -37,11 +39,14 @@ const view = (items: PortalItem[] = [item(), item({ nodeId: SECOND, invoiceNumbe
   buyerName: 'Transilvania Electro-Assembly SRL',
   expiresAt: '2026-11-13T12:00:00Z',
   items,
+  terms: verifyTerms,
 })
 
 const run = (state: SupplierState, ...inputs: SupplierInput[]) => inputs.reduce(supplierReducer, state)
 
 const ready = (v: PortalView = view()) => run({ phase: 'loading' }, { kind: 'loaded', view: v })
+
+const tick: SupplierInput = { kind: 'terms', accepted: true }
 
 function readyState(state: SupplierState) {
   if (state.phase !== 'ready') throw new Error(`expected ready, got ${state.phase}`)
@@ -57,6 +62,7 @@ describe('supplierFailureFor', () => {
     [409, 'DeliveryChanged', 'changed'],
     [404, 'NodeNotFound', 'changed'],
     [422, 'InvalidAnswer', 'changed'],
+    [422, 'TermsNotAccepted', 'termsChanged'],
     [429, 'RateLimited', 'rateLimited'],
   ] as const)('maps %i %s to %s', (status, code, failure) => {
     expect(supplierFailureFor(status, code)).toBe(failure)
@@ -168,7 +174,7 @@ describe('answers', () => {
   })
 
   it('marks the draft as sending and ignores taps until the answer comes back', () => {
-    const sending = run(open(), { kind: 'send' })
+    const sending = run(open(), tick, { kind: 'send' })
     expect(readyState(sending).draft?.sending).toBe(true)
     for (const input of [
       { kind: 'transport', value: null },
@@ -176,19 +182,93 @@ describe('answers', () => {
       { kind: 'open', nodeId: SECOND },
       { kind: 'send' },
       { kind: 'reload' },
+      { kind: 'terms', accepted: false },
     ] as SupplierInput[]) {
       expect(supplierReducer(sending, input)).toBe(sending)
     }
   })
 
-  it('builds the request body with the node and both answers', () => {
+  it('builds the request body with the node, both answers and the accepted terms', () => {
     const { draft } = readyState(run(open(), { kind: 'energy', value: null }))
-    expect(answerBody('p1.abc', draft!)).toEqual({ t: 'p1.abc', nodeId: N3, transportMode: 'road', energySource: null })
+    expect(answerBody('p1.abc', draft!, verifyTerms.sha256)).toEqual({
+      t: 'p1.abc',
+      nodeId: N3,
+      transportMode: 'road',
+      energySource: null,
+      acceptedTerms: verifyTerms.sha256,
+    })
+  })
+})
+
+describe('supplier terms', () => {
+  const open = () => run(ready(), { kind: 'open', nodeId: N3 })
+  const changedTerms = (v: PortalView = view()): PortalView => ({
+    ...v,
+    terms: { ...verifyTerms, version: '2026-12-01', sha256: 'b'.repeat(64) },
+  })
+
+  it('start unticked, and nothing is sent until the supplier ticks them', () => {
+    const state = open()
+    expect(readyState(state).accepted).toBeNull()
+    expect(termsAccepted(readyState(state))).toBe(false)
+    expect(supplierReducer(state, { kind: 'send' })).toBe(state)
+    const ticked = readyState(supplierReducer(state, tick))
+    expect(ticked.accepted).toBe(verifyTerms.sha256)
+    expect(readyState(supplierReducer(ticked, { kind: 'send' })).draft?.sending).toBe(true)
+  })
+
+  it('untick when the supplier unticks them', () => {
+    const state = readyState(run(open(), tick, { kind: 'terms', accepted: false }))
+    expect(state.accepted).toBeNull()
+    expect(supplierReducer(state, { kind: 'send' })).toBe(state)
+  })
+
+  it('are ticked once per page: the next delivery sends without another tick', () => {
+    const answered = run(open(), tick, { kind: 'send' }, {
+      kind: 'answered',
+      nodeId: N3,
+      result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] }, view: view() },
+    })
+    const sending = readyState(run(answered, { kind: 'open', nodeId: SECOND }, { kind: 'send' }))
+    expect(sending.draft).toMatchObject({ nodeId: SECOND, sending: true })
+  })
+
+  it('read as unticked when a list arrives with other terms', () => {
+    const answered = readyState(
+      run(open(), tick, { kind: 'send' }, {
+        kind: 'answered',
+        nodeId: N3,
+        result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] }, view: changedTerms() },
+      }),
+    )
+    expect(answered.accepted).toBeNull()
+    const reloaded = readyState(run(ready(), tick, { kind: 'reload' }, { kind: 'loaded', view: changedTerms() }))
+    expect(reloaded.accepted).toBeNull()
+  })
+
+  it('changed on the server: the list is read again, the box unticked, the answers kept on the delivery', () => {
+    const answers = { transport: 'road', energy: 'renewable' } as const
+    const failed = readyState(
+      run(open(), { kind: 'energy', value: 'renewable' }, tick, { kind: 'send' }, {
+        kind: 'answerFailed',
+        nodeId: N3,
+        failure: 'termsChanged',
+      }),
+    )
+    expect(failed).toMatchObject({ stale: true, accepted: null })
+    expect(failed.draft).toMatchObject({ nodeId: N3, answers, sending: false, failure: 'termsChanged' })
+    const reloaded = readyState(supplierReducer(failed, { kind: 'loaded', view: changedTerms() }))
+    expect(reloaded.draft).toMatchObject({ nodeId: N3, answers })
+    expect(supplierReducer(reloaded, { kind: 'send' })).toBe(reloaded)
+    const resent = readyState(run(reloaded, tick, { kind: 'send' }))
+    expect(resent.accepted).toBe('b'.repeat(64))
+    expect(resent.draft).toMatchObject({ sending: true, failure: null })
   })
 })
 
 describe('after a send', () => {
-  const sending = () => run(ready(), { kind: 'open', nodeId: N3 }, { kind: 'energy', value: 'renewable' }, { kind: 'send' })
+  const sending = () =>
+    run(ready(), { kind: 'open', nodeId: N3 }, { kind: 'energy', value: 'renewable' }, tick, { kind: 'send' })
   const confirmedList = view([
     item({ nodeId: SECOND, invoiceNumber: 'OH-2026-ADV1', defaultEnergy: 'renewable' }),
     item({ status: 'VERIFIED', answeredMode: 'road', answeredEnergy: 'renewable' }),

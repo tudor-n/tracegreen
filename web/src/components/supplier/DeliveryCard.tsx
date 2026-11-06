@@ -27,6 +27,8 @@ interface DeliveryCardProps {
   draft: Draft | null
   /** True while another delivery's answers are on the way, so no second card opens. */
   busy: boolean
+  /** True when the supplier ticked the terms box above the list; nothing is sent without it. */
+  termsAccepted: boolean
   warnings: PlausibilityWarning[] | undefined
   onOpen: () => void
   onClose: () => void
@@ -43,6 +45,7 @@ export function DeliveryCard({
   questions,
   draft,
   busy,
+  termsAccepted,
   warnings,
   onOpen,
   onClose,
@@ -118,10 +121,16 @@ export function DeliveryCard({
             onChange={onEnergy}
           />
 
-          {!canSubmit(draft.answers) && (
+          {!canSubmit(draft.answers) ? (
             <p role="status" className="text-center text-base text-muted-foreground">
               {questions.answerOne}
             </p>
+          ) : (
+            !termsAccepted && (
+              <p role="status" className="text-center text-base text-muted-foreground">
+                {questions.terms.tickToSubmit}
+              </p>
+            )
           )}
           {draft.failure !== null && (
             <p role="alert" data-testid={`${id}-failure`} className="text-center text-base text-[var(--status-estimated)]">
@@ -138,7 +147,7 @@ export function DeliveryCard({
               <Button
                 data-testid={`${id}-confirm`}
                 className="h-14 w-full rounded-xl text-lg"
-                disabled={sending || !canSubmit(draft.answers)}
+                disabled={sending || !termsAccepted || !canSubmit(draft.answers)}
                 onClick={onSend}
               >
                 {sending ? copy.sending : copy.send}

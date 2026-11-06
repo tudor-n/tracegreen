@@ -234,4 +234,5 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   MassUnknown: 'Mass unknown for this item.',
   AlreadyConfirmed: 'Already confirmed by the supplier.',
   DeliveryChanged: 'Another answer arrived first.',
+  TermsNotAccepted: 'Supplier terms not accepted.',
 }

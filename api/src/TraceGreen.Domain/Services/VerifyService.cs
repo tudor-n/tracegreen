@@ -13,16 +13,18 @@ namespace TraceGreen.Domain.Services;
 
 /// <summary>
 /// Ruling 5 maps these to HTTP: <see cref="InvalidToken"/> 401, <see cref="Expired"/> and <see cref="InvoiceChanged"/>
-/// 410, <see cref="AlreadyUsed"/> 409, <see cref="InvalidAnswer"/> 422, <see cref="NodeNotFound"/> 404 (dev path only).
-/// <see cref="NodeChanged"/> 409 comes only from a submit that passes the node state it expects (the supplier page, F12).
+/// 410, <see cref="AlreadyUsed"/> 409, <see cref="InvalidAnswer"/> and <see cref="TermsNotAccepted"/> 422,
+/// <see cref="NodeNotFound"/> 404 (dev path only). <see cref="NodeChanged"/> 409 comes only from a submit that passes the
+/// node state it expects (the supplier page, F12).
 /// </summary>
-public enum VerifyErrorCode { InvalidToken, Expired, InvoiceChanged, AlreadyUsed, InvalidAnswer, NodeNotFound, NodeChanged }
+public enum VerifyErrorCode { InvalidToken, Expired, InvoiceChanged, AlreadyUsed, InvalidAnswer, NodeNotFound, TermsNotAccepted, NodeChanged }
 
 public sealed record VerifyError(VerifyErrorCode Code, string Message);
 
 /// <summary>
 /// The anonymous supplier side of the loop (F3). A token is checked in the signer's order (format, signature, expiry,
-/// invoice hash recomputed from the stored extract), then for single use. A submit rebuilds the node from the answers
+/// invoice hash recomputed from the stored extract), then for single use. A submit then needs the current supplier terms'
+/// SHA-256 (the supplier ticked them), then valid answers. It rebuilds the node from the answers
 /// through <see cref="NodeFactory"/>, records the verification and its audit entry atomically (the repository's unique
 /// nonce turns a replay into <see cref="VerifyErrorCode.AlreadyUsed"/>), and publishes <c>node.verified</c> with fresh
 /// KPIs, then <c>audit.appended</c>. Neither the token, its nonce nor the client address reaches a payload or an event.
@@ -76,7 +78,8 @@ public sealed class VerifyService(
             EnergySources: Enum.GetValues<EnergySource>(),
             DefaultEnergy: EnergySource.Grid,
             MassT: link.Node.MassT,
-            ExpiresAt: link.ExpiresAt));
+            ExpiresAt: link.ExpiresAt,
+            Terms: VerifyTerms.From(seed.SupplierTerms)));
     }
 
     /// <param name="clientAddress">Hashed with <see cref="ServiceOptions.IpHashKey"/> before it is stored; never stored as is.</param>
@@ -102,6 +105,16 @@ public sealed class VerifyService(
         {
             return Fail(Used());
         }
+        // Before the answers: without the terms the supplier saw and ticked, nothing they said is recorded.
+        var terms = seed.SupplierTerms;
+        if (!string.Equals(answer.AcceptedTerms, terms.Sha256, StringComparison.Ordinal))
+        {
+            return Fail(new VerifyError(
+                VerifyErrorCode.TermsNotAccepted,
+                answer.AcceptedTerms is null
+                    ? "Accept the supplier terms before submitting."
+                    : $"These are not the current supplier terms (version {terms.Version}); reload the page."));
+        }
         if (Invalid(answer, link.Lane) is { } problem)
         {
             return Fail(new VerifyError(VerifyErrorCode.InvalidAnswer, problem));
@@ -118,7 +131,7 @@ public sealed class VerifyService(
         var now = clock.GetUtcNow();
         var verification = new Verification(
             Ids.NewId(), node.WorkspaceId, node.Id, link.Nonce, answer.TransportMode, answer.EnergySource, answer.MassT, now,
-            Hashing.IpHash(clientAddress ?? "unknown", options.IpHashKey), now);
+            Hashing.IpHash(clientAddress ?? "unknown", options.IpHashKey), now, terms.Version, terms.Sha256);
         // Strings only (see IngestService): jsonb may re-render decimals and break the chain hash. No nonce, no address.
         var payload = new JsonObject
         {
@@ -129,7 +142,14 @@ public sealed class VerifyService(
             ["energySource"] = answer.EnergySource?.ToString().ToLowerInvariant(),
             ["massTConfirmed"] = answer.MassT?.ToString(CultureInfo.InvariantCulture),
             ["warnings"] = new JsonArray(warnings.Select(w => (JsonNode)JsonValue.Create(Name(w.Code))).ToArray()),
+            ["termsVersion"] = terms.Version,
+            ["termsSha256"] = terms.Sha256,
         };
+        if (answer.Simulated)
+        {
+            // The terms were accepted by the demo tool, not by a person at the supplier; the log must not pass it off as one.
+            payload["simulated"] = true;
+        }
         var recorded = await repo.RecordVerificationAsync(
             link.Ctx, verification, patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", payload),
             expected, ct);

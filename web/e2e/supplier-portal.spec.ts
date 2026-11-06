@@ -63,18 +63,24 @@ test('supplier page: one link lists every delivery from the supplier, each confi
       }
     })
 
-    await test.step('4. N3 confirmed with Road + Mostly renewable: VERIFIED on the dashboard within 2 s', async () => {
+    await test.step('4. N3 confirmed with Road + Mostly renewable after the terms tick: VERIFIED on the dashboard within 2 s', async () => {
       await supplier.getByTestId(`delivery-${N3}-open`).click()
       await expect(supplier.getByTestId(`delivery-${N3}-transport-road`)).toHaveAttribute('aria-pressed', 'true')
       await supplier.getByTestId(`delivery-${N3}-energy-renewable`).click()
+      // One terms box for the page: unticked, linked to the full text without the token, and nothing is sent without it.
+      await expect(supplier.getByTestId('supplier-terms')).not.toBeChecked()
+      await expect(supplier.getByTestId('supplier-terms-link')).toHaveAttribute('href', /^\/terms\/supplier\?lang=(ro|en)$/)
+      await expect(supplier.getByTestId(`delivery-${N3}-confirm`)).toBeDisabled()
+      await supplier.getByTestId('supplier-terms').check()
       await supplier.getByTestId(`delivery-${N3}-confirm`).click()
       await expect(n3).toHaveAttribute('data-status', 'VERIFIED', { timeout: 2_000 })
       await expect(supplier.getByTestId(`delivery-${N3}`)).toHaveAttribute('data-status', 'VERIFIED')
     })
 
-    await test.step('5. the second delivery comes pre-selected with the same power source', async () => {
+    await test.step('5. the second delivery comes pre-selected with the same power source, the terms still ticked', async () => {
       await supplier.getByTestId(`delivery-${second}-open`).click()
       await expect(supplier.getByTestId(`delivery-${second}-energy-renewable`)).toHaveAttribute('aria-pressed', 'true')
+      await expect(supplier.getByTestId('supplier-terms')).toBeChecked()
       await supplier.getByTestId(`delivery-${second}-confirm`).click()
       await expect(page.getByTestId(`node-${second}`)).toHaveAttribute('data-status', 'VERIFIED', { timeout: 2_000 })
     })
@@ -86,6 +92,8 @@ test('supplier page: one link lists every delivery from the supplier, each confi
       for (const id of [N3, second]) {
         await expect(again.getByTestId(`delivery-${id}`)).toHaveAttribute('data-status', 'VERIFIED')
       }
+      // Nothing is left to answer, so the page asks for no terms.
+      await expect(again.getByTestId('supplier-terms')).toHaveCount(0)
     })
   } finally {
     await phone.close()
