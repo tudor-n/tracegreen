@@ -86,24 +86,17 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
-    public Task<RecordVerificationResult> RecordVerificationAsync(
-        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
+    public Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct)
     {
         lock (_gate)
         {
             var ws = Get(ctx.WorkspaceId);
-            if (ws.Nonces.Contains(verification.TokenNonce))
+            if (!ws.Nonces.Add(verification.TokenNonce))
             {
                 return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.AlreadyUsed, null, null));
             }
             var node = ws.Nodes.GetValueOrDefault(verification.NodeId)
                 ?? throw new InvalidOperationException($"Node {verification.NodeId} not found.");
-            // Checked before the nonce is taken, so a refused answer leaves nothing behind.
-            if (expected is not null && NodeAnswerState.Of(node) != expected)
-            {
-                return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.NodeChanged, node, null));
-            }
-            ws.Nonces.Add(verification.TokenNonce);
             var patched = node with
             {
                 Status = patch.Status,

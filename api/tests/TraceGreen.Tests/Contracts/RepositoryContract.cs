@@ -27,8 +27,7 @@ public abstract class RepositoryContract
         prev => AuditChain.Build(prev, Ids.DemoWorkspace, Now, "test", action, payload ?? new JsonObject());
 
     private static Verification NewVerification(Guid nodeId, string nonce) => new(
-        Ids.NewId(), Ids.DemoWorkspace, nodeId, nonce, TransportMode.Road, EnergySource.Grid, 1.4m, Now, "iphash", Now,
-        "2026-11-06", "terms-sha256");
+        Ids.NewId(), Ids.DemoWorkspace, nodeId, nonce, TransportMode.Road, EnergySource.Grid, 1.4m, Now, "iphash", Now);
 
     private static readonly NodePatch VerifiedPatch = new(NodeStatus.Verified, 123m, TransportMode.Road, EnergySource.Grid, 1.4m, 4321m, 3);
 
@@ -151,7 +150,7 @@ public abstract class RepositoryContract
         var repo = await MakeAsync();
         var auditBefore = (await AllAudit(repo)).Count;
 
-        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "fresh-nonce-1"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "fresh-nonce-1"), VerifiedPatch, Audit("verification.submitted"), CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.Ok, result.Status);
         Assert.Equal(NodeStatus.Verified, result.Node!.Status);
@@ -161,9 +160,7 @@ public abstract class RepositoryContract
         Assert.Equal(TransportMode.Road, stored.TransportMode);
         Assert.Equal(4321m, stored.CostEur);
         Assert.Equal(3, stored.LeadDays);
-        var verification = Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
-        Assert.Equal("2026-11-06", verification.TermsVersion);
-        Assert.Equal("terms-sha256", verification.TermsSha256);
+        Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
         var audit = await AllAudit(repo);
         Assert.Equal(auditBefore + 1, audit.Count);
         Assert.True(AuditChain.Verify(audit).Valid);
@@ -189,7 +186,7 @@ public abstract class RepositoryContract
         var auditBefore = (await AllAudit(repo)).Count;
         var usedNonce = Bundle.DemoState.Nodes.Single(n => n.Key == "N2").Nonce!;
 
-        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, usedNonce), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, usedNonce), VerifiedPatch, Audit("verification.submitted"), CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.AlreadyUsed, result.Status);
         Assert.Null(result.Node);
@@ -203,66 +200,10 @@ public abstract class RepositoryContract
         var repo = await MakeAsync();
 
         var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ =>
-            Task.Run(() => repo.RecordVerificationAsync(Ctx, NewVerification(N3, "race-nonce"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None))));
+            Task.Run(() => repo.RecordVerificationAsync(Ctx, NewVerification(N3, "race-nonce"), VerifiedPatch, Audit("verification.submitted"), CancellationToken.None))));
 
         Assert.Equal(1, results.Count(r => r.Status == RecordVerificationStatus.Ok));
         Assert.Equal(9, results.Count(r => r.Status == RecordVerificationStatus.AlreadyUsed));
-        Assert.True(AuditChain.Verify(await AllAudit(repo)).Valid);
-    }
-
-    private static readonly NodeAnswerState Unanswered = new(NodeStatus.Estimated, null, null);
-
-    [Fact]
-    public async Task RecordVerificationWritesWhenTheNodeIsAsExpected()
-    {
-        var repo = await MakeAsync();
-
-        var result = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "expected-ok"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
-
-        Assert.Equal(RecordVerificationStatus.Ok, result.Status);
-        Assert.Equal(NodeStatus.Verified, (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!.Status);
-    }
-
-    [Fact]
-    public async Task RecordVerificationOnAChangedNodeWritesNothingAndLeavesItsNonceFree()
-    {
-        var repo = await MakeAsync();
-        var first = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "first"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
-        Assert.Equal(RecordVerificationStatus.Ok, first.Status);
-        var auditBefore = (await AllAudit(repo)).Count;
-        var otherPatch = VerifiedPatch with { EnergySource = EnergySource.Renewable, ActivityKg = 99m };
-
-        // Built on the node as it was before the first answer.
-        var stale = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "stale"), otherPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
-
-        Assert.Equal(RecordVerificationStatus.NodeChanged, stale.Status);
-        Assert.Null(stale.Entry);
-        var stored = (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!;
-        Assert.Equal(EnergySource.Grid, stored.EnergySource);
-        Assert.Equal(123m, stored.ActivityKg);
-        Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
-        Assert.Equal(auditBefore, (await AllAudit(repo)).Count);
-        // The refused answer did not use up its nonce.
-        var retried = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "stale"), otherPatch, Audit("verification.submitted"), NodeAnswerState.Of(stored), CancellationToken.None);
-        Assert.Equal(RecordVerificationStatus.Ok, retried.Status);
-    }
-
-    [Fact]
-    public async Task TenConcurrentAnswersBuiltOnTheSameNodeExactlyOneLands()
-    {
-        var repo = await MakeAsync();
-
-        var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(i =>
-            Task.Run(() => repo.RecordVerificationAsync(
-                Ctx, NewVerification(N3, $"same-state-{i}"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None))));
-
-        Assert.Equal(1, results.Count(r => r.Status == RecordVerificationStatus.Ok));
-        Assert.Equal(9, results.Count(r => r.Status == RecordVerificationStatus.NodeChanged));
-        Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
         Assert.True(AuditChain.Verify(await AllAudit(repo)).Valid);
     }
 

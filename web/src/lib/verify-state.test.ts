@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { ProblemCode, VerifyContext } from '@/api/client'
 import { verifyCopy } from '@/copy/verify'
 import {
-  canSend,
   canSubmit,
   failureFor,
   formatIssueDate,
@@ -15,7 +14,6 @@ import {
   verifyReducer,
   type VerifyState,
 } from './verify-state'
-import { verifyTerms } from './test-fixtures'
 
 const context = (overrides: Partial<VerifyContext> = {}): VerifyContext => ({
   nodeId: '11111111-1111-4111-8111-000000000001',
@@ -32,14 +30,10 @@ const context = (overrides: Partial<VerifyContext> = {}): VerifyContext => ({
   defaultEnergy: 'grid',
   massT: 2.3,
   expiresAt: '2026-11-05T12:00:00Z',
-  terms: verifyTerms,
   ...overrides,
 })
 
 const ready = (ctx = context()): VerifyState => verifyReducer({ phase: 'loading' }, { kind: 'contextLoaded', context: ctx })
-
-/** Ready, with the supplier's tick on the terms. */
-const ticked = (ctx = context()): VerifyState => verifyReducer(ready(ctx), { kind: 'terms', accepted: true })
 
 describe('resolveLang', () => {
   it('shows Romanian unless the link asks for English', () => {
@@ -60,7 +54,6 @@ describe('failureFor', () => {
     [410, 'InvoiceChanged', 'invoiceChanged'],
     [429, 'RateLimited', 'rateLimited'],
     [422, 'InvalidAnswer', 'invalid'],
-    [422, 'TermsNotAccepted', 'termsChanged'],
     [404, 'NodeNotFound', 'invalid'],
   ])('maps %s %s to %s', (status, code, failure) => {
     expect(failureFor(status, code)).toBe(failure)
@@ -116,7 +109,7 @@ describe('verifyReducer', () => {
   })
 
   it('submits one answer (PARTIAL) but not two skips', () => {
-    const one = verifyReducer(ticked(), { kind: 'energy', value: null })
+    const one = verifyReducer(ready(), { kind: 'energy', value: null })
     expect(verifyReducer(one, { kind: 'submit' })).toMatchObject({ phase: 'submitting' })
 
     const none = verifyReducer(one, { kind: 'transport', value: null })
@@ -124,65 +117,14 @@ describe('verifyReducer', () => {
     expect(verifyReducer(none, { kind: 'submit' })).toBe(none)
   })
 
-  it('ignores taps, the checkbox and a second submit while sending', () => {
-    const sending = verifyReducer(ticked(), { kind: 'submit' })
+  it('ignores taps and a second submit while sending', () => {
+    const sending = verifyReducer(ready(), { kind: 'submit' })
     expect(verifyReducer(sending, { kind: 'transport', value: 'sea' })).toBe(sending)
-    expect(verifyReducer(sending, { kind: 'terms', accepted: false })).toBe(sending)
     expect(verifyReducer(sending, { kind: 'submit' })).toBe(sending)
   })
 
-  it('starts with the terms unticked and sends nothing until the supplier ticks them', () => {
-    const state = ready()
-    expect(state).toMatchObject({ phase: 'ready', accepted: false })
-    expect(verifyReducer(state, { kind: 'submit' })).toBe(state)
-
-    const accepted = verifyReducer(state, { kind: 'terms', accepted: true })
-    expect(verifyReducer(accepted, { kind: 'submit' })).toEqual({
-      phase: 'submitting',
-      context: context(),
-      answers: { transport: 'air', energy: 'grid' },
-    })
-
-    const unticked = verifyReducer(accepted, { kind: 'terms', accepted: false })
-    expect(verifyReducer(unticked, { kind: 'submit' })).toBe(unticked)
-  })
-
-  it('keeps the tick when an answer changes', () => {
-    expect(verifyReducer(ticked(), { kind: 'transport', value: 'sea' })).toMatchObject({ accepted: true })
-  })
-
-  it('reads changed terms again before anything is sent, keeping the answers given', () => {
-    let state = verifyReducer(ticked(), { kind: 'transport', value: 'sea' })
-    state = verifyReducer(state, { kind: 'energy', value: null })
-    const sending = verifyReducer(state, { kind: 'submit' })
-    const changed = verifyReducer(sending, { kind: 'failed', failure: 'termsChanged' })
-    const previous = { transport: 'sea', energy: null }
-    expect(changed).toEqual({ phase: 'failed', failure: 'termsChanged', retry: { phase: 'loading', previous } })
-
-    const reloading = verifyReducer(changed, { kind: 'retry' })
-    expect(reloading).toEqual({ phase: 'loading', previous })
-    // The supplier's answers, not the defaults (air, grid), and the box unticked for the new text.
-    expect(verifyReducer(reloading, { kind: 'contextLoaded', context: context() })).toMatchObject({
-      phase: 'ready',
-      answers: previous,
-      accepted: false,
-    })
-  })
-
-  it('falls back to the pre-selection when the reloaded link no longer offers a kept answer', () => {
-    const reloading: VerifyState = { phase: 'loading', previous: { transport: 'sea', energy: 'renewable' } }
-    const state = verifyReducer(reloading, { kind: 'contextLoaded', context: context({ modes: ['air'] }) })
-    expect(state).toMatchObject({ answers: { transport: 'air', energy: 'renewable' } })
-  })
-
-  it('keeps the answers when the reload itself is lost and retried', () => {
-    const reloading: VerifyState = { phase: 'loading', previous: { transport: 'sea', energy: null } }
-    const lost = verifyReducer(reloading, { kind: 'failed', failure: 'offline' })
-    expect(verifyReducer(lost, { kind: 'retry' })).toEqual(reloading)
-  })
-
   it('ends on the outcome with its warnings', () => {
-    const sending = verifyReducer(ticked(), { kind: 'submit' })
+    const sending = verifyReducer(ready(), { kind: 'submit' })
     const warnings = [{ code: 'AIR_HEAVY' as const, detail: 'Air freight above 2 t' }]
     const done = verifyReducer(sending, {
       kind: 'submitted',
@@ -198,7 +140,7 @@ describe('verifyReducer', () => {
   })
 
   it('retries a lost submission with the same answers', () => {
-    const sending = verifyReducer(verifyReducer(ticked(), { kind: 'transport', value: 'sea' }), { kind: 'submit' })
+    const sending = verifyReducer(verifyReducer(ready(), { kind: 'transport', value: 'sea' }), { kind: 'submit' })
     const lost = verifyReducer(sending, { kind: 'failed', failure: 'rateLimited' })
     expect(verifyReducer(lost, { kind: 'retry' })).toEqual(sending)
   })
@@ -218,21 +160,12 @@ describe('verifyReducer', () => {
   })
 })
 
-describe('canSend', () => {
-  it('needs an answer and the tick', () => {
-    expect(canSend({ transport: 'sea', energy: null }, true)).toBe(true)
-    expect(canSend({ transport: 'sea', energy: null }, false)).toBe(false)
-    expect(canSend({ transport: null, energy: null }, true)).toBe(false)
-  })
-})
-
 describe('submitBody', () => {
-  it('sends a skipped answer as null, leaves the mass to the invoice and names the accepted terms', () => {
-    expect(submitBody('v1.token', { transport: 'sea', energy: null }, verifyTerms.sha256)).toEqual({
+  it('sends a skipped answer as null and leaves the mass to the invoice', () => {
+    expect(submitBody('v1.token', { transport: 'sea', energy: null })).toEqual({
       t: 'v1.token',
       transportMode: 'sea',
       energySource: null,
-      acceptedTerms: verifyTerms.sha256,
     })
   })
 })

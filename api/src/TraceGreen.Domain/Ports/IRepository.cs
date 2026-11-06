@@ -5,20 +5,9 @@ namespace TraceGreen.Domain.Ports;
 
 public sealed record HealthStatus(bool Ok, string? Detail);
 
-/// <summary><see cref="NodeChanged"/>: the node no longer matches the caller's <see cref="NodeAnswerState"/>; nothing was written.</summary>
-public enum RecordVerificationStatus { Ok, AlreadyUsed, NodeChanged }
+public enum RecordVerificationStatus { Ok, AlreadyUsed }
 
 public sealed record RecordVerificationResult(RecordVerificationStatus Status, SupplierNode? Node, AuditEntry? Entry);
-
-/// <summary>
-/// What a caller saw of a node when it built an answer: its status and confirmed answers. Passed to
-/// <see cref="IRepository.RecordVerificationAsync"/>, it is compared under the write's lock, so an answer built on a node
-/// that someone else answered in the meantime is refused instead of overwriting that answer.
-/// </summary>
-public sealed record NodeAnswerState(NodeStatus Status, TransportMode? TransportMode, EnergySource? EnergySource)
-{
-    public static NodeAnswerState Of(SupplierNode node) => new(node.Status, node.TransportMode, node.EnergySource);
-}
 
 public enum InsertInvoiceStatus { Ok, Duplicate }
 
@@ -55,12 +44,7 @@ public interface IRepository
     /// </summary>
     Task<InsertInvoiceResult> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct);
 
-    /// <param name="expected">
-    /// When set, the write happens only if the node still has this status and these answers; otherwise
-    /// <see cref="RecordVerificationStatus.NodeChanged"/> with nothing written. Null writes whatever the node holds (the phone page).
-    /// </param>
-    Task<RecordVerificationResult> RecordVerificationAsync(
-        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct);
+    Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct);
 
     Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct);
 

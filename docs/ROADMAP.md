@@ -17,7 +17,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 |---|---|---|---|
 | F1 | e-Factura import (UBL 2.1, BT-158 classification code and BT-159 origin country, unit codes) | **done** | `Domain/Ubl`, `POST /api/ingest/ubl`; the seed XMLs pass ANAF's validator (`NEXT.md`) |
 | F2 | Supply-chain graph: status colours, hotspot ring, log-width edges, KPI bar | **done** | `web/src/store`, `components/graph`, `KpiBar`; KPIs from the API, labelled per ruling R2 |
-| F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; the Supplier Terms ticked before a submit and recorded in the audit log, printable at `/terms/supplier` (2026-11-06, operator details still placeholders, `docs/legal/README.md`); M2's timed run is still open |
+| F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; M2's timed run is still open |
 | F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **done** | Backend (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel and ghost node in the drawer (B5), checked in the browser in both data modes (`NEXT.md`) |
 | F5 | Audit log panel with chain check | **done** | `AuditPanel`, `POST /api/audit/verify` |
 | F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The Python service answers `/classify` from the cache, then the stub, with the allow-list enforced (C7); the live model provider is open, and D4 places it in hackathon hours H1–H4 |
@@ -26,7 +26,6 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | F9 | PDF invoice drop | **open** | Hackathon, if time |
 | F10 | Scenario export | **open** | Only if everything else is done |
 | F11 | AI alternative suggester | **open** | The alternatives come from the curated `seed/alternatives.json` |
-| F12 | Supplier page: one link per supplier, every delivery confirmed from one list | **built** | `PortalService`, `POST /api/portal-link`, `/api/portal/{view,answer}`, `/supplier`, the drawer's "Supplier page link"; the Supplier Terms ticked once per page visit and recorded with each answer; `web/e2e/supplier-portal.spec.ts` passes in both data modes, on the Vite dev stack and in CI on the demo image; not yet run on a real phone (`NEXT.md`) |
 
 ## Controls
 
@@ -36,9 +35,9 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | C2 | Token bound to the invoice hash; a mismatch is 410 | **done** | `VerifyService`, `Hashing.InvoiceHash` |
 | C3 | Single use through a unique nonce; a second use is 409 | **done** | Both repositories; the context route answers 409 too |
 | C4 | Hash-chained audit log with an on-screen check | **done** | `AuditChain`, append-only trigger, `AuditPanel` |
-| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES`; the supplier page's routes count apart, at 3 × the limit (F12) |
+| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES` |
 | C6 | Untrusted text rendered as text; CSP header | **done** | `react/no-danger` lint; CSP in `web/nginx.conf` (demo image) |
-| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` and `/supplier` (F12) |
+| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` |
 | C8 | RLS; secrets only on the server | **partial** | RLS is enabled with no policies yet (the app connects as owner); secrets are server-only; see "Known gaps" in `SECURITY.md` |
 | C9 | 7-day expiry with a countdown on the QR card | **done** | `LINK_TTL_SECONDS` default 604800; "expires in …" on the link card |
 

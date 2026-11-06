@@ -66,7 +66,7 @@ public static class DemoState
             var at = node.CreatedAt.AddHours(1);
             verifications.Add(new Verification(
                 spec.VerificationId!.Value, workspaceId, spec.NodeId, spec.Nonce!, spec.TransportMode, spec.EnergySource,
-                node.MassT, at, "seed", at, TermsVersion: null, TermsSha256: null));
+                node.MassT, at, "seed", at));
             Append(at, "verification.submitted", new JsonObject
             {
                 ["nodeId"] = spec.NodeId.ToString("D"),

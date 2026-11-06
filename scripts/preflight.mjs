@@ -15,14 +15,12 @@ import {
   ETS_PLACES,
   factorDocMismatches,
   placeholderFactors,
-  placeholderTerms,
 } from './lib/preflight-checks.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = (file) => readFileSync(join(root, file), 'utf8');
 const FACTORS = 'seed/factors.json';
 const DOC = 'docs/factor-sources.md';
-const TERMS = 'seed/supplier-terms.json';
 
 /** Tracked text files outside the documents that state the rules, and how many were left out. */
 function trackedTextFiles() {
@@ -58,10 +56,6 @@ const checks = [
       const findings = carbonPriceAgreement(values, row?.value ?? '', DOC, row?.line ?? null);
       return { findings, note: findings.length === 0 ? `${values[0].value} in ${values.length} files and ${DOC}` : '' };
     },
-  },
-  {
-    title: `The supplier terms name the operator (${TERMS})`,
-    run: () => ({ findings: placeholderTerms(read(TERMS), TERMS) }),
   },
   {
     title: 'No banned term in a tracked file (CLAUDE.md, Copy rules)',

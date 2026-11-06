@@ -115,14 +115,6 @@ export function requestLink(nodeId: string): Promise<Answer<RequestLinkResponse>
   return fetchBody(() => api.POST('/api/request-link', { body: { nodeId } }))
 }
 
-/**
- * POST /api/portal-link: the supplier page link (F12) for the supplier of this node, reusable until it expires. Like a
- * verification link, the token exists only inside `url`, so the answer stays in the component that shows it.
- */
-export function requestPortalLink(nodeId: string): Promise<Answer<RequestLinkResponse>> {
-  return fetchBody(() => api.POST('/api/portal-link', { body: { nodeId } }))
-}
-
 /** POST /api/audit/verify: the API recomputes every hash of the audit log and names the first entry that fails. */
 export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
   return fetchBody(() => api.POST('/api/audit/verify'))

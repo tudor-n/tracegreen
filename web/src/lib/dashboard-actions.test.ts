@@ -1,14 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { savedScenario, scenarioResult } from '@/store/testFixtures'
-import {
-  failureMessage,
-  requestLink,
-  requestPortalLink,
-  saveScenario,
-  simulateChange,
-  verifyAuditChain,
-} from './dashboard-actions'
+import { failureMessage, requestLink, saveScenario, simulateChange, verifyAuditChain } from './dashboard-actions'
 
 const problem = (status: number, code: string, detail: string) => ({
   type: 'about:blank',
@@ -48,23 +41,6 @@ describe('failureMessage', () => {
 
   it("reads a proxy's bare 413 as too large", () => {
     expect(failureMessage(413, '<html>413 Request Entity Too Large</html>')).toBe('File too large.')
-  })
-})
-
-describe('requestPortalLink', () => {
-  const nodeId = '00000000-0000-0000-0000-0000000000a1'
-  const link = { nodeId, url: 'http://192.168.137.1:3000/supplier?t=p1.x', expiresAt: '2026-11-03T10:00:00Z', loopback: false }
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('posts the node id to the supplier page route and returns the link', async () => {
-    const post = vi
-      .spyOn(api, 'POST')
-      .mockResolvedValue({ data: link, response: new Response(null, { status: 201 }) } as never)
-    expect(await requestPortalLink(nodeId)).toEqual({ ok: true, data: link })
-    expect(post).toHaveBeenCalledWith('/api/portal-link', { body: { nodeId } })
   })
 })
 

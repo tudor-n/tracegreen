@@ -72,12 +72,11 @@ internal static class Mapping
         Id = v.Id, WorkspaceId = v.WorkspaceId, NodeId = v.NodeId, TokenNonce = v.TokenNonce,
         TransportMode = Name(v.TransportMode), EnergySource = Name(v.EnergySource), MassTConfirmed = v.MassTConfirmed,
         ConsumedAt = Utc(v.ConsumedAt), IpHash = v.IpHash, CreatedAt = Utc(v.CreatedAt),
-        TermsVersion = v.TermsVersion, TermsSha256 = v.TermsSha256,
     };
 
     public static Verification ToDomain(VerificationRow r) => new(
         r.Id, r.WorkspaceId, r.NodeId, r.TokenNonce, ParseOpt<TransportMode>(r.TransportMode),
-        ParseOpt<EnergySource>(r.EnergySource), r.MassTConfirmed, r.ConsumedAt, r.IpHash, r.CreatedAt, r.TermsVersion, r.TermsSha256);
+        ParseOpt<EnergySource>(r.EnergySource), r.MassTConfirmed, r.ConsumedAt, r.IpHash, r.CreatedAt);
 
     public static AuditRow ToRow(NewAuditEntry e) => new()
     {

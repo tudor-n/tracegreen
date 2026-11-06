@@ -106,8 +106,7 @@ public sealed record LinkGrant(Guid NodeId, string Url, DateTimeOffset ExpiresAt
 
 /// <summary>
 /// What the supplier's phone page needs to ask its two questions, and nothing personal: company names, the invoiced item,
-/// the lane's modes with the default pre-selected, the energy answers with grid pre-selected, and the checkbox statement of
-/// the <see cref="Terms"/> the supplier must accept before submitting (both languages, so the page switches without a request).
+/// the lane's modes with the default pre-selected, and the energy answers with grid pre-selected.
 /// <see cref="ItemDescription"/> is invoice text: render it as text.
 /// </summary>
 public sealed record VerifyContext(
@@ -124,49 +123,10 @@ public sealed record VerifyContext(
     IReadOnlyList<EnergySource> EnergySources,
     EnergySource DefaultEnergy,
     decimal? MassT,
-    DateTimeOffset ExpiresAt,
-    VerifyTerms Terms);
+    DateTimeOffset ExpiresAt);
 
-/// <summary>
-/// The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.
-/// <see cref="AcceptedTerms"/> is the <see cref="SupplierTerms.Sha256"/> of the terms the supplier ticked; anything else is refused.
-/// <see cref="Simulated"/> marks an answer the demo tool gave for a supplier, so its audit entry says so.
-/// </summary>
-public sealed record VerifyAnswer(
-    string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT, string? AcceptedTerms, bool Simulated = false);
+/// <summary>The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.</summary>
+public sealed record VerifyAnswer(string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT);
 
 /// <summary>What the phone page shows after a submit: the node's new status and any plausibility warnings.</summary>
 public sealed record VerifyOutcome(Guid NodeId, NodeStatus Status, IReadOnlyList<PlausibilityWarning> Warnings);
-
-/// <summary>
-/// The supplier page (F12): every delivery on the buyer's graph from the supplier the link was made for, with nothing
-/// personal and no carbon figure. Items still waiting for an answer come before confirmed ones. <see cref="Terms"/> is the
-/// checkbox statement of the supplier terms, as on the phone page: an answer sends back its SHA-256 once the supplier ticked it.
-/// </summary>
-public sealed record PortalView(
-    string SupplierLabel, string BuyerName, DateTimeOffset ExpiresAt, IReadOnlyList<PortalItem> Items, VerifyTerms Terms);
-
-/// <summary>
-/// One delivery on the supplier page, with what the phone page would ask for it. <see cref="DefaultMode"/> and
-/// <see cref="DefaultEnergy"/> are the answers to pre-select: an answer the node already has, else the lane's default mode
-/// and the power source the supplier gave most recently, else grid. <see cref="AnsweredMode"/> and
-/// <see cref="AnsweredEnergy"/> are what the supplier has confirmed so far (null when not answered).
-/// <see cref="ItemDescription"/> is invoice text: render it as text.
-/// </summary>
-public sealed record PortalItem(
-    Guid NodeId,
-    NodeStatus Status,
-    string InvoiceNumber,
-    DateOnly IssueDate,
-    string ItemDescription,
-    string Origin,
-    string Dest,
-    IReadOnlyList<TransportMode> Modes,
-    TransportMode DefaultMode,
-    IReadOnlyList<EnergySource> EnergySources,
-    EnergySource DefaultEnergy,
-    TransportMode? AnsweredMode,
-    EnergySource? AnsweredEnergy);
-
-/// <summary>What the supplier page gets back for an answer: the outcome, and the list as it now is, so one call is one confirmation.</summary>
-public sealed record PortalAnswerResult(VerifyOutcome Outcome, PortalView View);

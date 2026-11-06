@@ -480,14 +480,6 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("node_id");
 
-                    b.Property<string>("TermsSha256")
-                        .HasColumnType("text")
-                        .HasColumnName("terms_sha256");
-
-                    b.Property<string>("TermsVersion")
-                        .HasColumnType("text")
-                        .HasColumnName("terms_version");
-
                     b.Property<string>("TokenNonce")
                         .IsRequired()
                         .HasColumnType("text")

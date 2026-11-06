@@ -12,20 +12,6 @@ public class CanonicalJsonAndHashingTests
     public void CanonicalJsonSortsKeysDeeplyAndOmitsWhitespace() =>
         Assert.Equal("{\"a\":{\"c\":3,\"d\":2},\"b\":1}", CanonicalJson.Serialize(new { b = 1, a = new { d = 2, c = 3 } }));
 
-    /// <summary>
-    /// How canonical JSON escapes strings, pinned against the same probe in scripts/lib/terms-hash.test.mjs, so the
-    /// supplier terms' fingerprint can be recomputed without .NET (scripts/terms-hash.mjs).
-    /// </summary>
-    [Fact]
-    public void CanonicalJsonEscapesStringsAsTheTermsHashScriptExpects()
-    {
-        const string Probe = """{"z":"<>&'+`\"","a":"\\ \n\t é ș „” § 😀","n":[1,true,null],"B":"x"}""";
-        const string Expected =
-            """{"B":"x","a":"\\ \n\t \u00E9 \u0219 \u201E\u201D \u00A7 \uD83D\uDE00","n":[1,true,null],"z":"\u003C\u003E\u0026\u0027\u002B\u0060\u0022"}""";
-
-        Assert.Equal(Expected, CanonicalJson.Serialize(JsonNode.Parse(Probe)));
-    }
-
     [Fact]
     public void CanonicalJsonIsStableAcrossInsertionOrder()
     {

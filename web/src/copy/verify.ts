@@ -13,16 +13,8 @@ interface Message {
   body: string
 }
 
-/** The outcomes the page can end on: done, or one of the error states (401, 409, 410 twice, 422 terms, 429, network). */
-export type VerifyResult =
-  | 'thanks'
-  | 'alreadyUsed'
-  | 'expired'
-  | 'invoiceChanged'
-  | 'invalid'
-  | 'termsChanged'
-  | 'rateLimited'
-  | 'offline'
+/** The outcomes the page can end on: done, or one of the error states (401, 409, 410 twice, 429, network). */
+export type VerifyResult = 'thanks' | 'alreadyUsed' | 'expired' | 'invoiceChanged' | 'invalid' | 'rateLimited' | 'offline'
 
 export interface VerifyStrings {
   title: string
@@ -43,24 +35,6 @@ export interface VerifyStrings {
   retry: string
   /** The "please reconfirm" banner for plausibility warnings. It never blocks (D2). */
   reconfirm: { title: string; warnings: Record<PlausibilityCode, string> }
-  /**
-   * The frame around the supplier terms. The terms themselves (title, key points, the checkbox statement with its link,
-   * and the sections) come from the API, which hashes exactly that text, so none of it is written here.
-   */
-  terms: {
-    version: (version: string) => string
-    /** Read by screen readers after the link in the checkbox statement. */
-    opensInNewTab: string
-    /** Shown under the submit button while the terms are not ticked. */
-    tickToSubmit: string
-  }
-  /** The printable terms page /terms/supplier. */
-  termsPage: {
-    loading: string
-    fingerprint: string
-    print: string
-    failed: Message
-  }
 }
 
 export const verifyCopy = {
@@ -103,10 +77,6 @@ export const verifyCopy = {
         title: 'Acest link nu este valid',
         body: 'Verificați dacă ați deschis linkul complet sau cereți cumpărătorului unul nou.',
       },
-      termsChanged: {
-        title: 'Termenii au fost actualizați',
-        body: 'Citiți versiunea nouă a termenilor, apoi trimiteți din nou răspunsurile.',
-      },
       rateLimited: {
         title: 'Prea multe încercări',
         body: 'Așteptați un minut, apoi încercați din nou.',
@@ -124,20 +94,6 @@ export const verifyCopy = {
           'Transportul aerian este neobișnuit pentru o livrare atât de grea. Dacă marfa nu a fost transportată pe calea aerului, anunțați persoana de contact de la cumpărător.',
         SEA_TOO_FAST:
           'Datele de livrare par prea apropiate pentru transport maritim. Dacă marfa nu a fost transportată pe mare, anunțați persoana de contact de la cumpărător.',
-      },
-    },
-    terms: {
-      version: (version: string) => `Versiunea ${version}`,
-      opensInNewTab: 'se deschide într-o filă nouă',
-      tickToSubmit: 'Bifați caseta de mai sus pentru a trimite răspunsurile.',
-    },
-    termsPage: {
-      loading: 'Se încarcă termenii…',
-      fingerprint: 'Amprenta SHA-256',
-      print: 'Tipăriți sau salvați',
-      failed: {
-        title: 'Termenii nu au putut fi încărcați',
-        body: 'Verificați conexiunea la internet și încercați din nou.',
       },
     },
   },
@@ -180,10 +136,6 @@ export const verifyCopy = {
         title: 'This link is not valid',
         body: 'Check that you opened the whole link, or ask the buyer for a new one.',
       },
-      termsChanged: {
-        title: 'The terms have been updated',
-        body: 'Read the new version of the terms, then send your answers again.',
-      },
       rateLimited: {
         title: 'Too many attempts',
         body: 'Wait a minute, then try again.',
@@ -201,20 +153,6 @@ export const verifyCopy = {
           'Air freight is unusual for a shipment this heavy. If the goods did not travel by air, please tell your contact at the buyer.',
         SEA_TOO_FAST:
           'The delivery dates look too short for sea freight. If the goods did not travel by sea, please tell your contact at the buyer.',
-      },
-    },
-    terms: {
-      version: (version: string) => `Version ${version}`,
-      opensInNewTab: 'opens in a new tab',
-      tickToSubmit: 'Tick the box above to send your answers.',
-    },
-    termsPage: {
-      loading: 'Loading the terms…',
-      fingerprint: 'SHA-256 fingerprint',
-      print: 'Print or save',
-      failed: {
-        title: 'The terms could not be loaded',
-        body: 'Check your internet connection and try again.',
       },
     },
   },
