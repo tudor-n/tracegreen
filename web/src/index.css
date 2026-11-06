@@ -57,7 +57,8 @@
   --secondary: #efeff1;
   --secondary-foreground: #1d1d1f;
   --muted: #efeff1;
-  --muted-foreground: #6e6e73;
+  /* 5.1:1 on the sidebar (#ececef) and 5.2:1 on fills (#efeff1): WCAG AA for small text. */
+  --muted-foreground: #636366;
   --accent: #efeff1;
   --accent-foreground: #1d1d1f;
   --destructive: #d93a2e;
