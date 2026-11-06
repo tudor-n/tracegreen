@@ -39,7 +39,7 @@ export const supplierCopy = {
     progress: (confirmed: number, total: number) =>
       `${confirmed} din ${total} ${total === 1 ? 'confirmată' : 'confirmate'}`,
     empty: 'Nu aveți nimic de confirmat acum.',
-    status: { ESTIMATED: 'Așteaptă răspunsul dvs.', PARTIAL: 'Mai e un răspuns', VERIFIED: 'Confirmată' },
+    status: { ESTIMATED: 'Așteaptă confirmarea', PARTIAL: 'Mai e un răspuns', VERIFIED: 'Confirmată' },
     open: 'Confirmați',
     close: 'Mai târziu',
     send: 'Trimite',

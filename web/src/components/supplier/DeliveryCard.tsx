@@ -57,27 +57,26 @@ export function DeliveryCard({
 
   return (
     <li data-testid={id} data-status={item.status} className="flex flex-col gap-4 rounded-xl border bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-base font-semibold">
-            {item.invoiceNumber} · {formatIssueDate(item.issueDate, lang)}
-          </p>
-          <p className="text-base break-words">{item.itemDescription}</p>
-          <p className="text-sm text-muted-foreground">
-            {item.origin} → {item.dest}
-          </p>
-        </div>
+      {/* The status on its own row, so the invoice text keeps the card's full width at 360 px in either language. */}
+      <div className="flex flex-col gap-2">
         <span
           aria-live="polite"
           data-testid={`${id}-status`}
           className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-full border-2 px-2.5 py-1 text-sm font-semibold',
+            'flex items-center gap-1.5 self-start rounded-full border-2 px-2.5 py-1 text-sm font-semibold',
             STATUS_TONE[item.status],
           )}
         >
           <span aria-hidden className="size-2 rounded-full bg-current" />
           {copy.status[item.status]}
         </span>
+        <p className="text-base font-semibold">
+          {item.invoiceNumber} · {formatIssueDate(item.issueDate, lang)}
+        </p>
+        <p className="text-base break-words">{item.itemDescription}</p>
+        <p className="text-sm text-muted-foreground">
+          {item.origin} → {item.dest}
+        </p>
       </div>
 
       {summary !== '' && draft === null && <p className="text-base text-muted-foreground">{summary}</p>}
