@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-// The node drawer's building blocks, shared by its sections and the simulator panel inside it.
+// Small building blocks shared by the simulator panel: a titled section and a quiet tag such as "illustrative".
 
 export function Section({ title, tag, children }: { title: string; tag?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+      <h3 className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
         {title}
         {tag !== undefined && <Tag>{tag}</Tag>}
       </h3>
@@ -35,8 +35,8 @@ export function Tag({ tone, children }: { tone?: 'warning'; children: ReactNode 
   return (
     <span
       className={cn(
-        'shrink-0 rounded px-1 text-[10px] font-medium tracking-normal normal-case',
-        tone === 'warning' ? 'bg-destructive/10 font-semibold text-destructive' : 'bg-muted text-muted-foreground',
+        'shrink-0 rounded-md px-1.5 py-px text-[11px] font-medium',
+        tone === 'warning' ? 'bg-estimated-tint font-semibold text-estimated-ink' : 'bg-fill text-muted-foreground',
       )}
     >
       {children}

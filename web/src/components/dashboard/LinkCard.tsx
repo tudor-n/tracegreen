@@ -10,25 +10,25 @@ import { formatDateTime, formatTimeLeft } from '@/store'
 
 export function LinkCard({ link }: { link: RequestLinkResponse }) {
   const card = useRef<HTMLElement>(null)
-  // The card appears at the top of the drawer; bring it into view when the drawer is scrolled down.
+  // The card replaces the request card in the panel; bring it into view when the panel is scrolled down.
   useEffect(() => {
     card.current?.scrollIntoView({ block: 'nearest' })
   }, [link])
 
   return (
-    <section ref={card} data-testid="qr-card" className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">
-      <h3 className="self-start text-xs font-semibold tracking-wide text-muted-foreground uppercase">{linkCopy.title}</h3>
+    <section ref={card} data-testid="qr-card" className="flex flex-col items-center gap-2.5 rounded-2xl bg-grouped p-[18px] text-center">
+      <h3 className="self-start text-[15px] font-semibold">{linkCopy.title}</h3>
       {/* Dark on white in either theme, with a quiet zone, so phone cameras read it. */}
-      <div className="rounded-md bg-white p-1">
+      <div className="rounded-xl bg-white p-1.5 shadow-[0_0_0_0.5px_rgb(0_0_0/0.14)]">
         <QRCodeSVG value={link.url} size={176} marginSize={2} title={linkCopy.qr} />
       </div>
-      <p className="text-xs text-muted-foreground">{linkCopy.scan}</p>
+      <p className="text-[13px] text-ink-2">{linkCopy.scan}</p>
       <p data-testid="qr-url" className="w-full font-mono text-[11px] break-all select-all">
         {link.url}
       </p>
       <Expiry expiresAt={link.expiresAt} />
       {link.loopback && (
-        <p role="alert" data-testid="qr-loopback" className="rounded bg-destructive/10 px-2 py-1 text-xs text-destructive">
+        <p role="alert" data-testid="qr-loopback" className="rounded-lg bg-hotspot-tint px-2.5 py-1.5 text-xs text-hotspot-ink">
           {linkCopy.loopback}
         </p>
       )}
