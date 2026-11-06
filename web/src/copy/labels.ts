@@ -40,6 +40,10 @@ export const AI_SUGGESTED = 'AI-suggested · illustrative'
 export const AI_EXTRACTED = 'AI-extracted · check fields'
 /** Lane cost and lead time, and any other figure that is not measured. */
 export const ILLUSTRATIVE = 'illustrative'
+/** F6: the flag on a node whose category waits for a person (an AI-mapped category, or one left unclassified). */
+export const CHECK_CATEGORY = 'Check category'
+/** F6: the provenance note once a person confirmed or chose the node's category (source `buyer`). */
+export const CATEGORY_SET_BY_BUYER = 'Category set by buyer'
 
 /** The simulator's MAC badge, by the generated badge value. */
 export const macBadgeLabel = {

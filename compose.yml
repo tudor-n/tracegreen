@@ -66,6 +66,8 @@ services:
       - /src/artifacts
       - nuget:/root/.nuget/packages
       - ./seed:/seed:ro
+      # Read by the banned-term parity test (BannedTermsTests), so `docker compose exec api dotnet test` passes too.
+      - ./scripts:/scripts:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
@@ -79,7 +81,7 @@ services:
       AI_EXTRACT_TIMEOUT_MS: ${AI_EXTRACT_TIMEOUT_MS:-25000}
       SEED_DIR: /seed
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      ETS_PRICE_EUR_PER_T: "70"
+      ETS_PRICE_EUR_PER_T: "90.01"
     ports:
       - "8080:8080"
     depends_on:

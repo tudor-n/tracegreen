@@ -54,6 +54,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm or change a node's category; recomputes its figures, appends classification.reviewed and publishes node.updated */
+        post: operations["ReviewClassification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The categories a buyer may set for a node, which are also the AI's allow-list */
+        get: operations["ListCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingest/ubl": {
         parameters: {
             query?: never;
@@ -258,40 +292,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/categories": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The categories a buyer may set for a node, which are also the AI's allow-list */
-        get: operations["ListCategories"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/nodes/{nodeId}/classification": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Set a node's category: recompute its estimate on the server, keep the correction for that description and publish node.updated */
-        put: operations["CorrectClassification"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/nodes/{nodeId}/suggestions": {
         parameters: {
             query?: never;
@@ -453,6 +453,10 @@ export interface components {
             kg: number;
             factors: components["schemas"]["FactorLookup"][];
         };
+        CategoryOption: {
+            id: string;
+            label: string;
+        };
         ChainVerification: {
             valid: boolean;
             /** Format: int32 */
@@ -483,11 +487,14 @@ export interface components {
         };
         /** @enum {unknown} */
         ChatStatus: "answered" | "notAnswered" | "unavailable";
-        ClassificationRequest: {
+        /** @enum {unknown} */
+        ClassificationReview: "notNeeded" | "pending" | "confirmed" | "corrected";
+        ClassificationReviewRequest: {
             categoryId: string;
+            expectedCategoryId: string;
         };
         /** @enum {unknown} */
-        ClassificationSource: "invoice" | "cache" | "model" | "stub";
+        ClassificationSource: "invoice" | "cache" | "model" | "stub" | "buyer";
         ClassificationView: {
             categoryId: string;
             categoryLabel: string;
@@ -496,6 +503,9 @@ export interface components {
             confidence: null | number;
             aiMapped: boolean;
             lineDescription: string;
+            review: components["schemas"]["ClassificationReview"];
+            /** Format: date-time */
+            reviewedAt: null | string;
             rationale: null | string;
         };
         DomainEvent: components["schemas"]["DomainEventNodeCreated"] | components["schemas"]["DomainEventNodeUpdated"] | components["schemas"]["DomainEventNodeVerified"] | components["schemas"]["DomainEventAuditAppended"] | components["schemas"]["DomainEventScenarioSaved"] | components["schemas"]["DomainEventGraphReset"];
@@ -779,7 +789,7 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -1007,6 +1017,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphSnapshot"];
+                };
+            };
+        };
+    };
+    ReviewClassification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassificationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ListCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOption"][];
                 };
             };
         };
@@ -1538,70 +1621,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Scenario"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ApiProblem"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ApiProblem"];
-                };
-            };
-        };
-    };
-    ListCategories: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategoryOption"][];
-                };
-            };
-        };
-    };
-    CorrectClassification: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                nodeId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ClassificationRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NodeView"];
                 };
             };
             /** @description Not Found */

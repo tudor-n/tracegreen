@@ -25,7 +25,9 @@ public class NodeViewMapperTests
         Assert.Equal(NodeStatus.Verified, n2.Status);
         Assert.Equal(CarbonBasis.Activity, n2.Basis);
         Assert.Equal(n2.Activity!.Kg, n2.CarbonKg);
-        Assert.Equal(["Sea container freight (placeholder)", "Electrical items: printed circuit boards (placeholder)"], n2.Activity.Factors.Select(f => f.RowLabel));
+        Assert.Equal(
+            ["Freighting goods: cargo ship, container ship, average", "Material use: Electrical items - IT, primary material production"],
+            n2.Activity.Factors.Select(f => f.RowLabel));
         Assert.Equal(Uncertainty.Low, n2.Uncertainty);
         Assert.Equal(TransportMode.Sea, n2.Lane.Mode);
     }
@@ -56,11 +58,12 @@ public class NodeViewMapperTests
     }
 
     [Fact]
-    public void PlaceholderSourcesReachTheView()
+    public void FactorSourcesReachTheView()
     {
         var n2 = View("N2");
 
-        Assert.Contains("PLACEHOLDER", n2.Activity!.Factors[0].Source);
+        Assert.All(n2.Activity!.Factors, f => Assert.Equal("DESNZ UK GHG conversion factors", f.Source));
+        Assert.All(n2.Activity.Factors, f => Assert.Equal(2026, f.Year));
     }
 
     [Fact]
@@ -136,5 +139,25 @@ public class NodeViewMapperTests
             Assert.Equal(node.ClassificationRationale, view.Classification.Rationale);
             Assert.False(string.IsNullOrWhiteSpace(view.Classification.Rationale));
         }
+    }
+
+    [Fact]
+    public void NoReasonShowsForUnclassifiedOrAfterABuyersReview()
+    {
+        var spec = Seed.DemoState.Nodes.Single(n => n.Key == "N3");
+        var node = State.Nodes.Single(n => n.Id == spec.NodeId);
+        var invoice = State.Invoices.Single(i => i.Id == node.InvoiceId);
+
+        // A model answer outside the allow-list keeps its source and a rejection note, which is no reason for a category.
+        var rejected = node with
+        {
+            CategoryId = Ids.Unclassified,
+            ClassificationSource = ClassificationSource.Model,
+            ClassificationRationale = "Category outside the allow-list: anything",
+        };
+        var reviewed = node with { ClassificationSource = ClassificationSource.Buyer, ClassificationRationale = "Die-cast zinc housing" };
+
+        Assert.Null(Mapper.Map(rejected, invoice).Classification.Rationale);
+        Assert.Null(Mapper.Map(reviewed, invoice).Classification.Rationale);
     }
 }

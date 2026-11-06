@@ -87,7 +87,7 @@ public sealed record AppConfig(
             LinkTtlSeconds: GetInt(env, "LINK_TTL_SECONDS", 604800),
             DemoTools: Get(env, "DEMO_TOOLS") == "1",
             PublicBaseUrl: Get(env, "PUBLIC_BASE_URL")?.TrimEnd('/'),
-            EtsPriceEurPerT: GetDecimal(env, "ETS_PRICE_EUR_PER_T", 70m),
+            EtsPriceEurPerT: GetDecimal(env, "ETS_PRICE_EUR_PER_T", 90.01m),
             AiBaseUrl: (Get(env, "AI_BASE_URL") ?? "http://localhost:8000").TrimEnd('/'),
             AiTimeoutMs: GetInt(env, "AI_TIMEOUT_MS", 10000),
             AiChatTimeoutMs: GetInt(env, "AI_CHAT_TIMEOUT_MS", 20000),

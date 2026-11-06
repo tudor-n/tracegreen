@@ -1,9 +1,12 @@
 import { useMemo } from 'react'
+import { useSearchParams } from 'react-router'
 import type { NodeView } from '@/api/client'
 import { PageHeader, PageMessage } from '@/components/shell/Page'
+import { CheckFilter } from '@/components/suppliers/CheckFilter'
 import { SupplierPanel } from '@/components/suppliers/SupplierPanel'
 import { SupplierTree } from '@/components/suppliers/SupplierTree'
-import { canvasCopy, suppliersCopy } from '@/copy/dashboard'
+import { canvasCopy, reviewCopy, suppliersCopy } from '@/copy/dashboard'
+import { CHECK_FILTER, categoriesToCheck } from '@/lib/review-display'
 import { byCarbonDesc, formatTonnes, hotspotIds, selectLoaded, selectSelectedNode, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
@@ -29,6 +32,10 @@ export default function Suppliers() {
   const select = useGraphStore((s) => s.select)
   const nodes = useMemo(() => byEmissions(nodeMap), [nodeMap])
   const hotspots = useMemo(() => hotspotIds(nodes), [nodes])
+  // The Overview's counter opens this list filtered to the categories to check (F6); the hotspots stay those of all nodes.
+  const [params] = useSearchParams()
+  const checking = params.get(CHECK_FILTER.param) === CHECK_FILTER.value
+  const listed = useMemo(() => (checking ? categoriesToCheck(nodes) : nodes), [checking, nodes])
 
   let body
   if (!loaded) {
@@ -40,11 +47,19 @@ export default function Suppliers() {
       )
   } else if (nodes.length === 0) {
     body = <PageMessage>{canvasCopy.empty}</PageMessage>
+  } else if (listed.length === 0) {
+    body = (
+      <>
+        <PageMessage>{reviewCopy.noneToCheck}</PageMessage>
+        <CheckFilter />
+      </>
+    )
   } else {
     body = (
       <>
+        {checking && <CheckFilter />}
         <SupplierTree
-          nodes={nodes}
+          nodes={listed}
           hotspots={hotspots}
           buyer={buyer}
           total={kpis === null ? null : formatTonnes(kpis.totalKg)}

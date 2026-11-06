@@ -76,13 +76,18 @@ public static class NodeFactory
             TransportMode: transportMode,
             EnergySource: energySource,
             CreatedAt: createdAt,
+            Review: InitialReview(classification.Source),
             ClassificationRationale: Reason(classification.Rationale));
     }
 
     /// <summary>Longest reason kept, the same cap the AI service applies to a model's rationale.</summary>
     public const int MaxRationaleChars = 200;
 
-    /// <summary>The reason as a reader may see it: whitespace collapsed, capped, and null when empty or against the copy rules.</summary>
+    /// <summary>
+    /// The reason as a reader may see it: whitespace collapsed, capped, and null when empty or against the copy rules. The
+    /// copy rules are checked on the whole text before the cut, so a name the cut would split is still caught, and the cut
+    /// never ends inside a surrogate pair (a lone surrogate is not valid UTF-8, and Postgres refuses it).
+    /// </summary>
     public static string? Reason(string? rationale)
     {
         if (string.IsNullOrWhiteSpace(rationale))
@@ -90,10 +95,22 @@ public static class NodeFactory
             return null;
         }
         var text = string.Join(' ', rationale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (BannedTerms.Any(text))
+        {
+            return null;
+        }
         if (text.Length > MaxRationaleChars)
         {
-            text = text[..MaxRationaleChars].TrimEnd();
+            var cut = char.IsHighSurrogate(text[MaxRationaleChars - 1]) ? MaxRationaleChars - 1 : MaxRationaleChars;
+            text = text[..cut].TrimEnd();
         }
         return BannedTerms.Clean(text);
     }
+
+    /// <summary>
+    /// Every AI-mapped category waits for a person, whatever its confidence; an invoice code, the stub and a buyer's own
+    /// choice need no review.
+    /// </summary>
+    public static ClassificationReview InitialReview(ClassificationSource source) =>
+        source is ClassificationSource.Cache or ClassificationSource.Model ? ClassificationReview.Pending : ClassificationReview.NotNeeded;
 }

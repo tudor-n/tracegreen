@@ -247,6 +247,8 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   AlreadyConfirmed: 'Already confirmed by the supplier.',
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
+  CategoryNotAllowed: 'Category not in the list.',
+  CategoryChanged: 'Category changed since this page loaded.',
   InvalidQuestion: 'That question could not be asked.',
   NotPdf: 'Not a PDF.',
   PdfNoText: 'This PDF has no text to read.',
@@ -294,4 +296,32 @@ export const suppliersCopy = {
   /** For a confirmed node: the rows behind the spend-based figure it replaced. */
   factorsBefore: (figure: string) => `Before confirmation: the rows behind ${figure}`,
   statusKey: 'Status key',
+} as const
+
+/**
+ * The classification review (F6): the Overview's counter, the filtered supplier list, and the side panel's control.
+ * The flag itself and the buyer's provenance note are fixed labels in ./labels.ts. English only, like the rest of the
+ * dashboard; the wording is Dev C's to settle.
+ */
+export const reviewCopy = {
+  count: (n: number) => (n === 1 ? '1 category to check' : `${n} categories to check`),
+  countBody: 'The AI chose these categories. Confirm or change each one; the figures follow the category.',
+  filtered: 'Showing the categories to check.',
+  showAll: 'Show all suppliers',
+  noneToCheck: 'No categories left to check.',
+  title: 'Category',
+  lineLabel: 'Invoice line',
+  confirm: 'Correct',
+  change: 'Change category',
+  choices: 'Categories to choose from',
+  current: 'current',
+  saving: 'Saving…',
+  saved: 'Category saved.',
+  /** 409: another person or page set the category first; the panel now shows it as it is. */
+  changed: 'Someone changed this category in the meantime. It now shows as it is; check it again.',
+  /** 422: a category the API no longer accepts. */
+  notAllowed: 'That category is not in the list. Pick one of the categories shown.',
+  categoriesLoading: 'Loading the categories…',
+  categoriesFailed: "Can't load the categories.",
+  retry: 'Try again',
 } as const
