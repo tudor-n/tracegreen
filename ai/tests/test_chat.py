@@ -373,11 +373,19 @@ def test_an_answer_that_breaks_a_rule_goes_back_once_with_the_rule() -> None:
 @pytest.mark.parametrize(
     ("text", "problem"),
     [
-        ("Taiwan PCB Ltd. emits the most.", "it types a name from the data"),
+        ("Taiwan PCB Ltd. emits the most.", None),
         ("Ask Cluj Metal SRL for a quote.", "it names a company"),
         ("Most of your emissions are still estimated.", "without citing the fact"),
         ("{{S1.name}} is the largest.", None),
         ("{{S1.name}} is the largest. FactIds: {{S1.name}}.", "format into its text"),
+        ("I'll add a what-if for {{S1.name}}.", "promises an action"),
+        ("I have changed the transport of {{S1.name}}.", "promises an action"),
+        ("I can't change anything, but What if can show it.", None),
+        ("It is {{S1.name}}, that is {{S1.name}} again.", "twice in one sentence"),
+        (
+            "{{S1.name}} emits {{S1.carbon}}, more than {{S1.carbon}} last year.",
+            "twice in one sentence",
+        ),
         ("{{S9.name}} is the largest.", "S9.name, which is not one of the facts"),
         ("It is about {{S1.name}} {S1.carbon}}.", "not written as {{id}}"),
         ("The total is large.", None),
@@ -405,13 +413,14 @@ def test_a_data_answer_must_cite_a_fact() -> None:
     assert broke is not None and broke.rule == "it is about the data but cites no fact"
 
 
-def test_the_hint_names_the_fact_to_cite_but_the_rule_holds_no_data() -> None:
+def test_a_name_typed_in_full_becomes_its_fact_and_a_part_of_one_goes_back() -> None:
     facts = {f["id"]: f["value"] for f in FACTS}
 
-    _, broke = check_answer(answer("Taiwan PCB Ltd. emits the most."), facts)
+    found, _ = check_answer(answer("Open Taiwan PCB Ltd. in What if."), facts)
+    _, broke = check_answer(answer("Taiwan PCB emits the most."), facts)
 
-    assert broke is not None
-    assert broke.rule == "it types a name from the data"
+    assert found == ("Open {{S1.name}} in What if.", ["S1.name"])
+    assert broke is not None and broke.rule == "it types a name from the data"
     assert broke.hint == "it types the name 'Taiwan PCB Ltd.'; write {{S1.name}} in its place"
 
 
@@ -433,3 +442,73 @@ def test_an_answer_the_api_refused_is_asked_again_with_the_rule() -> None:
     (prompt,) = fakes.prompts
     assert str(prompt[-2].content) == "{{S1.name}} is still estimated."
     assert "a status claim" in str(prompt[-1].content)
+
+
+def test_markdown_is_taken_out_of_the_text() -> None:
+    found, broke = check_answer(answer("Try **What if** or *Request data*.\n- `Sea` is one."), {})
+
+    assert broke is None and found is not None
+    assert found[0] == "Try What if or Request data. Sea is one."
+
+
+def test_a_what_if_supplier_typed_out_is_a_name_from_the_data() -> None:
+    facts = {"W1.supplier": "Cluj Metal Works SRL", "W1.change": "switch to sea"}
+
+    found, _ = check_answer(answer("Cluj Metal Works SRL could go by sea."), facts)
+
+    assert found is not None and found[0] == "{{W1.supplier}} could go by sea."
+
+
+def test_the_prompt_says_the_assistant_only_reads_and_how_to_read_a_change() -> None:
+    from app.chat import SYSTEM
+
+    assert "you only read the facts" in SYSTEM
+    assert "(less)" in SYSTEM and "(more)" in SYSTEM
+    assert "same language as the message" in SYSTEM
+
+
+def test_an_answer_in_another_language_than_the_question_goes_back() -> None:
+    facts = {f["id"]: f["value"] for f in FACTS}
+    romanian = answer("Puteți reduce costurile cu {{S1.name}} și emisiile pentru furnizorii mari.")
+
+    _, broke = check_answer(romanian, facts, "i want to lower my costs if i can")
+    found, none = check_answer(romanian, facts, "vreau să reduc costurile cu furnizorii")
+
+    assert broke is not None and broke.hint.endswith("answer in English")
+    assert none is None and found is not None
+    # A word or two says nothing about the language.
+    assert check_answer(answer("Hello! Ask me about your suppliers."), facts, "salut")[1] is None
+
+
+def test_automatic_names_its_first_local_model_for_the_warm_up() -> None:
+    from app.chat import build_chat
+
+    fakes = ChatFakes({})
+    no_own = Settings.from_env({**ENV, "AI_MODELS": ""})
+    cloud_only = Settings.from_env({**ENV, "AI_MODELS": "openai:model-a"})
+
+    # With no model of its own Automatic asks the first local one; with a local one of its own,
+    # that one; with only a cloud model, none is local.
+    assert build_chat(no_own, fakes, lambda: ("m:3b", "n:7b")).first_local() == "m:3b"
+    assert build_chat(Settings.from_env(ENV), fakes, lambda: ("m:3b",)).first_local() == "local:3b"
+    assert build_chat(cloud_only, fakes, lambda: ("m:3b",)).first_local() is None
+
+
+def test_a_warm_up_with_no_server_says_so_and_does_not_raise() -> None:
+    from app.local_models import warm_up
+
+    assert warm_up("http://127.0.0.1:9", "m:3b", 8192, "30m") is False
+
+
+def test_an_off_topic_message_answered_with_figures_goes_back() -> None:
+    facts = {f["id"]: f["value"] for f in FACTS}
+    pitch = answer("You could lower costs with {{S1.name}}.")
+
+    _, cake = check_answer(pitch, facts, "da-mi o reteta faina de prajitura")
+    _, pizza = check_answer(pitch, facts, "give me a pizza recipe")
+    plain_no = check_answer(answer("I only help with your supplier data."), facts, "a pizza recipe")
+
+    assert cake is not None and pizza is not None
+    assert pizza.rule == "it answers an off-topic message with figures"
+    assert plain_no[1] is None
+    assert check_answer(pitch, facts, "how can I lower my costs?")[1] is None

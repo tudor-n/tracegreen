@@ -112,6 +112,19 @@ public class ChatFactsTests
         Assert.Empty(result.Segments);
     }
 
+    [Theory]
+    [InlineData("Still estimated: {{list.estimated}}, that is {{S2.name}} and {{S3.name}}.")]
+    public void TwoFactsOfTheSameValueAreAValueRepeatedOnlyWhenTheValuesMatch(string text) =>
+        Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
+
+    [Fact]
+    public void TheSameValueByTwoFactsIsRepeated()
+    {
+        var oneEstimated = Pack.Facts.Single(f => f.Id == "list.estimated").Value.Split(", ");
+        Assert.Equal(2, oneEstimated.Length); // the seed: two estimated suppliers, so the list is not one name
+        Assert.Equal("a value repeated", AnswerCheck.Check("{{S2.status}} and {{S3.status}} both.", Pack).Problem);
+    }
+
     [Fact]
     public void ABannedTermIsRefused()
     {
@@ -246,5 +259,141 @@ public class ChatFactsTests
         Assert.Contains("Sibiu", F("list.estimated").Value);
         Assert.DoesNotContain("Taiwan", F("list.estimated").Value);
         Assert.Contains("Taiwan", F("list.confirmed").Value);
+    }
+}
+
+/// <summary>The what-if facts and the checks the free chat needed after a real conversation (2026-11-07).</summary>
+public class ChatWhatIfTests
+{
+    private static readonly SeedBundle Seed = SeedLoader.Load(TestPaths.SeedDir);
+    private static readonly DemoStateData State = DemoState.Build(Seed);
+    private static readonly NodeViewMapper Mapper = new(Seed);
+
+    private static readonly IReadOnlyList<NodeView> Views =
+        State.Nodes.Select(n => Mapper.Map(n, State.Invoices.Single(i => i.Id == n.InvoiceId))).OrderByDescending(n => n.CarbonKg).ToList();
+
+    private static ScenarioResult Result(decimal carbonKg, decimal costEur, int days, MacBadge badge) =>
+        new(0, 0, 0, new ScenarioDelta(carbonKg, costEur, days),
+            new MacResult(carbonKg < 0 ? MacKind.Abatement : MacKind.NotAbatement, null, costEur, carbonKg / 1000m), badge, [], false, true);
+
+    // S1 to air costs more and emits more; S1 to sea saves both; S2 to rail saves a little carbon at a premium.
+    private static readonly FactPack Pack = FactPack.Build(
+        new GraphSnapshot(Seed.Buyer, Views, KpiCalculator.Compute(State.Nodes), [], 0, "memory"),
+        [],
+        [
+            new WhatIf(Views[0], new ScenarioChange(TransportMode.Air, null), Result(3800m, 1620m, -20, MacBadge.NotAbatement)),
+            new WhatIf(Views[0], new ScenarioChange(TransportMode.Sea, null), Result(-14000m, -3910m, 33, MacBadge.WinWin)),
+            new WhatIf(Views[1], new ScenarioChange(TransportMode.Rail, null), Result(-400m, 900m, 2, MacBadge.Premium)),
+        ]);
+
+    private static Fact F(string id) => Pack.Find(id) ?? throw new InvalidOperationException($"no fact {id}");
+
+    [Fact]
+    public void WhatIfsAreNumberedByTheirCutInEmissionsWithSignedValuesForTheModel()
+    {
+        Assert.Equal("switch to sea", F("W1.change").Value);
+        Assert.Equal("-14000", F("W1.carbonDelta").Value);
+        Assert.Equal("-14.0 t CO2e (less)", F("W1.carbonDelta").PromptText);
+        Assert.Equal("-EUR 3,910 (less)", F("W1.costDelta").PromptText);
+        Assert.Equal("+33 days (slower)", F("W1.leadDelta").PromptText);
+        Assert.Equal("win-win", F("W1.badge").Value);
+        Assert.Contains("the largest cut in emissions", F("W1.carbonDelta").About);
+        Assert.Equal("switch to air", F("W3.change").Value);
+        Assert.Equal("+3.8 t CO2e (more)", F("W3.carbonDelta").PromptText);
+        Assert.Equal(Views[0].Id, F("W3.supplier").NodeId);
+        Assert.Equal("3", F("count.whatIfs").Value);
+    }
+
+    [Theory]
+    [InlineData("Switching {{W1.supplier}} to sea cuts emissions by {{W1.carbonDelta}} and cost by {{W1.costDelta}}.")]
+    [InlineData("Switching to air would raise emissions by {{W3.carbonDelta}} and add {{W3.costDelta}} to the cost.")]
+    [InlineData("Sea cuts {{W1.carbonDelta}} but adds {{W1.leadDelta}} to the lead time.")]
+    [InlineData("For {{W1.supplier}}: {{W1.change}}, {{W1.carbonDelta}}, {{W1.costDelta}}.")]
+    public void ChangesTheDataHoldsPass(string text) =>
+        Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
+
+    [Theory]
+    [InlineData("Switching {{W3.supplier}} to air would cut {{S1.carbon}} by {{W3.carbonDelta}}.", "a change the data does not hold")]
+    [InlineData("Switching to air saves {{W3.costDelta}} and reduces {{W3.carbonDelta}}.", "a change the data does not hold")]
+    [InlineData("Rail lowers the cost by {{W2.costDelta}}.", "a change the data does not hold")]
+    [InlineData("Going by sea raises emissions by {{W1.carbonDelta}}.", "a change the data does not hold")]
+    [InlineData("I'll add a what-if for {{S2.name}}.", "an action the assistant cannot take")]
+    [InlineData("I have changed the transport mode of {{S1.name}}.", "an action the assistant cannot take")]
+    [InlineData("Let me send a request to {{S1.name}}.", "an action the assistant cannot take")]
+    [InlineData("The largest are {{S1.name}} ({{S1.carbon}}) and {{S2.name}} ({{S1.carbon}}).", "a value repeated")]
+    [InlineData("Supplier-confirmed: {{S1.status}}, like {{S1.status}}.", "a value repeated")]
+    public void ChangesActionsAndRepeatsTheDataDoesNotHoldAreRefused(string text, string problem) =>
+        Assert.Equal(problem, AnswerCheck.Check(text, Pack).Problem);
+
+    [Fact]
+    public void AWhatIfStaysWithItsOwnSupplier()
+    {
+        Assert.Equal("a what-if given to another supplier", AnswerCheck.Check("Switching {{S1.name}} to rail cuts {{W2.carbonDelta}}.", Pack).Problem);
+        Assert.True(AnswerCheck.Check("By rail, {{W2.supplier}} cuts {{W2.carbonDelta}}.", Pack).Ok);
+        Assert.True(AnswerCheck.Check("By rail, {{S2.name}} cuts {{W2.carbonDelta}}.", Pack).Ok);
+        Assert.True(AnswerCheck.Check("{{W1.supplier}} by sea cuts {{W1.carbonDelta}}, and {{W2.supplier}} by rail cuts {{W2.carbonDelta}}.", Pack).Ok);
+        // "Its" is the supplier the sentence before named.
+        Assert.Equal("a what-if given to another supplier",
+            AnswerCheck.Check("Open {{S1.name}} in What if. Switching its transport to rail would cut {{W2.carbonDelta}}.", Pack).Problem);
+        Assert.True(AnswerCheck.Check("{{W2.supplier}} could go by rail. It would cut {{W2.carbonDelta}}.", Pack).Ok);
+        // A figure of one supplier beside another's what-if.
+        Assert.Equal("a what-if given to another supplier",
+            AnswerCheck.Check("To lower {{S1.carbon}}, try {{W2.change}} on {{W2.supplier}}.", Pack).Problem);
+        Assert.Equal("a change the supplier has no what-if for",
+            AnswerCheck.Check("Open {{S3.name}} on the Suppliers screen. Try its road transport to rail.", Pack).Problem);
+    }
+
+    [Fact]
+    public void ASupplierIsSentOnlyToAModeItsWhatIfsOffer()
+    {
+        // S1 has sea and air what-ifs, S2 rail, S3 none at all.
+        Assert.Equal("a change the supplier has no what-if for", AnswerCheck.Check("Open {{S3.name}} and try switching to rail in What if.", Pack).Problem);
+        Assert.Equal("a change the supplier has no what-if for", AnswerCheck.Check("Try {{S1.name}} to rail instead.", Pack).Problem);
+        Assert.True(AnswerCheck.Check("Try {{S1.name}} to sea in What if.", Pack).Ok);
+        Assert.True(AnswerCheck.Check("Switching {{S2.name}} to rail cuts {{W2.carbonDelta}}.", Pack).Ok);
+        Assert.True(AnswerCheck.Check("{{S3.name}} has no what-if: {{S3.whatIf}}.", Pack).Ok);
+    }
+
+    [Fact]
+    public void ALargeSupplierWithNoWhatIfSaysWhy()
+    {
+        Assert.Null(Pack.Find("S1.whatIf"));
+        Assert.Null(Pack.Find("S2.whatIf"));
+        Assert.Equal("none", F("S3.whatIf").Value);
+        Assert.StartsWith("none: ", F("S3.whatIf").PromptText);
+    }
+
+    [Fact]
+    public void WhatTheAssistantCanOfferIsNotAPromise()
+    {
+        Assert.True(AnswerCheck.Check("I can't change suppliers, but in What if you can compare {{W1.change}} for {{W1.supplier}}.", Pack).Ok);
+        Assert.True(AnswerCheck.Check("I can show you what a change of transport would do.", Pack).Ok);
+    }
+
+    [Fact]
+    public void MarkdownIsShownAsPlainText()
+    {
+        var result = AnswerCheck.Check("Compare transport modes in **What if** or *Request data*.\n- `Sea` is one.", Pack);
+
+        Assert.True(result.Ok, result.Problem);
+        Assert.Equal("Compare transport modes in What if or Request data.\nSea is one.", Assert.Single(result.Segments).Text);
+    }
+}
+
+public class ChatRepeatSupplierTests
+{
+    [Fact]
+    public void ASecondDeliveryFromTheSameSupplierSaysSo()
+    {
+        var seed = SeedLoader.Load(TestPaths.SeedDir);
+        var state = DemoState.Build(seed);
+        var mapper = new NodeViewMapper(seed);
+        var views = state.Nodes.Select(n => mapper.Map(n, state.Invoices.Single(i => i.Id == n.InvoiceId))).OrderByDescending(n => n.CarbonKg).ToList();
+        var twice = views.Append(views[1] with { Id = Guid.NewGuid(), CarbonKg = views[1].CarbonKg - 1m }).ToList();
+
+        var pack = FactPack.Build(new GraphSnapshot(seed.Buyer, twice, KpiCalculator.Compute(state.Nodes), [], 0, "memory"), []);
+
+        Assert.DoesNotContain("another delivery", pack.Find("S2.name")!.About);
+        Assert.Contains("another delivery from the same supplier as S2", pack.Find("S3.name")!.About);
     }
 }

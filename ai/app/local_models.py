@@ -21,6 +21,8 @@ TAGS_TIMEOUT_S = 1.5
 # answer is asked again sooner.
 KEEP_FOUND_S = 30.0
 KEEP_MISSING_S = 10.0
+# Loading a model can take a while on first use; the warm-up runs in the background.
+WARM_UP_TIMEOUT_S = 120.0
 
 # GETs a URL within a timeout and returns the parsed JSON body; raises on any failure.
 Fetch = Callable[[str, float], Any]
@@ -29,6 +31,24 @@ Fetch = Callable[[str, float], Any]
 def fetch_json(url: str, timeout_s: float) -> Any:
     with urllib.request.urlopen(url, timeout=timeout_s) as response:
         return json.load(response)
+
+
+def warm_up(base_url: str, name: str, num_ctx: int, keep_alive: str) -> bool:
+    """Loads a model into Ollama with the context the tasks use, so the first question does not
+    wait for the load: an empty prompt loads the model and answers nothing. False on failure."""
+    url = base_url.rstrip("/") + "/api/generate"
+    body = {"model": name, "prompt": "", "keep_alive": keep_alive, "options": {"num_ctx": num_ctx}}
+    try:
+        request = urllib.request.Request(
+            url, json.dumps(body).encode(), {"content-type": "application/json"}
+        )
+        with urllib.request.urlopen(request, timeout=WARM_UP_TIMEOUT_S) as response:
+            response.read()
+        log.info("model ollama:%s loaded", name)
+        return True
+    except Exception as error:
+        log.info("model ollama:%s not loaded ahead: %s", name, type(error).__name__)
+        return False
 
 
 def chat_capable(entry: Any) -> bool:

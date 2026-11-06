@@ -6,12 +6,14 @@ carbon number. The C# API calls it with a
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Sequence
+import threading
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.chat import ChatModelRefused, build_chat
+from app.chat import Chat, ChatModelRefused, build_chat
 from app.config import (
     API_CHAT_TIMEOUT_S,
     API_EXTRACT_TIMEOUT_S,
@@ -20,7 +22,7 @@ from app.config import (
     settings,
 )
 from app.extract import build_extractor
-from app.local_models import OllamaTags
+from app.local_models import OllamaTags, warm_up
 from app.models import ModelFactory, chat_model_factory
 from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
@@ -47,11 +49,13 @@ def create_app(
     config: Settings,
     model_factory: ModelFactory | None = None,
     local_models: Callable[[], Sequence[str]] | None = None,
+    warm: bool = False,
 ) -> FastAPI:
     """The app for one configuration. The seed files are read here, so a broken seed fails
     at startup. Tests pass a `model_factory` of fake models; production builds the LangChain
     chat models of AI_MODELS. `local_models` lists the Ollama server's models for the chat box;
-    by default the server is asked (GET /api/tags) when OLLAMA_DISCOVER is on."""
+    by default the server is asked (GET /api/tags) when OLLAMA_DISCOVER is on. `warm` loads the
+    local model Automatic asks first when the server starts (the served app only)."""
     if config.ai_timeout_s >= API_TIMEOUT_S:
         log.warning(
             "AI_TIMEOUT_S is %g s, not under the API's %g s timeout (AI_TIMEOUT_MS): the API "
@@ -80,7 +84,15 @@ def create_app(
         local_models = OllamaTags(config.ollama_base_url).names
     chat_task = build_chat(config, factory, local_models)
     extractor = build_extractor(config, factory)
-    app = FastAPI(title="TraceGreen AI", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # On start, in the background: the first question should not pay the model's load.
+        if warm:
+            threading.Thread(target=_warm, args=(config, chat_task), daemon=True).start()
+        yield
+
+    app = FastAPI(title="TraceGreen AI", version="0.1.0", lifespan=lifespan)
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -171,4 +183,10 @@ def create_app(
     return app
 
 
-app = create_app(settings)
+def _warm(config: Settings, chat_task: Chat) -> None:
+    name = chat_task.first_local()
+    if name is not None:
+        warm_up(config.ollama_base_url, name, config.ollama_num_ctx, config.ollama_keep_alive)
+
+
+app = create_app(settings, warm=True)

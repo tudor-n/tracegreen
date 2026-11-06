@@ -47,8 +47,9 @@ public sealed record ChatError(ChatErrorCode Code, string Message);
 /// else, and the values the reader sees are filled in here from the data. A refused or unanswerable question says so; it
 /// is never answered with a guess. Read-only: nothing is stored or audited, and the model's text is never logged.
 /// </summary>
-public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist ai, ServiceOptions options)
+public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist ai, ScenarioService simulator, ServiceOptions options)
 {
+
     public const int MaxQuestionChars = 300;
     public const int MaxHistory = 3;
     public const int MaxModelIdChars = 120;
@@ -104,7 +105,7 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
 
         var snapshot = await graph.SnapshotAsync(ctx, ct);
         var scenarios = await repo.ListScenariosAsync(ctx, null, ct);
-        var pack = FactPack.Build(snapshot, scenarios);
+        var pack = FactPack.Build(snapshot, scenarios, await WhatIfsAsync(ctx, snapshot, ct));
         var input = new ChatInput(asked, earlier, pack.Facts.Select(f => new ChatFactInput(f.Id, f.About, f.PromptText)).ToList(), chosen);
 
         var started = Stopwatch.GetTimestamp();
@@ -180,6 +181,30 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
             .Select(f => new ChatFactView(f.Id, f.Field, f.Kind, f.Value, f.Subject, f.NodeId, f.AuditId))
             .ToList();
         return Result<ChatResult, ChatError>.Ok(new ChatResult(new ChatAnswer(ChatStatus.Answered, checkedAnswer.Segments, facts, outcome.Provider), note));
+    }
+
+    /// <summary>
+    /// The What if tab's results for the largest suppliers, worked out by the same simulator and never saved: each other
+    /// mode the lane has and each alternative. A change the simulator refuses (no mass, no such leg) is left out.
+    /// </summary>
+    private async Task<IReadOnlyList<WhatIf>> WhatIfsAsync(Ctx ctx, GraphSnapshot snapshot, CancellationToken ct)
+    {
+        var found = new List<WhatIf>();
+        foreach (var node in snapshot.Nodes.OrderByDescending(n => n.CarbonKg).ThenBy(n => n.Label, StringComparer.Ordinal).Take(FactPack.WhatIfSuppliers))
+        {
+            var current = node.TransportMode ?? node.Lane.Mode;
+            var changes = node.Lane.Modes.Where(m => m != current).Select(m => new ScenarioChange(m, null))
+                .Concat(node.Alternatives.Select(a => new ScenarioChange(null, a.Id)));
+            foreach (var change in changes)
+            {
+                var run = await simulator.SimulateAsync(ctx, node.Id, change, ct);
+                if (run.IsOk)
+                {
+                    found.Add(new WhatIf(node, change, run.Value));
+                }
+            }
+        }
+        return found;
     }
 
     private async Task<ChatOutcome> AskAi(ChatInput input, TimeSpan budget, CancellationToken ct)

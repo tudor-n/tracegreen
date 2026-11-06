@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using TraceGreen.Domain.Copy;
 
@@ -29,6 +30,8 @@ public static partial class AnswerCheck
 
     public static CheckedAnswer Check(string text, FactPack pack)
     {
+        // The panel shows plain text: Markdown emphasis and list marks a model adds would show as asterisks.
+        text = Plain(text);
         if (string.IsNullOrWhiteSpace(text))
         {
             return Fail("empty answer");
@@ -76,6 +79,10 @@ public static partial class AnswerCheck
         if (FormatWords().IsMatch(free))
         {
             return Fail("the answer's format in its text");
+        }
+        if (ActionPromise().IsMatch(free))
+        {
+            return Fail("an action the assistant cannot take");
         }
         if (Unit().Replace(free, " ").Any(char.IsDigit))
         {
@@ -140,6 +147,15 @@ public static partial class AnswerCheck
     {
         "a number written out" => "it types a number; cite the fact that holds the value, or leave it out",
         "the answer's format in its text" => "it writes factIds or kind into the text; the text holds only the sentences",
+        "an action the assistant cannot take" =>
+            "it says the assistant will do or did something, but the assistant only reads the data; say where the buyer does it: the supplier's What if tab on the Suppliers screen, or Request data",
+        "a change the data does not hold" =>
+            "it says a change lowers something its fact shows rising, or the other way round; a negative change is less, a positive one is more",
+        "a value repeated" => "it says the same value twice in one sentence; say each value once, and two deliveries from one supplier as two deliveries",
+        "a change the supplier has no what-if for" =>
+            "it suggests a transport change the supplier has no what-if for; suggest only changes its own W facts show, and a supplier with an {{Sn.whatIf}} fact has none",
+        "a what-if given to another supplier" =>
+            "it puts one supplier's what-if under another supplier's name; cite the what-if's own {{Wn.supplier}}, and a supplier with an {{Sn.whatIf}} fact has none",
         "a name written out" => "it types a name from the data; write the name's fact, such as {{S1.name}}, in its place",
         "a company name written out" => "it names a company; cite the supplier's name fact, or leave the name out",
         "a banned term" => "it uses a term TraceGreen does not use; say supplier-confirmed share, or tamper-evident audit log",
@@ -165,12 +181,38 @@ public static partial class AnswerCheck
     private static string? Claims(IReadOnlyList<AnswerSegment> segments, FactPack pack)
     {
         int? previousLargest = null;
+        var about = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sentence in Sentences(segments))
         {
+            // Who the sentence is about: the suppliers it names, else the ones the sentence before was about ("its").
+            var named = NamedIn(sentence, pack);
+            if (named.Count > 0)
+            {
+                about = named;
+            }
             var words = string.Join(' ', sentence.Where(s => s.Text is not null).Select(s => s.Text)).ToLowerInvariant();
             if (!sentence.Any(s => s.FactId is not null) && DataClaim().IsMatch(words))
             {
                 return "a claim about the data without a fact";
+            }
+            // The same value twice in one sentence, by one fact or two ("estimated are {{list.estimated}}: {{S3.name}}"
+            // with one supplier, "{{S1.status}} and {{S2.status}}"): it reads as a stutter, or two suppliers where one is.
+            if (sentence.Where(s => s.FactId is not null).Select(s => pack.Find(s.FactId!)).OfType<Fact>()
+                .GroupBy(f => (f.Kind, f.Value)).Any(g => g.Count() > 1))
+            {
+                return "a value repeated";
+            }
+            if (WrongDirection(sentence, pack))
+            {
+                return "a change the data does not hold";
+            }
+            if (WhatIfOfAnother(sentence, pack, about))
+            {
+                return "a what-if given to another supplier";
+            }
+            if (ModeNotOnOffer(pack, words, about))
+            {
+                return "a change the supplier has no what-if for";
             }
             var ranks = sentence.Where(s => s.FactId is not null).Select(s => FactPack.RankOf(s.FactId!)).OfType<int>().Distinct().ToList();
             if (ranks.Count == 0)
@@ -243,6 +285,78 @@ public static partial class AnswerCheck
             .Where(r => said.Count == 0 || (pack.StatusOf(r) is { } status && said.Contains(status)))
             .Select(r => (int?)r)
             .FirstOrDefault();
+
+    private static readonly HashSet<string> DeltaFields = new(["carbonDelta", "costDelta", "leadDelta"], StringComparer.Ordinal);
+
+    /// <summary>
+    /// Whether a sentence says a change goes one way while its fact goes the other: "cuts emissions by {{W1.carbonDelta}}"
+    /// with a positive change, "raises cost by {{C1.costDelta}}" with a negative one. Each change fact is read against
+    /// the last direction word before it in the sentence ("would cut … by", "saves", "and adds").
+    /// </summary>
+    private static bool WrongDirection(List<AnswerSegment> sentence, FactPack pack)
+    {
+        bool? less = null;
+        foreach (var segment in sentence)
+        {
+            if (segment.Text is { } text)
+            {
+                if (DirectionWord().Matches(text.ToLowerInvariant()).LastOrDefault() is { } word)
+                {
+                    less = word.Groups["less"].Success;
+                }
+                continue;
+            }
+            if (less is null || pack.Find(segment.FactId!) is not { } fact || !DeltaFields.Contains(fact.Field)
+                || !decimal.TryParse(fact.Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var change) || change == 0)
+            {
+                continue;
+            }
+            if (less.Value ? change > 0 : change < 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The suppliers a sentence names (by name fact), compared by name so two deliveries from one count as one.</summary>
+    private static HashSet<string> NamedIn(List<AnswerSegment> sentence, FactPack pack) =>
+        sentence.Where(s => s.FactId is not null).Select(s => pack.Find(s.FactId!)).OfType<Fact>()
+            .Where(f => f.Field == "name" && f.Subject is not null)
+            .Select(f => f.Subject!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether a sentence with a what-if (W) or saved scenario (C) puts a supplier's figure beside a supplier it is not
+    /// about. <paramref name="named"/> is who the sentence is about: the suppliers it names, or, when it names none ("its
+    /// transport…"), those the sentence before named. Refused: "switching {{S2.name}} to rail cuts {{W1.carbonDelta}}"
+    /// with W1 another supplier's, the same with "its" for {{S2.name}}, and "to lower {{S2.carbon}}, try {{W1.change}} on
+    /// {{W1.supplier}}".
+    /// </summary>
+    private static bool WhatIfOfAnother(List<AnswerSegment> sentence, FactPack pack, HashSet<string> named)
+    {
+        var cited = sentence.Where(s => s.FactId is not null).Select(s => pack.Find(s.FactId!)).OfType<Fact>().ToList();
+        if (named.Count == 0 || !cited.Any(f => WhatIfFact().IsMatch(f.Id) && f.Field != "name"))
+        {
+            return false;
+        }
+        return cited.Any(f => f.Field != "name" && f.Subject is { } whose && !named.Contains(whose));
+    }
+
+    /// <summary>
+    /// Whether a sentence sends a supplier "to rail" (or sea, air, road) when none of the suppliers it is about has that
+    /// what-if: "open Oradea Harness SRL and try switch to rail" for a supplier whose lane has road only. Only suppliers
+    /// the simulator looked at are checked; for the others nothing is known.
+    /// </summary>
+    private static bool ModeNotOnOffer(FactPack pack, string words, HashSet<string> named)
+    {
+        var said = ModeTo().Matches(words).Select(m => m.Groups["mode"].Value).ToHashSet(StringComparer.Ordinal);
+        var known = named.Where(pack.ModesOnOffer.ContainsKey).Select(n => pack.ModesOnOffer[n]).ToList();
+        return said.Count > 0 && known.Count > 0 && said.Any(mode => !known.Any(offer => offer.Contains(mode)));
+    }
+
+    /// <summary>The text without Markdown emphasis, code marks or list bullets.</summary>
+    private static string Plain(string text) => ListMark().Replace(Emphasis().Replace(text, "${t}"), "");
 
     /// <summary>The n of "second largest" (2) and its kin; 1 when the rank word has no ordinal.</summary>
     private static int Nth(Match ordinal) => !ordinal.Success ? 1 : ordinal.Groups["n"].Value switch
@@ -325,6 +439,30 @@ public static partial class AnswerCheck
 
     [GeneratedRegex(@"[.!?;]+(?=\s|$)")]
     private static partial Regex SentenceEnd();
+
+    /// <summary>A transport change in the sentence's own words: "to rail", "to sea", "to air", "to road".</summary>
+    [GeneratedRegex(@"\bto\s+(?<mode>rail|sea|air|road)\b")]
+    private static partial Regex ModeTo();
+
+    [GeneratedRegex(@"^[WC]\d+\.")]
+    private static partial Regex WhatIfFact();
+
+    /// <summary>Words that say which way a change goes: less (cut, save, lower…) or more (raise, add, increase…).</summary>
+    [GeneratedRegex(@"\b(?:(?<less>cut|cuts|cutting|save|saves|saving|savings|reduce|reduces|reducing|reduction|lower|lowers|lowering|decrease|decreases|drop|drops|less|fewer|cheaper|faster|shorter)|raise|raises|raising|increase|increases|increasing|add|adds|adding|more|higher|costlier|pricier|slower|longer|extra)\b")]
+    private static partial Regex DirectionWord();
+
+    /// <summary>
+    /// The assistant saying it will do, or did, what only the buyer can: "I'll add a what-if", "I've changed", "let me send".
+    /// It only reads the data.
+    /// </summary>
+    [GeneratedRegex(@"\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:\w+\s+){0,2}?(?:add|added|create|created|change|changed|switch|switched|set|send|sent|save|saved|apply|applied|run|update|updated|make|made|request|requested|confirm|confirmed|delete|deleted|contact|contacted|email|emailed|order|ordered)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ActionPromise();
+
+    [GeneratedRegex(@"\*\*(?<t>[^*]+)\*\*|__(?<t>[^_]+)__|(?<![\w*])\*(?<t>[^*\s][^*]*?)\*(?![\w*])|`(?<t>[^`]+)`")]
+    private static partial Regex Emphasis();
+
+    [GeneratedRegex(@"(?m)^\s*(?:[-•*]|\d+[.)])\s+")]
+    private static partial Regex ListMark();
 
     /// <summary>The answer's own fields written into its text ("factIds: …", "kind: data"), which a small model does.</summary>
     [GeneratedRegex(@"\bfact\s?ids?\b|\bkind\s*:", RegexOptions.IgnoreCase)]

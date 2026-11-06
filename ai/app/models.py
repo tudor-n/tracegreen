@@ -91,6 +91,7 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
                 reasoning=False,
                 num_ctx=settings.ollama_num_ctx,
                 num_predict=spec.max_tokens,
+                keep_alive=settings.ollama_keep_alive,
                 client_kwargs={"timeout": spec.timeout_s},
             )
             # stream=False: ChatOllama streams by default, so its timeout would bound each chunk,

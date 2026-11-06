@@ -69,6 +69,9 @@ class Settings:
     # OLLAMA_DISCOVER: the chat box also offers the models the Ollama server has (GET /api/tags),
     # to be picked by name; Automatic keeps to AI_CHAT_MODELS, else AI_MODELS.
     ollama_discover: bool = True
+    # OLLAMA_KEEP_ALIVE: how long Ollama keeps a model loaded after a call ("30m", "-1" for ever),
+    # sent with every call, so the next question does not pay the load (seconds, past the cap).
+    ollama_keep_alive: str = "30m"
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
@@ -118,6 +121,7 @@ class Settings:
             ollama_base_url=_text(source, "OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
             ollama_num_ctx=_tokens(source, "OLLAMA_NUM_CTX", 12288),
             ollama_discover=_flag(source, "OLLAMA_DISCOVER", default="1"),
+            ollama_keep_alive=_text(source, "OLLAMA_KEEP_ALIVE") or "30m",
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
             openai_api_key=keys["OPENAI_API_KEY"],
