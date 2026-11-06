@@ -37,7 +37,7 @@ Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven ste
 
 Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 22 script tests (`node --test scripts/lib/*.test.mjs`, 10 of them for demo-check).
 
-Test counts after the supplier terms (2026-11-06): 274 .NET tests, 260 in memory mode (the 14 Postgres contract tests skipped), 274 with `DATABASE_URL` on `tracegreen_test`; 179 web unit tests; 24 script tests; the smoke with nine steps (the terms tick in step 3, the printable terms in step 6).
+Test counts after the supplier terms (2026-11-06): 278 .NET tests, 264 in memory mode (the 14 Postgres contract tests skipped), 278 with `DATABASE_URL` on `tracegreen_test`; 181 web unit tests; 28 script tests, which CI now runs in the web job; the smoke with nine steps (the terms tick and link in step 3, the printable terms in step 6).
 
 ## Wire contract (slice 1)
 
@@ -111,11 +111,11 @@ Before submitting, the supplier ticks the Supplier Terms: the text is `seed/supp
 
 | Route | Success | Errors |
 |---|---|---|
-| `GET /api/verify/context?t=` | `VerifyContext` gained `terms: SupplierTerms { version, sha256, ro, en }`, each language `{ title, keyPoints, acceptance { before, link, after }, sections[{ number, heading, paragraphs }] }` | as before |
+| `GET /api/verify/context?t=` | `VerifyContext` gained `terms: VerifyTerms { version, sha256, ro, en }`, each language the checkbox statement `{ before, link, after }` | as before |
 | `POST /api/verify {t, transportMode?, energySource?, massT?, acceptedTerms?}` | as before; the verification row and the `verification.submitted` payload carry `termsVersion` and `termsSha256` | `TermsNotAccepted` → 422 when `acceptedTerms` is missing or is not the current `terms.sha256`, checked after single use and before the answers; the link stays unused |
-| `GET /api/terms/supplier` | 200 `SupplierTerms`, the same object as in the context; no token, not rate limited | — |
+| `GET /api/terms/supplier` | 200 `SupplierTerms { version, sha256, ro, en }`, each language `{ title, keyPoints, acceptance { before, link, after }, sections[{ number, heading, paragraphs }] }`; no token, not rate limited | — |
 
-`sha256` is the SHA-256 of the file's canonical JSON, computed when the seed loads; reformatting the file keeps it, a changed word changes it. Postgres gained the nullable columns `verifications.terms_version` and `terms_sha256` (migration `SupplierTerms`). `simulate-answer` accepts the current terms on the simulated supplier's behalf.
+`sha256` is the SHA-256 of the file's canonical JSON, computed when the seed loads; reformatting the file keeps it, a changed word changes it. `seed/supplier-terms-versions.json` pins each published version to its SHA-256, and `node scripts/terms-hash.mjs` recomputes it without .NET (`docs/legal/README.md`, "Changing the terms"). Postgres gained the nullable columns `verifications.terms_version` and `terms_sha256` (migration `SupplierTerms`). `simulate-answer` accepts the current terms on the simulated supplier's behalf and marks its audit payload `simulated: true`.
 
 Checked on 2026-11-06: `dotnet test` in memory mode and against `tracegreen_test`; `pnpm typecheck`, `lint`, `test`; the script tests; the Playwright smoke against Compose in Postgres mode and with the API in memory mode, and on the demo image; the page at Pixel 7 size in RO and EN.
 

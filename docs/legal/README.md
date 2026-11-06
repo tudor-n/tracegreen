@@ -64,22 +64,30 @@ Section 7 then lets the operator pass a buyer's claim on to the supplier whose f
 
 ## Changing the terms
 
-A published version is never edited in place. The audit log records the SHA-256 of the exact text each supplier accepted, so the text behind every fingerprint must stay recoverable from git.
+A published version is never edited in place. The audit log records the SHA-256 of the exact text each supplier accepted, so the text behind every fingerprint must stay recoverable. `seed/supplier-terms-versions.json` pins every published version to its fingerprint. The API refuses to start, and the tests fail, when a pinned version's text no longer matches.
 
-1. Edit `seed/supplier-terms.json` in both languages, keeping the same numbered sections in each. `SeedLoader` refuses a file with a language, the acceptance statement, a heading or a paragraph missing, or with sections numbered differently in the two languages.
+1. Edit `seed/supplier-terms.json` in both languages, keeping the same numbered sections in each. `SeedLoader` refuses a file with a language, the acceptance statement, a heading or a paragraph missing, an empty section, two sections with the same number, or sections numbered differently in the two languages.
 2. Set `version` to the new date (`YYYY-MM-DD`).
 3. If the clauses that need express acceptance move or change, update the `acceptance` statement so it still names them. The statement is `before` + `link` + `after`; the page makes `link` the link to the full text. `SeedLoaderTests` checks that §6, §7 and §10 are named and that the link text is not empty.
-4. Restart the API (`docker compose restart api`). It reads `seed/` once at startup. A supplier page opened before the restart gets `422 TermsNotAccepted` on submit and shows "The terms have been updated" with a retry that loads the new text.
-5. Commit with a subject such as `F3: supplier terms 2026-12-01`. To find the text behind a fingerprint in the audit log, check out the commit, start the API and compare `sha256` from `GET /api/terms/supplier`.
+4. Run `node scripts/terms-hash.mjs` and add the line it prints to `seed/supplier-terms-versions.json` (`"<version>": "<sha256>"`). Never change an existing line.
+5. Restart the API (`docker compose restart api`). It reads `seed/` once at startup. A supplier page opened before the restart gets `422 TermsNotAccepted` on submit and shows "The terms have been updated" with a retry that loads the new statement and keeps the supplier's answers.
+6. Commit with a subject such as `F3: supplier terms 2026-12-01`.
 
-The fingerprint is the SHA-256 of the file's canonical JSON (keys sorted, no whitespace, as `Domain/Security/CanonicalJson.cs` writes it), so reformatting the file keeps it and changing any word changes it.
+**The fingerprint** is the SHA-256 of the file's canonical JSON:
+
+- object keys are sorted by UTF-16 code unit, with no whitespace;
+- strings are escaped as .NET's `System.Text.Json` does by default: `\uXXXX` in upper-case hex for every character outside printable ASCII and for `" & ' + < >` and the backtick;
+- the hash covers the whole file, both languages and the version.
+
+Reformatting the file keeps the fingerprint; changing any word changes it. `node scripts/terms-hash.mjs <file>` computes it without .NET, and a test on each side pins the C# and Node implementations to the same result. To check a fingerprint from the audit log, find the version in the history of `seed/supplier-terms-versions.json` (`git log -p`), take `seed/supplier-terms.json` from that commit and run the script on it. A printed or saved web page cannot be hashed this way, because the fingerprint covers the JSON file; the operator provides that file on request.
 
 ## Sources
 
-- Romanian Civil Code (Legea 287/2009): [art. 1202](https://www.codulcivil.ro/art-1202-Clauze-standard/), [art. 1203](https://notari.pro/noul-cod-civil-legea-287-2009/art-1203-clauze-neuzuale-incheierea-contractului-contractul), [art. 1245](https://notari.pro/noul-cod-civil-legea-287-2009/art-1245-forma-contractelor-electronice-incheierea-contractului-contractul), [art. 1355](https://www.codulcivil.ro/art-1355/)
-- [Legea 365/2002 on electronic commerce, republished (legislatie.just.ro)](https://legislatie.just.ro/Public/DetaliiDocumentAfis/77218)
-- Legea 214/2024 on electronic signatures: [BPV Grigorescu](https://www.bpv-grigorescu.com/latest/publications/new-legal-provisions-on-the-use-of-electronic-signatures), [Lynx Legal](https://lynx.legal/romania-the-impact-of-law-no-214-2024-on-the-use-of-electronic-signatures-and-modernization-of-digital-processes-in-romania/)
-- CJEU C-322/14 *El Majdoub*: [A&L Goodbody](https://www.algoodbody.com/insights-publications/cjeu-confirms-that-click-wrapping-meets-the-requirements-of-article-23-of-t), [conflictoflaws.net](https://conflictoflaws.net/2015/the-ecj-on-choice-of-court-agreements-relating-to-contracts-concluded-electronically/?print=pdf)
-- CJEU C-413/23 P *EDPS v SRB*: [Jones Day](https://www.jonesday.com/es/insights/2025/09/cjeu-clarifies-scope-of-personal-data-in-edps-v-srb-decision)
-- CSRD Omnibus I and the value-chain cap: [EcoVadis](https://ecovadis.com/blog/value-chain-action-reporting-after-omnibus/), [BCLP](https://www.bclplaw.com/en-US/events-insights-news/csrd-requesting-data-from-sme-suppliers.html)
-- Industry practice for supplier data terms and product-footprint disclaimers: [Terrascope supplier terms](https://support-v2.terrascope.com/en/articles/16000677-supplier-t-cs), [BASF](https://www.basf.com/dam/jcr:299033b6-8771-40a5-b1c5-370191d683a8/PCF-Disclaimer%20for%20IT-Platform_Dec2024.pdf), [LyondellBasell](https://www.lyondellbasell.com/globalassets/lyb/sustainability/reporting/product-carbon-bootprint-disclaimer-update-july242025-lyb.pdf)
+These are the primary texts. The industry practice the terms follow (supplier terms of carbon-accounting platforms and product-footprint disclaimers published by chemical producers, read on 2026-11-06) is not cited by name, under the project's copy rules.
+
+- Romanian Civil Code (Legea 287/2009, republished): art. 1202, 1203, 1245, 1255, 1280, 1295 and following, 1355, 2517. Legea 214/2024 on electronic signatures and trust services, and Legea 193/2000 on unfair terms. Official texts on the Ministry of Justice's portal, [legislatie.just.ro](https://legislatie.just.ro).
+- [Legea 365/2002 on electronic commerce, republished](https://legislatie.just.ro/Public/DetaliiDocumentAfis/77218)
+- [Regulation (EU) 2016/679 (GDPR)](https://eur-lex.europa.eu/eli/reg/2016/679/oj), [Directive 2000/31/EC on electronic commerce](https://eur-lex.europa.eu/eli/dir/2000/31/oj), [Regulation (EU) 1215/2012 (Brussels I bis)](https://eur-lex.europa.eu/eli/reg/2012/1215/oj)
+- Directive (EU) 2026/470 (Omnibus I, the value-chain cap), in force since 18 March 2026. The number comes from secondary reports; confirm it on EUR-Lex before citing it outside the team.
+- CJEU, [C-322/14 *El Majdoub*](https://curia.europa.eu/juris/liste.jsf?num=C-322/14), judgment of 21 May 2015 (click-wrap acceptance of a jurisdiction clause)
+- CJEU, [C-413/23 P *EDPS v SRB*](https://curia.europa.eu/juris/liste.jsf?num=C-413/23), judgment of 4 September 2025 (when pseudonymised data is personal data)
