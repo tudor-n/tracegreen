@@ -1,33 +1,147 @@
+"""Process settings, read from the environment once at import time. A bad value fails here, so
+a misconfigured service never starts."""
+
 from __future__ import annotations
 
+import math
 import os
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
+
+# The provider prefix of an AI_MODELS entry and the variable that holds its key (None: no key).
+PROVIDER_KEYS: dict[str, str | None] = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google_genai": "GOOGLE_API_KEY",
+    "ollama": None,
+}
+
+DEFAULT_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    """One AI_MODELS entry. A model whose key is missing stays in the list, not ready, so
+    /health can say why; the chain skips it."""
+
+    provider: str
+    model: str
+    timeout_s: float
+    ready: bool
+    reason: str | None
+
+    @property
+    def id(self) -> str:
+        return f"{self.provider}:{self.model}"
 
 
 @dataclass(frozen=True)
 class Settings:
-    """Process settings read from the environment once at import time."""
-
     seed_dir: Path
-    ai_model: str | None
-    anthropic_api_key: str | None
+    models: tuple[ModelSpec, ...]
     ai_timeout_s: float
+    ollama_base_url: str
+    dev_routes: bool
+    # Keys stay out of repr, so logging the settings never prints one.
+    anthropic_api_key: str | None = field(default=None, repr=False)
+    openai_api_key: str | None = field(default=None, repr=False)
+    google_api_key: str | None = field(default=None, repr=False)
 
     @property
     def model_configured(self) -> bool:
-        return bool(self.ai_model) and bool(self.anthropic_api_key)
+        return any(spec.ready for spec in self.models)
+
+    def api_key(self, provider: str) -> str | None:
+        return {
+            "anthropic": self.anthropic_api_key,
+            "openai": self.openai_api_key,
+            "google_genai": self.google_api_key,
+        }.get(provider)
 
     @classmethod
-    def from_env(cls, env: dict[str, str] | None = None) -> Settings:
+    def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
         source = os.environ if env is None else env
-        seed_dir = Path(source.get("SEED_DIR") or _default_seed_dir())
+        keys = {name: _text(source, name) for name in PROVIDER_KEYS.values() if name is not None}
         return cls(
-            seed_dir=seed_dir,
-            ai_model=(source.get("AI_MODEL") or "").strip() or None,
-            anthropic_api_key=(source.get("ANTHROPIC_API_KEY") or "").strip() or None,
-            ai_timeout_s=float(source.get("AI_TIMEOUT_S") or 10),
+            seed_dir=Path(source.get("SEED_DIR") or _default_seed_dir()),
+            models=parse_models(
+                _text(source, "AI_MODELS") or "",
+                legacy_model=_text(source, "AI_MODEL"),
+                keys=keys,
+                cloud_timeout_s=_seconds(source, "AI_MODEL_TIMEOUT_S", 4),
+                ollama_timeout_s=_seconds(source, "OLLAMA_TIMEOUT_S", 6),
+            ),
+            ai_timeout_s=_seconds(source, "AI_TIMEOUT_S", 8),
+            ollama_base_url=_text(source, "OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
+            dev_routes=_flag(source, "AI_DEV_ROUTES"),
+            anthropic_api_key=keys["ANTHROPIC_API_KEY"],
+            openai_api_key=keys["OPENAI_API_KEY"],
+            google_api_key=keys["GOOGLE_API_KEY"],
         )
+
+
+def parse_models(
+    raw: str,
+    *,
+    legacy_model: str | None,
+    keys: Mapping[str, str | None],
+    cloud_timeout_s: float,
+    ollama_timeout_s: float,
+) -> tuple[ModelSpec, ...]:
+    """AI_MODELS, in order: `<provider>:<model>` entries separated by commas. The provider is
+    the text before the first colon, so Ollama tags such as `ollama:qwen3.5:4b` keep theirs.
+    When AI_MODELS is empty, the older AI_MODEL counts as `anthropic:<AI_MODEL>`."""
+    entries = [entry.strip() for entry in raw.split(",") if entry.strip()]
+    if not entries and legacy_model:
+        entries = [f"anthropic:{legacy_model}"]
+    specs: list[ModelSpec] = []
+    for entry in entries:
+        provider, colon, model = (part.strip() for part in entry.partition(":"))
+        if not colon or not provider or not model:
+            raise ValueError(f"AI_MODELS entry {entry!r} is not <provider>:<model>")
+        if provider not in PROVIDER_KEYS:
+            known = ", ".join(PROVIDER_KEYS)
+            raise ValueError(f"AI_MODELS entry {entry!r}: unknown provider; use one of {known}")
+        spec_id = f"{provider}:{model}"
+        if any(spec.id == spec_id for spec in specs):
+            raise ValueError(f"AI_MODELS lists {spec_id!r} twice")
+        key_name = PROVIDER_KEYS[provider]
+        ready = key_name is None or bool(keys.get(key_name))
+        specs.append(
+            ModelSpec(
+                provider=provider,
+                model=model,
+                timeout_s=ollama_timeout_s if provider == "ollama" else cloud_timeout_s,
+                ready=ready,
+                reason=None if ready else f"{key_name} not set",
+            )
+        )
+    return tuple(specs)
+
+
+def _text(source: Mapping[str, str], name: str) -> str | None:
+    return (source.get(name) or "").strip() or None
+
+
+def _seconds(source: Mapping[str, str], name: str, default: float) -> float:
+    raw = _text(source, name)
+    if raw is None:
+        return float(default)
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a number of seconds, not {raw!r}") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a positive number of seconds, not {raw!r}")
+    return value
+
+
+def _flag(source: Mapping[str, str], name: str) -> bool:
+    raw = _text(source, name) or "0"
+    if raw not in ("0", "1"):
+        raise ValueError(f"{name} must be 0 or 1, not {raw!r}")
+    return raw == "1"
 
 
 def _default_seed_dir() -> str:
