@@ -72,6 +72,8 @@ builder.Services.AddScoped<IngestService>();
 builder.Services.AddScoped<DemoService>();
 builder.Services.AddScoped<SuggestionService>();
 builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<PdfImportService>();
+builder.Services.AddSingleton<PdfDraftStore>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -144,6 +146,7 @@ app.MapScenarios();
 app.MapClassification();
 app.MapSuggestions();
 app.MapChat();
+app.MapPdfImport();
 app.MapDev();
 
 app.Run();

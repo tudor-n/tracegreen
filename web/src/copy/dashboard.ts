@@ -262,6 +262,12 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   TermsNotAccepted: 'Supplier terms not accepted.',
   CategoryNotAllowed: 'That category is not one of the allowed categories.',
   InvalidQuestion: 'That question could not be asked.',
+  NotPdf: 'Not a PDF.',
+  PdfNoText: 'This PDF has no text to read.',
+  PdfUnreadable: 'This PDF could not be read.',
+  ExtractionUnavailable: 'No AI model could read the PDF right now.',
+  DraftExpired: 'This check has run out of time.',
+  InvalidInvoiceFields: 'A field needs fixing.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

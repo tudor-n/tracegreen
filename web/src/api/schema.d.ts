@@ -326,6 +326,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ingest/pdf/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read a PDF invoice's fields into a draft for a person to check; nothing is imported */
+        post: operations["ExtractPdfInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/pdf/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a PDF invoice's fields as a person checked them, as an ESTIMATED node */
+        post: operations["ConfirmPdfInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -538,6 +572,24 @@ export interface components {
             /** Format: uuid */
             workspaceId: string;
         };
+        DraftInvoice: {
+            supplierName: string;
+            supplierTaxId: string;
+            supplierCountry: string;
+            invoiceNumber: string;
+            issueDate: string;
+            currency: string;
+            totalNet: string;
+            lines: components["schemas"]["DraftLine"][];
+        };
+        DraftLine: {
+            description: string;
+            quantity: string;
+            unitCode: string;
+            amount: string;
+            classificationCode: string;
+            classificationScheme: string;
+        };
         /** @enum {unknown} */
         EnergySource: "grid" | "renewable" | "unknown";
         /** @enum {unknown} */
@@ -658,6 +710,32 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        PdfConfirmRequest: {
+            draftId: null | string;
+            invoice: null | components["schemas"]["PdfInvoiceForm"];
+        };
+        PdfDraftView: {
+            draftId: string;
+            invoice: components["schemas"]["DraftInvoice"];
+            found: {
+                [key: string]: boolean;
+            };
+            provider: string;
+            /** Format: int32 */
+            pages: number;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        PdfInvoiceForm: {
+            supplierName: null | string;
+            supplierTaxId: null | string;
+            supplierCountry: null | string;
+            invoiceNumber: null | string;
+            issueDate: null | string;
+            currency: null | string;
+            totalNet: null | string;
+            lines: null | components["schemas"]["DraftLine"][];
+        };
         /** @enum {unknown} */
         PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST";
         PlausibilityWarning: {
@@ -705,7 +783,7 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "InvalidQuestion";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -1614,6 +1692,131 @@ export interface operations {
             };
             /** @description Too Many Requests */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ExtractPdfInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdfDraftView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Payload Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ConfirmPdfInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PdfConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResult"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
