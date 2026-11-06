@@ -1,4 +1,6 @@
+using System.Text.Json.Nodes;
 using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
 
 namespace TraceGreen.Tests.Domain;
@@ -82,6 +84,123 @@ public class SeedLoaderTests
         Assert.Equal(NodeStatus.Partial, byKey["N5"].Status);
         Assert.Null(byKey["N5"].EnergySource);
         Assert.NotNull(byKey["N5"].Nonce);
+    }
+
+    [Fact]
+    public void SupplierTermsLoadInBothLanguagesWithTheHashOfTheCanonicalFile()
+    {
+        var terms = Load().SupplierTerms;
+        var file = File.ReadAllText(Path.Combine(TestPaths.SeedDir, SeedLoader.TermsFile));
+
+        Assert.Equal(Hashing.Sha256Hex(CanonicalJson.Serialize(JsonNode.Parse(file))), terms.Sha256);
+        Assert.False(string.IsNullOrWhiteSpace(terms.Version));
+        Assert.Equal(terms.Ro.Sections.Select(s => s.Number), terms.En.Sections.Select(s => s.Number));
+        // The checkbox statement names the clauses that need express acceptance (Civil Code art. 1203).
+        static string Statement(TermsAcceptance a) => a.Before + a.Link + a.After;
+        foreach (var number in new[] { 6, 7, 10 })
+        {
+            Assert.Contains(terms.Ro.Sections, s => s.Number == number);
+            Assert.Contains($"§{number} (", Statement(terms.En.Acceptance), StringComparison.Ordinal);
+            Assert.Contains($"§{number} (", Statement(terms.Ro.Acceptance), StringComparison.Ordinal);
+        }
+        Assert.False(string.IsNullOrWhiteSpace(terms.En.Acceptance.Link));
+        Assert.False(string.IsNullOrWhiteSpace(terms.Ro.Acceptance.Link));
+    }
+
+    [Fact]
+    public void TheCurrentTermsVersionIsPinnedToItsHash()
+    {
+        var terms = Load().SupplierTerms;
+        var published = JsonNode.Parse(File.ReadAllText(Path.Combine(TestPaths.SeedDir, SeedLoader.TermsVersionsFile)))!.AsObject();
+
+        Assert.Equal(terms.Sha256, published[terms.Version]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ReformattingTheTermsFileKeepsItsHashAndAChangedWordWithoutANewVersionIsRefused()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, dir);
+        var path = Path.Combine(dir, SeedLoader.TermsFile);
+        try
+        {
+            var original = Load().SupplierTerms.Sha256;
+            File.WriteAllText(path, JsonNode.Parse(File.ReadAllText(path))!.ToJsonString());
+            Assert.Equal(original, SeedLoader.Load(dir).SupplierTerms.Sha256);
+
+            File.WriteAllText(path, File.ReadAllText(path).Replace("Romanian law", "Romanian laws", StringComparison.Ordinal));
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains($"was published with SHA-256 {original}", StringComparison.Ordinal)
+                && v.Contains("give the changed text a new version", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ANewTermsVersionNeedsItsEntryInTheVersionsFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-new-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, dir);
+        var path = Path.Combine(dir, SeedLoader.TermsFile);
+        var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        doc["version"] = "2099-01-01";
+        File.WriteAllText(path, doc.ToJsonString());
+        try
+        {
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains("has no entry for version 2099-01-01", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RejectsAnEmptyTermsSectionAndRepeatedSectionNumbers()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-sections-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, dir);
+        var path = Path.Combine(dir, SeedLoader.TermsFile);
+        var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        doc["ro"]!["sections"]!.AsArray().Add(null);
+        doc["en"]!["sections"]![1]!["number"] = 1;
+        File.WriteAllText(path, doc.ToJsonString());
+        try
+        {
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains("ro: an empty section", StringComparison.Ordinal));
+            Assert.Contains(ex.Violations, v => v.Contains("en: two sections share a number", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RejectsSupplierTermsWithALanguageOrAnAcceptanceMissing()
+    {
+        var bad = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-bad-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, bad);
+        var path = Path.Combine(bad, SeedLoader.TermsFile);
+        var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        doc.Remove("en");
+        doc["ro"]!["acceptance"]!["link"] = "";
+        File.WriteAllText(path, doc.ToJsonString());
+        try
+        {
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(bad));
+            Assert.Contains(ex.Violations, v => v.Contains("no en text", StringComparison.Ordinal));
+            Assert.Contains(ex.Violations, v => v.Contains("ro: no acceptance statement", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(bad, recursive: true);
+        }
     }
 
     [Fact]

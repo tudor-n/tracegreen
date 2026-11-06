@@ -26,6 +26,7 @@ public enum ProblemCode
     [JsonStringEnumMemberName("InvalidChange")] InvalidChange,
     [JsonStringEnumMemberName("ModeNotAvailable")] ModeNotAvailable,
     [JsonStringEnumMemberName("MassUnknown")] MassUnknown,
+    [JsonStringEnumMemberName("TermsNotAccepted")] TermsNotAccepted,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -59,6 +60,7 @@ public static class Problems
             ProblemCode.InvalidChange => (StatusCodes.Status422UnprocessableEntity, "Change not accepted"),
             ProblemCode.ModeNotAvailable => (StatusCodes.Status422UnprocessableEntity, "Mode not available on this lane"),
             ProblemCode.MassUnknown => (StatusCodes.Status422UnprocessableEntity, "Mass unknown"),
+            ProblemCode.TermsNotAccepted => (StatusCodes.Status422UnprocessableEntity, "Supplier terms not accepted"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

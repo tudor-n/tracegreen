@@ -89,6 +89,9 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - name: Script tests (preflight checks, demo check, the supplier terms' hash parity with C#)
+        working-directory: .
+        run: node --test scripts/lib/*.test.mjs
 
   types-drift:
     name: types drift (schema.d.ts matches the API's OpenAPI)

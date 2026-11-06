@@ -112,7 +112,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults; nothing personal */
+        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults, and the supplier terms; nothing personal */
         get: operations["GetVerifyContext"];
         put?: never;
         post?: never;
@@ -131,8 +131,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit the supplier's answers: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
+        /** Submit the supplier's answers with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
         post: operations["SubmitVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/supplier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current supplier terms in Romanian and English, with their version and the SHA-256 a submit sends back */
+        get: operations["GetSupplierTerms"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -492,7 +509,7 @@ export interface components {
             detail: string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "TermsNotAccepted";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -560,6 +577,29 @@ export interface components {
             /** Format: double */
             massT?: null | number;
         };
+        SupplierTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsText"];
+            en: components["schemas"]["TermsText"];
+        };
+        TermsAcceptance: {
+            before: string;
+            link: string;
+            after: string;
+        };
+        TermsSection: {
+            /** Format: int32 */
+            number: number;
+            heading: string;
+            paragraphs: string[];
+        };
+        TermsText: {
+            title: string;
+            keyPoints: string[];
+            acceptance: components["schemas"]["TermsAcceptance"];
+            sections: components["schemas"]["TermsSection"][];
+        };
         /** @enum {unknown} */
         TransportMode: "road" | "rail" | "sea" | "air";
         /** @enum {unknown} */
@@ -593,6 +633,7 @@ export interface components {
             massT: null | number;
             /** Format: date-time */
             expiresAt: string;
+            terms: components["schemas"]["VerifyTerms"];
         };
         VerifyOutcome: {
             /** Format: uuid */
@@ -606,6 +647,13 @@ export interface components {
             energySource?: null | components["schemas"]["EnergySource"];
             /** Format: double */
             massT?: null | number;
+            acceptedTerms?: null | string;
+        };
+        VerifyTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsAcceptance"];
+            en: components["schemas"]["TermsAcceptance"];
         };
     };
     responses: never;
@@ -944,6 +992,26 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetSupplierTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierTerms"];
                 };
             };
         };

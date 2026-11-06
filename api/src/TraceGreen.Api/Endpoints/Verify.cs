@@ -9,14 +9,20 @@ public sealed record RequestLinkRequest(Guid NodeId);
 /// <summary><see cref="Loopback"/> is true when a phone on the hotspot could not open <see cref="Url"/> (the QR card warns).</summary>
 public sealed record RequestLinkResponse(Guid NodeId, string Url, DateTimeOffset ExpiresAt, bool Loopback);
 
-/// <summary><see cref="T"/> is the token from the link's <c>?t=</c>. Leave a question's field out (or null) to skip it.</summary>
-public sealed record VerifyRequest(string T, TransportMode? TransportMode = null, EnergySource? EnergySource = null, decimal? MassT = null);
+/// <summary>
+/// <see cref="T"/> is the token from the link's <c>?t=</c>. Leave a question's field out (or null) to skip it.
+/// <see cref="AcceptedTerms"/> is <c>terms.sha256</c> from the context, sent once the supplier ticked the terms; without
+/// it, or with another value, the answer is refused with 422 <c>TermsNotAccepted</c>.
+/// </summary>
+public sealed record VerifyRequest(
+    string T, TransportMode? TransportMode = null, EnergySource? EnergySource = null, decimal? MassT = null, string? AcceptedTerms = null);
 
 /// <summary>
 /// The supplier verification loop (F3). The token is the only credential on <c>/api/verify*</c>; it never appears in a
 /// response body, an audit payload or a log line. Status mapping (ruling 5): malformed or bad signature → 401
 /// <c>InvalidToken</c>; expired → 410 <c>LinkExpired</c>; invoice changed or gone → 410 <c>InvoiceChanged</c>;
-/// replay → 409 <c>AlreadyUsed</c>; over <c>RATE_LIMIT_PER_MIN</c> per client address → 429 <c>RateLimited</c>.
+/// replay → 409 <c>AlreadyUsed</c>; terms not accepted → 422 <c>TermsNotAccepted</c>; over <c>RATE_LIMIT_PER_MIN</c> per
+/// client address → 429 <c>RateLimited</c>.
 /// </summary>
 public static class VerifyEndpoints
 {
@@ -43,7 +49,7 @@ public static class VerifyEndpoints
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("GetVerifyContext")
             .WithTags("Verify")
-            .WithSummary("What the supplier page shows for a link: supplier, item, the lane's modes and the defaults; nothing personal")
+            .WithSummary("What the supplier page shows for a link: supplier, item, the lane's modes and the defaults, and the supplier terms; nothing personal")
             .Produces<VerifyContext>()
             .ProducesApiProblem(
                 StatusCodes.Status401Unauthorized,
@@ -52,12 +58,12 @@ public static class VerifyEndpoints
                 StatusCodes.Status429TooManyRequests);
 
         app.MapPost("/api/verify", async (VerifyRequest body, HttpContext http, VerifyService verify, CancellationToken ct) =>
-                (await verify.SubmitAsync(new VerifyAnswer(body.T, body.TransportMode, body.EnergySource, body.MassT), ClientAddress(http), ct))
+                (await verify.SubmitAsync(new VerifyAnswer(body.T, body.TransportMode, body.EnergySource, body.MassT, body.AcceptedTerms), ClientAddress(http), ct))
                     .Match(TypedResults.Ok, ToProblem))
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("SubmitVerification")
             .WithTags("Verify")
-            .WithSummary("Submit the supplier's answers: both answered → VERIFIED, one skipped → PARTIAL; warnings never block")
+            .WithSummary("Submit the supplier's answers with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block")
             .Produces<VerifyOutcome>()
             .ProducesApiProblem(
                 StatusCodes.Status401Unauthorized,
@@ -80,6 +86,7 @@ public static class VerifyEndpoints
             VerifyErrorCode.AlreadyUsed => ProblemCode.AlreadyUsed,
             VerifyErrorCode.InvalidAnswer => ProblemCode.InvalidAnswer,
             VerifyErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
+            VerifyErrorCode.TermsNotAccepted => ProblemCode.TermsNotAccepted,
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, null),
         },
         error.Message);

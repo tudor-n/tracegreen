@@ -10,9 +10,11 @@ import type {
   VerifyRequest,
 } from '@/api/client'
 import { DEFAULT_LANG, type Lang, type VerifyResult } from '@/copy/verify'
+import type { Result } from './api-reply'
 
 // Pure decision logic behind the supplier page /verify/:nodeId: the language, which answers to offer and pre-select,
-// what each API answer means for the page, and the page's states. The page performs the two requests the states ask for
+// the supplier terms the supplier must tick before sending (never ticked for them), what each API answer means for the
+// page, and the page's states. The page performs the two requests the states ask for
 // (the context while loading, the answers while submitting) and renders the rest, so every rule here is unit-tested
 // without a browser.
 
@@ -25,7 +27,7 @@ export function resolveLang(param: string | null): Lang {
 export type Failure = Exclude<VerifyResult, 'thanks'>
 
 /** A request's result for the page: its body, or what went wrong. */
-export type Reply<T> = { ok: true; data: T } | { ok: false; failure: Failure }
+export type Reply<T> = Result<T, Failure>
 
 /** The two requests the page makes. */
 export interface VerifyApi {
@@ -37,6 +39,7 @@ export interface VerifyApi {
 const RETRYABLE: Record<Failure, boolean> = {
   offline: true,
   rateLimited: true,
+  termsChanged: true,
   alreadyUsed: false,
   expired: false,
   invoiceChanged: false,
@@ -60,6 +63,9 @@ export function failureFor(status: number | null, code: ProblemCode | null): Fai
       return 'invoiceChanged'
     case 'RateLimited':
       return 'rateLimited'
+    // The page sends the terms it showed, so this means they changed on the server since the page loaded.
+    case 'TermsNotAccepted':
+      return 'termsChanged'
     // The page offers the lane's modes alone and never sends two skips, so these mean the link no longer fits.
     case 'InvalidAnswer':
     case 'NodeNotFound':
@@ -91,6 +97,13 @@ function preselect<T>(options: T[], preferred: T): T | null {
   return options.includes(preferred) ? preferred : (options[0] ?? null)
 }
 
+/** The answer given before a reload when the link still offers it (a skip always fits), else the pre-selection. */
+function keepOrPreselect<T>(options: T[], preferred: T, previous: T | null | undefined): T | null {
+  if (previous === null) return null
+  if (previous !== undefined && options.includes(previous)) return previous
+  return preselect(options, preferred)
+}
+
 /** Each question's answer: the chosen option, or null when the supplier skipped it (the node then becomes PARTIAL). */
 export interface Answers {
   transport: TransportMode | null
@@ -102,17 +115,31 @@ export function canSubmit(answers: Answers): boolean {
   return answers.transport !== null || answers.energy !== null
 }
 
-/** The body of `POST /api/verify`. A skipped answer is sent as null; the mass is left to the invoice. */
-export function submitBody(token: string, answers: Answers): VerifyRequest {
-  return { t: token, transportMode: answers.transport, energySource: answers.energy }
+/** Sendable: at least one answer, and the supplier ticked the terms themselves (the API refuses a submit without them). */
+export function canSend(answers: Answers, accepted: boolean): boolean {
+  return accepted && canSubmit(answers)
 }
 
-/** Where a retry goes: the context request again, or the same answers sent again. */
-type RetryTarget = { phase: 'loading' } | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+/**
+ * The body of `POST /api/verify`. A skipped answer is sent as null; the mass is left to the invoice. `acceptedTerms` is
+ * the SHA-256 of the terms the page showed, from the context, so the server records exactly what was accepted.
+ */
+export function submitBody(token: string, answers: Answers, termsSha256: string): VerifyRequest {
+  return { t: token, transportMode: answers.transport, energySource: answers.energy, acceptedTerms: termsSha256 }
+}
 
+/** Where a retry goes: the context request again (keeping the answers given, if any), or the same answers sent again. */
+type RetryTarget =
+  | { phase: 'loading'; previous?: Answers }
+  | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+
+/**
+ * `accepted` is the supplier's tick on the terms checkbox; a submission is sent with it ticked, so 'submitting' needs no
+ * flag. `previous` holds the answers across a reload of the context, so a retry never swaps them for the defaults.
+ */
 export type VerifyState =
-  | { phase: 'loading' }
-  | { phase: 'ready'; context: VerifyContext; answers: Answers }
+  | { phase: 'loading'; previous?: Answers }
+  | { phase: 'ready'; context: VerifyContext; answers: Answers; accepted: boolean }
   | { phase: 'submitting'; context: VerifyContext; answers: Answers }
   | { phase: 'done'; status: NodeStatus; warnings: PlausibilityWarning[] }
   | { phase: 'failed'; failure: Failure; retry: RetryTarget | null }
@@ -121,6 +148,7 @@ export type VerifyInput =
   | { kind: 'contextLoaded'; context: VerifyContext }
   | { kind: 'transport'; value: TransportMode | null }
   | { kind: 'energy'; value: EnergySource | null }
+  | { kind: 'terms'; accepted: boolean }
   | { kind: 'submit' }
   | { kind: 'submitted'; outcome: VerifyOutcome }
   | { kind: 'failed'; failure: Failure }
@@ -144,10 +172,11 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
       if (state.phase !== 'loading') return state
       const { context } = input
       const answers = {
-        transport: preselect(offeredModes(context), context.defaultMode),
-        energy: preselect(offeredEnergy(context), context.defaultEnergy),
+        transport: keepOrPreselect(offeredModes(context), context.defaultMode, state.previous?.transport),
+        energy: keepOrPreselect(offeredEnergy(context), context.defaultEnergy, state.previous?.energy),
       }
-      return { phase: 'ready', context, answers }
+      // The terms always start unticked: acceptance has to be the supplier's own act (Civil Code art. 1203).
+      return { phase: 'ready', context, answers, accepted: false }
     }
     case 'transport':
       if (state.phase !== 'ready') return state
@@ -157,15 +186,23 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
       if (state.phase !== 'ready') return state
       if (input.value !== null && !offeredEnergy(state.context).includes(input.value)) return state
       return { ...state, answers: { ...state.answers, energy: input.value } }
+    case 'terms':
+      return state.phase === 'ready' ? { ...state, accepted: input.accepted } : state
     case 'submit':
-      return state.phase === 'ready' && canSubmit(state.answers) ? { ...state, phase: 'submitting' } : state
+      return state.phase === 'ready' && canSend(state.answers, state.accepted)
+        ? { phase: 'submitting', context: state.context, answers: state.answers }
+        : state
     case 'submitted':
       return state.phase === 'submitting'
         ? { phase: 'done', status: input.outcome.status, warnings: input.outcome.warnings }
         : state
     case 'failed':
-      if (state.phase === 'loading') return failed(input.failure, { phase: 'loading' })
+      // A lost reload retries the same reload, answers kept.
+      if (state.phase === 'loading') return failed(input.failure, state)
       if (state.phase === 'submitting') {
+        // Changed terms are read again before anything is sent: the retry reloads the context with the box unticked,
+        // keeping the supplier's answers.
+        if (input.failure === 'termsChanged') return failed(input.failure, { phase: 'loading', previous: state.answers })
         return failed(input.failure, { phase: 'submitting', context: state.context, answers: state.answers })
       }
       return state
