@@ -2,13 +2,13 @@ using TraceGreen.Domain.Model;
 
 namespace TraceGreen.Tests;
 
-/// <summary>Hand-computed fixtures matching the seed scenario (placeholder factors).</summary>
+/// <summary>Hand-computed fixtures matching the seed scenario (DESNZ 2026 factors, docs/factor-sources.md).</summary>
 public static class TestNodes
 {
     public static readonly Guid N1Id = Guid.Parse("11111111-1111-4111-8111-000000000001");
     public static readonly Guid N1InvoiceId = Guid.Parse("22222222-2222-4222-8222-000000000001");
 
-    /// <summary>N1 after verification (air, grid): transport 2.3 t × 7500 km × 0.80 = 13 800 kg, material 2.3 × 3000 = 6 900 kg.</summary>
+    /// <summary>N1 after verification (air, grid): transport 2.3 t × 7500 km × 0.5313 = 9 164.925 kg, material 2.3 × 3470.91114 = 7 983.095622 kg.</summary>
     public static SupplierNode N1(
         NodeStatus status = NodeStatus.Verified,
         TransportMode? mode = TransportMode.Air,
@@ -26,7 +26,7 @@ public static class TestNodes
         LaneId: "CN-RO",
         Status: status,
         SpendKg: 21600m,
-        ActivityKg: status == NodeStatus.Estimated ? null : 20700m,
+        ActivityKg: status == NodeStatus.Estimated ? null : 17148.020622m,
         SpendEur: 48000m,
         CostEur: 52600m,
         LeadDays: 7,

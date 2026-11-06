@@ -13,11 +13,11 @@ public class FactorTableTests
     {
         var lookup = Table.Lookup(FactorKind.Transport, "air");
 
-        Assert.Equal(0.80m, lookup.Value);
+        Assert.Equal(0.5313m, lookup.Value);
         Assert.Equal("kgCO2e/t.km", lookup.Unit);
         Assert.Equal(2026, lookup.Year);
-        Assert.Contains("PLACEHOLDER", lookup.Source);
-        Assert.False(string.IsNullOrWhiteSpace(lookup.RowLabel));
+        Assert.Equal("DESNZ UK GHG conversion factors", lookup.Source);
+        Assert.Equal("Freighting goods: freight flights, international, to/from non-UK, without RF", lookup.RowLabel);
     }
 
     [Fact]

@@ -27,8 +27,8 @@ public class NodeFactoryTests
 
         var node = NodeFactory.NewNode(Guid.NewGuid(), invoice, ZincDiecast, CnRo, NodeStatus.Verified, TransportMode.Air, EnergySource.Grid, Seed, Table, DateTimeOffset.UnixEpoch);
 
-        Assert.Equal(20700m, node.ActivityKg);
-        Assert.Equal(20700m, node.CarbonKg);
+        Assert.Equal(17148.020622m, node.ActivityKg); // TestNodes.N1: 9164.925 kg transport + 7983.095622 kg material
+        Assert.Equal(17148.020622m, node.CarbonKg);
     }
 
     [Fact]

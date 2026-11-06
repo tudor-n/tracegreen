@@ -73,7 +73,7 @@ services:
       AI_TIMEOUT_MS: "10000"
       SEED_DIR: /seed
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      ETS_PRICE_EUR_PER_T: "70"
+      ETS_PRICE_EUR_PER_T: "90.01"
     ports:
       - "8080:8080"
     depends_on:

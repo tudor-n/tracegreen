@@ -36,7 +36,7 @@ public class AppConfigTests
     {
         var c = AppConfig.FromEnvironment(Env());
         Assert.Equal(604800, c.LinkTtlSeconds);
-        Assert.Equal(70m, c.EtsPriceEurPerT);
+        Assert.Equal(90.01m, c.EtsPriceEurPerT);
         Assert.Equal(10000, c.AiTimeoutMs);
         Assert.Equal(10, c.RateLimitPerMin);
         Assert.False(c.DemoTools);

@@ -49,7 +49,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | T1 | 19 Oct | Team registration and dates | **outside** |
 | T2 | 20 Oct | Repository and CI | **done**: repo on the .NET / FastAPI / Vite stack; CI added in A9 (`.github/workflows/ci.yml`) |
 | T3 | 21 Oct | Database, tables, RLS, offline mode | **done**: Postgres with migrations `Init` and `Rls`, plus `DATA_MODE=memory` |
-| T4 | 22 Oct | Factor rows with source, year and row label, and a spend-factor source | **partial**: the spend source is decided (D1, US EPA v1.3) and `docs/factor-sources.md` exists. The freight and material rows and `ETS_PRICE_EUR_PER_T` are still placeholders; a person replaces them |
+| T4 | 22 Oct | Factor rows with source, year and row label, and a spend-factor source | **done** (2026-11-06): spend rows from US EPA v1.3 (D1); freight and material rows from DESNZ 2026, chosen with a person; `ETS_PRICE_EUR_PER_T` 90.01 from the 2026-11-05 EU primary auction (`docs/factor-sources.md`) |
 | T5 | 23 Oct | UBL parser and seed XMLs validated at ANAF | **done** (`NEXT.md`, "Seed XML validation") |
 | T6 | 23 Oct | Carbon math with MAC guard tests | **done**: `Domain/Carbon` |
 | T7 | 24 Oct | Graph, status colours, KPI bar | **done** (M1) |

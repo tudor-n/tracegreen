@@ -12,7 +12,7 @@ Where every emission factor in `seed/factors.json`, and the carbon price behind 
 - The DESNZ electricity factor is never used for Romania (roadmap FB14, FV5).
 - Where no row matches exactly, take the nearest row and write which one and why in the "match" column. Expect this for most materials: zinc die-cast, PCB, wire harness, connectors and generic goods.
 - Well-to-tank emissions are excluded. Transport rows use DESNZ's freight factors without its separate well-to-tank tables, so "WTT included?" reads No.
-- `year` is the year of the source edition (2026 for DESNZ 2026). When the data describe an earlier year, the "data year" column says so. The placeholder rows carry 2026 as well; that year means nothing until the row is sourced, which is why it is marked here.
+- `year` is the year of the source edition (2026 for DESNZ 2026). When the data describe an earlier year, the "data year" column says so.
 - The "i" icon next to every number shows the row's `source`, `year` and `rowLabel`, so a placeholder row shows the word PLACEHOLDER on screen. That is intended until T4 lands; do not hide it.
 - `scripts/preflight.mjs` (C6) fails while any `source` in `factors.json` contains PLACEHOLDER, while the carbon price below has no source and date, and while this file and `factors.json` disagree. An unset variable cannot be the test for the price, because `AppConfig` falls back to 70 when it is empty. So `v0.9-prehack` cannot be tagged on placeholder data.
 - If the real rows change a demo badge (D5), report it in `docs/NEXT.md` and change what the demo script says. Lanes, masses and prices are never adjusted to bring a badge back.
@@ -20,24 +20,26 @@ Where every emission factor in `seed/factors.json`, and the carbon price behind 
 
 ## Transport
 
+Source: DESNZ, UK Government GHG Conversion Factors for Company Reporting 2026, full set (published 11 June 2026, Open Government Licence v3.0), file `ghg-conversion-factors-2026-full-set.xlsx` from https://www.gov.uk/government/publications/greenhouse-gas-reporting-conversion-factors-2026 (SHA-256 `b5c4f2f86cdc74707337b2fb013b44ded189a1b528f5e29ea99856ba65ae0205`), sheets "Freighting goods" (kg CO2e per tonne.km) and "Material use" (kg CO2e per tonne, column "Primary material production"). Every value was checked against the flat file revised on 31 July 2026, whose revision touched car well-to-tank and hotel-stay values alone. Rows read from the file and chosen with a person on 2026-11-06. Material rows count making the material, not the part: die-casting, board fabrication and harness assembly are outside them. The table name leads each row label, so every DESNZ row shares one `source` and a VERIFIED node reads "Supplier-confirmed · DESNZ UK GHG conversion factors 2026".
+
 | id | key | value | unit | source | year | data year | row label | WTT included? | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| `transport.road` | road | 0.1 | kgCO2e/t.km | PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4 | 2026 (placeholder) |  | HGV road freight, average laden (placeholder) | No |  |
-| `transport.rail` | rail | 0.03 | kgCO2e/t.km | PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4 | 2026 (placeholder) |  | Rail freight (placeholder) | No |  |
-| `transport.sea` | sea | 0.016 | kgCO2e/t.km | PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4 | 2026 (placeholder) |  | Sea container freight (placeholder) | No |  |
-| `transport.air` | air | 0.8 | kgCO2e/t.km | PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4 | 2026 (placeholder) |  | Air freight, long-haul (placeholder) | No | DESNZ publishes air freight with and without radiative forcing: name the variant in the row label. For lanes that do not touch the UK, the "international, to/from non-UK" row is likely a better fit than long-haul. |
+| `transport.road` | road | 0.07926 | kgCO2e/t.km | DESNZ UK GHG conversion factors | 2026 |  | Freighting goods: HGV (non-refrigerated, all diesel), average non-refrigerated artics, average laden | No | Four of the five road lanes are 180-1,500 km intercity runs done by articulated trucks; the all-HGV average (0.10356) mixes in rigid trucks (0.19947), and the >33 t class (0.07835) would assume a weight class nobody reports. UK fleet and UK average loading; a part load emits more per tonne-km. |
+| `transport.rail` | rail | 0.02583 | kgCO2e/t.km | DESNZ UK GHG conversion factors | 2026 |  | Freighting goods: rail, freight train | No | The one freight-rail row. |
+| `transport.sea` | sea | 0.01612 | kgCO2e/t.km | DESNZ UK GHG conversion factors | 2026 |  | Freighting goods: cargo ship, container ship, average | No | Container ships of every size class, averaged. |
+| `transport.air` | air | 0.5313 | kgCO2e/t.km | DESNZ UK GHG conversion factors | 2026 |  | Freighting goods: freight flights, international, to/from non-UK, without RF | No | The air lanes (Shenzhen and Taoyuan to Sibiu) do not touch the UK. Without radiative forcing, as GHG accounting and most freight reporting count emissions; with RF the same row is 0.89939 (an uplift of about 1.7 for contrails and NOx at altitude, real but uncertain). |
 
 ## Material
 
 | id | key | value | unit | source | year | data year | row label | match |
 |---|---|---|---|---|---|---|---|---|
-| `material.zinc_diecast` | zinc_diecast | 3000 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Zinc die-cast, primary production (placeholder) |  |
-| `material.pcb` | pcb | 5000 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Electrical items: printed circuit boards (placeholder) |  |
-| `material.wire_harness` | wire_harness | 2500 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Copper wire harness (placeholder) |  |
-| `material.packaging_paper` | packaging_paper | 1000 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Paper and board packaging (placeholder) |  |
-| `material.connectors` | connectors | 4000 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Electrical connectors (placeholder) |  |
-| `material.plastics` | plastics | 3100 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Average plastics (placeholder) |  |
-| `material.generic` | generic | 2000 | kgCO2e/t | PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4 | 2026 (placeholder) |  | Generic manufactured goods (placeholder) |  |
+| `material.zinc_diecast` | zinc_diecast | 3470.91114 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Metal: scrap metal, primary material production | Nearest row: DESNZ has no zinc. Its mixed-metal row is within 1% of the zinc industry's published global average for primary zinc (3.5 kg CO2e/kg). Die-casting itself is not included. |
+| `material.pcb` | pcb | 24865.47556 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Electrical items - IT, primary material production | Nearest row: DESNZ has no circuit-board row. A university LCA of FR-4 boards gives about 20 kg CO2e/kg, which this row is closest to; "Electrical items - small" (5647.95) would understate bare boards about 3.5 times. The row describes whole IT equipment. |
+| `material.wire_harness` | wire_harness | 3821.94858 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Construction: Metals, primary material production | Nearest row: DESNZ has no copper or cable row. A harness is mostly copper (global average about 4 kg CO2e/kg) and PVC (DESNZ 2942.44); "Electrical items - small" (5647.95) would treat it as an appliance. Harness assembly is not included. |
+| `material.packaging_paper` | packaging_paper | 1198.23866 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Paper and board: board, primary material production | Direct match: corrugated boxes are board. |
+| `material.connectors` | connectors | 3351.96455 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Plastics: average plastic rigid, primary material production | Nearest row: connectors are mostly moulded plastic housings by mass, with copper-alloy contacts and no electronics; the contacts put the true figure somewhat higher. |
+| `material.plastics` | plastics | 3351.96455 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Plastics: average plastic rigid, primary material production | Moulded plastic parts are rigid; "average plastics" (3170.51) mixes in film. |
+| `material.generic` | generic | 3470.91114 | kgCO2e/t | DESNZ UK GHG conversion factors | 2026 |  | Material use: Metal: scrap metal, primary material production | A proxy for UNCLASSIFIED lines, whose material is unknown: DESNZ's mixed-metal row, in the middle of its metal and plastic rows (3170.51-3821.95). |
 
 ## Spend
 
@@ -70,9 +72,9 @@ The API converts on every import (`api/src/TraceGreen.Domain/Carbon/SpendConvers
 
 | name | value | unit | benchmark | source | date set |
 |---|---|---|---|---|---|
-| `ETS_PRICE_EUR_PER_T` | 70 | EUR/tCO2e | Settlement price of the front-December EUA futures contract on ICE Endex | PLACEHOLDER |  |
+| `ETS_PRICE_EUR_PER_T` | 90.01 | EUR/tCO2e | Clearing price of the EU ETS primary auction of allowances (EUA, common EU auction) | EU ETS primary market auction report 2026 of the auction platform, auction of 2026-11-05 (2,791,500 t sold), file `emission-spot-primary-market-auction-report-2026-data.xlsx` (SHA-256 `c38f8384a14bb87d5ffaa6945e1d4432ba8184a3fb9b4459ac9c194ed3b07efa`) | 2026-11-06 |
 
-The MAC badge compares an option's abatement cost with this price: below it the option is "below the carbon price", above it a "premium option". The 70 is a placeholder. A person sets the price on 5 Nov from the benchmark above and writes the source and the date here. The value lives in four places: `.env.demo`, `.env.example`, `compose.yml` and the default in `api/src/TraceGreen.Api/AppConfig.cs`. All four change in the same commit, and preflight (C6) checks that they agree.
+The MAC badge compares an option's abatement cost with this price: below it the option is "below the carbon price", above it a "premium option". The price is the clearing price of the 2026-11-05 auction, from the auction platform's public report (https://public.eex-group.com/eex/eua-auction-report/emission-spot-primary-market-auction-report-2026-data.xlsx, retrieved 2026-11-06). It was chosen over the front-December futures settlement, the earlier benchmark, because the auction report is official, dated and free to download; a spot price usually sits slightly below the December future (that day about 89-90). The value lives in four places: `.env.demo`, `.env.example`, `compose.yml` and the default in `api/src/TraceGreen.Api/AppConfig.cs`. All four change in the same commit, and preflight (C6) checks that they agree.
 
 ## Decisions
 

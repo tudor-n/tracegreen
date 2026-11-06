@@ -3,111 +3,111 @@
     "id": "transport.road",
     "kind": "transport",
     "key": "road",
-    "value": 0.1,
+    "value": 0.07926,
     "unit": "kgCO2e/t.km",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "HGV road freight, average laden (placeholder)"
+    "rowLabel": "Freighting goods: HGV (non-refrigerated, all diesel), average non-refrigerated artics, average laden"
   },
   {
     "id": "transport.rail",
     "kind": "transport",
     "key": "rail",
-    "value": 0.03,
+    "value": 0.02583,
     "unit": "kgCO2e/t.km",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Rail freight (placeholder)"
+    "rowLabel": "Freighting goods: rail, freight train"
   },
   {
     "id": "transport.sea",
     "kind": "transport",
     "key": "sea",
-    "value": 0.016,
+    "value": 0.01612,
     "unit": "kgCO2e/t.km",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Sea container freight (placeholder)"
+    "rowLabel": "Freighting goods: cargo ship, container ship, average"
   },
   {
     "id": "transport.air",
     "kind": "transport",
     "key": "air",
-    "value": 0.8,
+    "value": 0.5313,
     "unit": "kgCO2e/t.km",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Freighting goods or EEA row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Air freight, long-haul (placeholder)"
+    "rowLabel": "Freighting goods: freight flights, international, to/from non-UK, without RF"
   },
   {
     "id": "material.zinc_diecast",
     "kind": "material",
     "key": "zinc_diecast",
-    "value": 3000,
+    "value": 3470.91114,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Zinc die-cast, primary production (placeholder)"
+    "rowLabel": "Material use: Metal: scrap metal, primary material production"
   },
   {
     "id": "material.pcb",
     "kind": "material",
     "key": "pcb",
-    "value": 5000,
+    "value": 24865.47556,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Electrical items: printed circuit boards (placeholder)"
+    "rowLabel": "Material use: Electrical items - IT, primary material production"
   },
   {
     "id": "material.wire_harness",
     "kind": "material",
     "key": "wire_harness",
-    "value": 2500,
+    "value": 3821.94858,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Copper wire harness (placeholder)"
+    "rowLabel": "Material use: Construction: Metals, primary material production"
   },
   {
     "id": "material.packaging_paper",
     "kind": "material",
     "key": "packaging_paper",
-    "value": 1000,
+    "value": 1198.23866,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Paper and board packaging (placeholder)"
+    "rowLabel": "Material use: Paper and board: board, primary material production"
   },
   {
     "id": "material.connectors",
     "kind": "material",
     "key": "connectors",
-    "value": 4000,
+    "value": 3351.96455,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Electrical connectors (placeholder)"
+    "rowLabel": "Material use: Plastics: average plastic rigid, primary material production"
   },
   {
     "id": "material.plastics",
     "kind": "material",
     "key": "plastics",
-    "value": 3100,
+    "value": 3351.96455,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Average plastics (placeholder)"
+    "rowLabel": "Material use: Plastics: average plastic rigid, primary material production"
   },
   {
     "id": "material.generic",
     "kind": "material",
     "key": "generic",
-    "value": 2000,
+    "value": 3470.91114,
     "unit": "kgCO2e/t",
-    "source": "PLACEHOLDER - replace with a DESNZ 2026 Material use row at T4",
+    "source": "DESNZ UK GHG conversion factors",
     "year": 2026,
-    "rowLabel": "Generic manufactured goods (placeholder)"
+    "rowLabel": "Material use: Metal: scrap metal, primary material production"
   },
   {
     "id": "spend.diecast_nonferrous",
