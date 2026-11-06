@@ -25,8 +25,8 @@ public class LineClassificationTests
             return classify(lines, ct);
         }
 
-        public Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<Suggestion>>([]);
+        public Task<SuggestOutcome> SuggestAsync(SuggestNodeInput node, IReadOnlyList<SuggestCandidateInput> candidates, CancellationToken ct) =>
+            Task.FromResult(new SuggestOutcome([], "fake"));
 
         public Task<HealthStatus> HealthAsync(CancellationToken ct) => Task.FromResult(new HealthStatus(true, null));
     }

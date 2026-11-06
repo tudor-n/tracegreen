@@ -25,6 +25,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.WorkspaceId, x.RawXmlHash });
             e.Property(x => x.ExtractedJson).HasColumnType("jsonb");
+            e.Property(x => x.DocumentKind).HasDefaultValue("ubl");
         });
         model.Entity<NodeRow>(e =>
         {

@@ -1,8 +1,9 @@
-import { LayoutGridIcon, type LucideIcon, ScrollTextIcon, WaypointsIcon } from 'lucide-react'
+import { LayoutGridIcon, type LucideIcon, MessageCircleIcon, ScrollTextIcon, WaypointsIcon } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { Toolbar } from '@/components/dashboard/Toolbar'
+import { chatCopy } from '@/copy/chat'
 import { auditPanelCopy, dashboardTitle, shellCopy } from '@/copy/dashboard'
 import type { Connection } from '@/hooks/useGraphEvents'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,8 @@ const selectSupplierCount = (s: GraphState) => new Set(Object.values(s.nodes).ma
 
 export function Sidebar({ connection }: { connection: Connection }) {
   const supplierCount = useGraphStore(selectSupplierCount)
+  const chatOpen = useGraphStore((s) => s.openPanels.chat)
+  const setPanel = useGraphStore((s) => s.setPanel)
   return (
     <nav
       aria-label={shellCopy.sections}
@@ -35,6 +38,22 @@ export function Sidebar({ connection }: { connection: Connection }) {
         <Item to="/" icon={LayoutGridIcon} label={shellCopy.overview} end />
         <Item to="/suppliers" icon={WaypointsIcon} label={shellCopy.suppliers} count={supplierCount} />
         <Item to="/audit" icon={ScrollTextIcon} label={auditPanelCopy.open} testId="toolbar-audit" />
+        <li>
+          {/* Not a screen: it opens the chat beside whichever screen is showing (F13). */}
+          <button
+            type="button"
+            data-testid="sidebar-chat"
+            aria-pressed={chatOpen}
+            onClick={() => setPanel('chat', !chatOpen)}
+            className={cn(
+              'flex h-9 w-full items-center gap-2.5 rounded-[9px] px-2.5 text-sm transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              chatOpen ? 'bg-sidebar-accent font-semibold text-foreground' : 'font-medium text-ink-2 hover:bg-fill-strong',
+            )}
+          >
+            <MessageCircleIcon className="size-[17px]" strokeWidth={1.7} aria-hidden />
+            <span className="flex-1 text-left">{chatCopy.open}</span>
+          </button>
+        </li>
       </ul>
       <div className="md:mt-auto">
         <Toolbar connection={connection} />

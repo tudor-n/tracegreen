@@ -30,13 +30,13 @@ public sealed class HttpAiClient(HttpClient http, AiOptions options) : IAiClient
             .ToList();
     }
 
-    public async Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct)
+    public async Task<SuggestOutcome> SuggestAsync(SuggestNodeInput node, IReadOnlyList<SuggestCandidateInput> candidates, CancellationToken ct)
     {
         using var response = await http.PostAsJsonAsync("suggest", new SuggestRequest(node, candidates), Json, ct);
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<SuggestResponse>(Json, ct)
             ?? throw new InvalidOperationException("Empty response from the AI service.");
-        return body.Suggestions;
+        return new SuggestOutcome(body.Suggestions ?? [], body.Provider ?? "stub");
     }
 
     public async Task<HealthStatus> HealthAsync(CancellationToken ct)
@@ -66,9 +66,9 @@ public sealed class HttpAiClient(HttpClient http, AiOptions options) : IAiClient
 
     private sealed record ClassifyResponse(List<ClassificationDto> Classifications, string? Provider);
 
-    private sealed record SuggestRequest(SupplierNode Node, IReadOnlyList<Alternative> Candidates);
+    private sealed record SuggestRequest(SuggestNodeInput Node, IReadOnlyList<SuggestCandidateInput> Candidates);
 
-    private sealed record SuggestResponse(List<Suggestion> Suggestions);
+    private sealed record SuggestResponse(List<Suggestion>? Suggestions, string? Provider);
 
     private sealed record HealthDto(bool Ok, string? Provider, int? CacheEntries, bool? ModelConfigured);
 }
@@ -82,8 +82,8 @@ public sealed class StubAiClient : IAiClient
         Task.FromResult<IReadOnlyList<Classification>>(
             lines.Select(l => new Classification(l.LineId, Ids.Unclassified, 0d, "AI not configured", ClassificationSource.Stub)).ToList());
 
-    public Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<Suggestion>>([]);
+    public Task<SuggestOutcome> SuggestAsync(SuggestNodeInput node, IReadOnlyList<SuggestCandidateInput> candidates, CancellationToken ct) =>
+        Task.FromResult(new SuggestOutcome([], "stub"));
 
     public Task<HealthStatus> HealthAsync(CancellationToken ct) => Task.FromResult(new HealthStatus(true, "stub"));
 }

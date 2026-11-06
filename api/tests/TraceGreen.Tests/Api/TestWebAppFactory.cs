@@ -57,8 +57,8 @@ public sealed class HangingAiWebAppFactory : TestWebAppFactory
         public Task<IReadOnlyList<Classification>> ClassifyAsync(IReadOnlyList<ClassificationInput> lines, CancellationToken ct) =>
             new TaskCompletionSource<IReadOnlyList<Classification>>().Task;
 
-        public Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct) =>
-            new TaskCompletionSource<IReadOnlyList<Suggestion>>().Task;
+        public Task<SuggestOutcome> SuggestAsync(SuggestNodeInput node, IReadOnlyList<SuggestCandidateInput> candidates, CancellationToken ct) =>
+            new TaskCompletionSource<SuggestOutcome>().Task;
 
         public Task<HealthStatus> HealthAsync(CancellationToken ct) => new TaskCompletionSource<HealthStatus>().Task;
     }

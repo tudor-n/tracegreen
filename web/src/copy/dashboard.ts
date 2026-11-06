@@ -120,6 +120,10 @@ export const simulatorCopy = {
   /** An alternative's country and the mode its lane ships by, which the swap uses. */
   alternativeVia: (country: string, mode: string) => `${country} · ${mode}`,
   noAlternatives: 'No other supplier of this category in the alternatives list.',
+  /** Under an alternative the AI picked (F11): its reason, in the AI's words. */
+  why: (reason: string) => `Why: ${reason}`,
+  suggestedHelp:
+    'An AI picked this supplier from the list as a fit for this part. The figures come from the simulator, not from the AI.',
   pick: 'Pick a mode or a supplier to see the change in emissions, cost and lead time.',
   nothingToTry: 'This lane has a leg for one mode only and no other supplier makes this item, so there is nothing to try.',
   simulating: 'Simulating…',
@@ -215,7 +219,9 @@ export const connectionCopy = {
 export const toolbarCopy = {
   import: 'Import invoice',
   importing: 'Importing…',
-  fileInput: 'UBL invoice (XML file)',
+  fileInput: 'Invoice: UBL XML, or a PDF to check before importing',
+  /** After a PDF upload: the review form opens. */
+  pdfReady: 'Check the fields read from the PDF.',
   demo: 'Load demo invoice',
   demoLoading: 'Loading…',
   reset: 'Reset demo',
@@ -257,6 +263,13 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
   CategoryNotAllowed: 'That category is not one of the allowed categories.',
+  InvalidQuestion: 'That question could not be asked.',
+  NotPdf: 'Not a PDF.',
+  PdfNoText: 'This PDF has no text to read.',
+  PdfUnreadable: 'This PDF could not be read.',
+  ExtractionUnavailable: 'No AI model could read the PDF right now.',
+  DraftExpired: 'This check has run out of time.',
+  InvalidInvoiceFields: 'A field needs fixing.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

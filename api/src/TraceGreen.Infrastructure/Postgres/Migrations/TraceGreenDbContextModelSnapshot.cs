@@ -247,6 +247,13 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("currency");
 
+                    b.Property<string>("DocumentKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("ubl")
+                        .HasColumnName("document_kind");
+
                     b.Property<string>("ExtractedJson")
                         .IsRequired()
                         .HasColumnType("jsonb")

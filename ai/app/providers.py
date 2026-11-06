@@ -16,14 +16,12 @@ picks a category id; the AI never produces a carbon number."""
 
 from __future__ import annotations
 
-import functools
 import logging
 import math
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import Future
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel
@@ -40,15 +38,13 @@ from app.prompts import (
     system_prompt,
 )
 from app.schemas import Classification, ClassificationInput
+from app.structured import ask_once, bind_models
 
 log = logging.getLogger(__name__)
 
 LOW_CONFIDENCE = 0.6
 LOW_CONFIDENCE_RATIONALE = "Low confidence, check this line"
 RUNTIME_CACHE_MAX_ENTRIES = 5000
-# Below this much time left, a model attempt is not started.
-MIN_ATTEMPT_S = 0.2
-MAX_LOGGED_ERROR_CHARS = 200
 
 
 class RuntimeCache:
@@ -73,21 +69,6 @@ class RuntimeCache:
     def __len__(self) -> int:
         with self._lock:
             return len(self._entries)
-
-
-def call_with_deadline(fn: Callable[[], Any], timeout_s: float) -> Any:
-    """fn's result, run in a daemon worker thread and waited on for at most timeout_s; raises
-    TimeoutError past it. An overrunning call is left to end on its own client timeout."""
-    future: Future[Any] = Future()
-
-    def run() -> None:
-        try:
-            future.set_result(fn())
-        except Exception as error:
-            future.set_exception(error)
-
-    threading.Thread(target=run, name="ai-model-call", daemon=True).start()
-    return future.result(timeout=timeout_s)
 
 
 class Chain:
@@ -162,9 +143,6 @@ class Chain:
     ) -> dict[int, Classification]:
         """The checked answers of one model call for the pending lines, by line index; empty
         when the model errs, overruns or no time is left."""
-        cap = min(model.spec.timeout_s, deadline - time.monotonic())
-        if cap < MIN_ATTEMPT_S:
-            return {}
         # One prompt row per description (by cache key), so a repeated description is asked
         # once. The model sees short ids of our own, never the invoice's line ids.
         same: dict[str, list[int]] = {}
@@ -172,15 +150,8 @@ class Chain:
             same.setdefault(cache_key(lines[index].description), []).append(index)
         prompt_ids = {str(n): group[0] for n, group in enumerate(same.values(), start=1)}
         prompt = messages(self._system, [(pid, lines[i]) for pid, i in prompt_ids.items()])
-        try:
-            output = call_with_deadline(lambda: model.runnable().invoke(prompt), cap)
-        except TimeoutError:
-            log.warning("model %s gave no answer within %.1f s", model.id, cap)
-            return {}
-        except Exception as error:
-            # A parse error carries the whole model output, so the message is cut to one line.
-            detail = " ".join(str(error).split())[:MAX_LOGGED_ERROR_CHARS]
-            log.warning("model %s failed: %s: %s", model.id, type(error).__name__, detail)
+        output = ask_once(model, prompt, deadline)
+        if output is None:
             return {}
         answers = self._checked(output, prompt_ids, lines)
         for group in same.values():
@@ -258,7 +229,7 @@ def build_chain(
     if model_factory is None:
         preload_providers(config.models)
     factory = model_factory or chat_model_factory(config)
-    models = [LazyModel(spec, functools.partial(factory, spec, schema)) for spec in config.models]
+    models = bind_models(config.models, factory, schema)
     return Chain(
         entries=entries,
         allow_list=load_allow_list(config.seed_dir),
