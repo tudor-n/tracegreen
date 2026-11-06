@@ -1,5 +1,5 @@
 import { SmartphoneIcon, XIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { NodeView, RequestLinkResponse } from '@/api/client'
 import { LinkCard } from '@/components/dashboard/LinkCard'
 import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
@@ -40,6 +40,12 @@ const statusTone: Record<NodeView['status'], ChipTone> = {
 export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: boolean }) {
   const select = useGraphStore((s) => s.select)
   const ai = aiMappedLabel(node.classification)
+  const panel = useRef<HTMLElement>(null)
+
+  // Below the lg breakpoint the panel sits under the tree; bring it into view when another supplier is picked.
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 1023px)').matches) panel.current?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [node.id])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -51,6 +57,7 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
 
   return (
     <aside
+      ref={panel}
       data-testid="node-drawer"
       aria-label={node.label}
       className="flex w-full flex-col gap-5 bg-card px-6 pt-6 pb-8 shadow-[0_-0.5px_0_var(--hairline)] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-6 motion-safe:duration-500 lg:sticky lg:top-0 lg:h-dvh lg:w-[360px] lg:shrink-0 lg:overflow-y-auto lg:shadow-[-0.5px_0_0_var(--hairline),-18px_0_40px_-30px_rgb(0_0_0/0.35)]"

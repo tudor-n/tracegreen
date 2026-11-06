@@ -268,7 +268,7 @@ function Figures({ result }: { result: ScenarioResult }) {
             {simulatorCopy.mac}
             <Tag>{ILLUSTRATIVE}</Tag>
           </dt>
-          <dd data-testid="sim-mac" className="text-right tabular-nums">
+          <dd data-testid="sim-mac" className="text-right whitespace-nowrap tabular-nums">
             {simulatorCopy.perTonne(formatEuros(mac.macEurPerT), CO2E_UNIT)}
           </dd>
         </div>
