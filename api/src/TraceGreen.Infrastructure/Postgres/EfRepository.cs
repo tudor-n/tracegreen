@@ -99,7 +99,8 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         return new InsertInvoiceResult(InsertInvoiceStatus.Ok, Mapping.ToDomain(row), null);
     }
 
-    public async Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct)
+    public async Task<RecordVerificationResult> RecordVerificationAsync(
+        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -111,6 +112,13 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         }
         var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == verification.NodeId, ct)
             ?? throw new InvalidOperationException($"Node {verification.NodeId} not found.");
+        // Read under the workspace's advisory lock, which every write takes, so no other answer can land between this check
+        // and the commit. Returning disposes the transaction uncommitted.
+        var current = Mapping.ToDomain(nodeRow);
+        if (expected is not null && NodeAnswerState.Of(current) != expected)
+        {
+            return new RecordVerificationResult(RecordVerificationStatus.NodeChanged, current, null);
+        }
         Mapping.Apply(nodeRow, patch);
         db.Verifications.Add(Mapping.ToRow(verification));
         var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, audit, ct);

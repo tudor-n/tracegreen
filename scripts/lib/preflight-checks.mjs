@@ -26,6 +26,25 @@ export function placeholderFactors(factorsText, file) {
     });
 }
 
+/**
+ * Every `[PLACEHOLDER: …]` left in seed/supplier-terms.json, by line: the operator's name, CUI, seat, city and contact
+ * that a person fills in before the terms are used outside the demo.
+ */
+export function placeholderTerms(termsText, file) {
+  const findings = [];
+  const bracketed = /\[PLACEHOLDER:\s*([^\]]*)\]/g;
+  termsText.split('\n').forEach((line, i) => {
+    for (const match of line.matchAll(bracketed)) {
+      findings.push({ file, line: i + 1, message: `the supplier terms still say "${match[1].trim()}"` });
+    }
+    // Whatever is left once the bracketed ones are taken out, such as a bare PLACEHOLDER on the same line.
+    if (line.replace(bracketed, '').includes(PLACEHOLDER)) {
+      findings.push({ file, line: i + 1, message: 'the supplier terms still contain a placeholder' });
+    }
+  });
+  return findings;
+}
+
 /** Splits a Markdown table row into trimmed cells; `\|` inside a cell is a literal bar. */
 function cellsOf(row) {
   return row

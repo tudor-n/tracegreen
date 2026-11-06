@@ -112,7 +112,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults; nothing personal */
+        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults, and the supplier terms; nothing personal */
         get: operations["GetVerifyContext"];
         put?: never;
         post?: never;
@@ -131,8 +131,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit the supplier's answers: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
+        /** Submit the supplier's answers with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
         post: operations["SubmitVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint the supplier page link for the supplier of a node and record portal.requested in the audit log */
+        post: operations["RequestPortalLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What the supplier page shows: the supplier's deliveries to the buyer, open ones first, with the answers to pre-select and the supplier terms */
+        post: operations["GetPortalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm one delivery from the supplier page with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is */
+        post: operations["SubmitPortalAnswer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/supplier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current supplier terms in Romanian and English, with their version and the SHA-256 a submit sends back */
+        get: operations["GetSupplierTerms"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -491,8 +559,48 @@ export interface components {
             code: components["schemas"]["PlausibilityCode"];
             detail: string;
         };
+        PortalAnswerRequest: {
+            t: null | string;
+            /** Format: uuid */
+            nodeId: string;
+            transportMode?: null | components["schemas"]["TransportMode"];
+            energySource?: null | components["schemas"]["EnergySource"];
+            acceptedTerms?: null | string;
+        };
+        PortalAnswerResult: {
+            outcome: components["schemas"]["VerifyOutcome"];
+            view: components["schemas"]["PortalView"];
+        };
+        PortalItem: {
+            /** Format: uuid */
+            nodeId: string;
+            status: components["schemas"]["NodeStatus"];
+            invoiceNumber: string;
+            /** Format: date */
+            issueDate: string;
+            itemDescription: string;
+            origin: string;
+            dest: string;
+            modes: components["schemas"]["TransportMode"][];
+            defaultMode: components["schemas"]["TransportMode"];
+            energySources: components["schemas"]["EnergySource"][];
+            defaultEnergy: components["schemas"]["EnergySource"];
+            answeredMode: null | components["schemas"]["TransportMode"];
+            answeredEnergy: null | components["schemas"]["EnergySource"];
+        };
+        PortalView: {
+            supplierLabel: string;
+            buyerName: string;
+            /** Format: date-time */
+            expiresAt: string;
+            items: components["schemas"]["PortalItem"][];
+            terms: components["schemas"]["VerifyTerms"];
+        };
+        PortalViewRequest: {
+            t: null | string;
+        };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -560,6 +668,29 @@ export interface components {
             /** Format: double */
             massT?: null | number;
         };
+        SupplierTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsText"];
+            en: components["schemas"]["TermsText"];
+        };
+        TermsAcceptance: {
+            before: string;
+            link: string;
+            after: string;
+        };
+        TermsSection: {
+            /** Format: int32 */
+            number: number;
+            heading: string;
+            paragraphs: string[];
+        };
+        TermsText: {
+            title: string;
+            keyPoints: string[];
+            acceptance: components["schemas"]["TermsAcceptance"];
+            sections: components["schemas"]["TermsSection"][];
+        };
         /** @enum {unknown} */
         TransportMode: "road" | "rail" | "sea" | "air";
         /** @enum {unknown} */
@@ -593,6 +724,7 @@ export interface components {
             massT: null | number;
             /** Format: date-time */
             expiresAt: string;
+            terms: components["schemas"]["VerifyTerms"];
         };
         VerifyOutcome: {
             /** Format: uuid */
@@ -606,6 +738,13 @@ export interface components {
             energySource?: null | components["schemas"]["EnergySource"];
             /** Format: double */
             massT?: null | number;
+            acceptedTerms?: null | string;
+        };
+        VerifyTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsAcceptance"];
+            en: components["schemas"]["TermsAcceptance"];
         };
     };
     responses: never;
@@ -944,6 +1083,188 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    RequestPortalLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestLinkResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetPortalView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalView"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SubmitPortalAnswer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAnswerResult"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetSupplierTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierTerms"];
                 };
             };
         };
