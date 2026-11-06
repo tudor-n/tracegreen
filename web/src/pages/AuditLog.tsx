@@ -77,7 +77,7 @@ export default function AuditLog() {
 
   return (
     <main data-testid="audit-panel" className="min-w-0 flex-1 px-5 py-8 md:px-12 md:py-11">
-      <div className="flex max-w-[820px] flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <PageHeader title={auditCopy.title} />
         <p className="-mt-4 max-w-[62ch] text-[15px] leading-relaxed text-muted-foreground">{auditPanelCopy.description}</p>
         <Surface className="flex flex-wrap items-center gap-x-5 gap-y-3 py-5">

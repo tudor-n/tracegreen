@@ -12,7 +12,7 @@ import { CO2E_UNIT, edgeWidth, formatTonnes, formatTonnesDelta, type ScenarioPre
 // row into the buyer. Line width follows the node's tonnes (the store's edgeWidth), colour follows its status, and a
 // PARTIAL line carries a dashed green overlay. A simulated change (B5) shows as a dashed "What if" row under its
 // supplier with a dotted line of its own. In a narrow tree (a phone, or beside the panel on a small laptop) the lines
-// and the buyer card step aside and the rows remain. Rows are buttons: a click selects the supplier and opens the side panel.
+// and the buyer card step aside and the rows remain; in a wide one the lines stretch so the tree fills the card. Rows are buttons: a click selects the supplier and opens the side panel.
 // Frozen test hooks (RUNBOOK): `node-<id>` with `data-status`, `ghost-<id>` with `data-badge`, `ghost-<id>-saved`.
 
 const ROW_H = 72
@@ -57,15 +57,24 @@ export function SupplierTree({ nodes, hotspots, buyer, total, selectedId, previe
             </Fragment>
           ))}
         </ul>
-        <div aria-hidden className="hidden items-center @min-[560px]:flex">
-          <svg width={LINE_W} height={height} viewBox={`0 0 ${LINE_W} ${height}`} className="block overflow-visible">
+        <div aria-hidden className="hidden w-[clamp(240px,38%,520px)] shrink-0 items-center @min-[560px]:flex">
+          {/* The drawing is LINE_W wide and stretched to the space there is; strokes keep their width. */}
+          <svg
+            width="100%"
+            height={height}
+            viewBox={`0 0 ${LINE_W} ${height}`}
+            preserveAspectRatio="none"
+            className="block min-w-24 flex-1 overflow-visible"
+          >
             {lines.map((line) =>
               line.kind === 'ghost' ? (
-                <path key={line.key} d={line.d} className="supply-line-ghost" />
+                <path key={line.key} d={line.d} className="supply-line-ghost" vectorEffect="non-scaling-stroke" />
               ) : (
                 <g key={line.key} opacity={selectedId === null || selectedId === line.key ? 1 : 0.45} className="transition-opacity duration-500">
-                  <path d={line.d} className="supply-line" data-status={line.status} strokeWidth={line.width} />
-                  {line.status === 'PARTIAL' && <path d={line.d} className="supply-line-partial" strokeWidth={line.width} />}
+                  <path d={line.d} className="supply-line" data-status={line.status} strokeWidth={line.width} vectorEffect="non-scaling-stroke" />
+                  {line.status === 'PARTIAL' && (
+                    <path d={line.d} className="supply-line-partial" strokeWidth={line.width} vectorEffect="non-scaling-stroke" />
+                  )}
                 </g>
               ),
             )}

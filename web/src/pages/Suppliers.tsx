@@ -58,7 +58,7 @@ export default function Suppliers() {
   return (
     <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
       <main data-testid="graph" className="min-w-0 flex-1 px-5 py-8 md:px-8 md:py-11">
-        <div className="flex max-w-[900px] flex-col gap-6">
+        <div className="flex flex-col gap-6">
           <PageHeader title={suppliersCopy.title} subtitle={suppliersCopy.subtitle} />
           {body}
         </div>

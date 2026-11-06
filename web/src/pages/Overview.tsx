@@ -37,7 +37,7 @@ export default function Overview() {
 
   return (
     <main className="min-w-0 flex-1 px-5 py-8 md:px-12 md:py-11">
-      <div className="flex max-w-[880px] flex-col gap-7">
+      <div className="flex flex-col gap-7">
         <PageHeader title={overviewCopy.title} subtitle={buyer === null ? undefined : `${buyer.name} · ${buyer.city}, ${buyer.country}`} />
         {body}
       </div>
