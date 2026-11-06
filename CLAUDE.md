@@ -56,7 +56,7 @@ Demo-critical path: F1 import → F2 graph → F3 verify loop → F4 simulator. 
 For anything a person outside the team can read: UI strings, seed data, README, demo copy, OpenAPI descriptions and the public docs. `scripts/lib/banned-terms.mjs` enforces the terms through the copy-guard hook and the preflight; this file is exempt so it can name them.
 
 - KPI wording (ruling R2): the API field is `primaryShare`; the UI says "Supplier-confirmed share", subtitle "by emissions, not by node count". Never write "primary data" without that definition, never "verified PCF", never "blockchain" (say "tamper-evident audit log"), never "first" or "only".
-- Never a real company name. The seed stays fictional: Transilvania Electro-Assembly SRL and its five suppliers. The banned names are stored only as hashes in `banned-terms.mjs`; add new ones with its `--hash` / `--exact` flags, never in plain text.
+- Never a real company name. The seed stays fictional: Transilvania Electro-Assembly SRL and its five suppliers. The banned names are stored only as hashes in `banned-terms.mjs`; add new ones with its `--hash` / `--exact` flags, never in plain text, and copy the same entry into `api/src/TraceGreen.Domain/Copy/BannedTerms.cs` (the API's check of model-written text; `BannedTermsTests` fails until both lists match).
 - Provenance on every node (ruling R3): "Supplier-confirmed · <factor source> <year>" when VERIFIED, "Spend-based estimate · <factor source>" when ESTIMATED; lane cost and lead time say "illustrative".
 
 ## Data rules
