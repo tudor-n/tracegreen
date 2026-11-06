@@ -355,7 +355,7 @@ export interface components {
             brokenAt: null | number;
         };
         /** @enum {unknown} */
-        ClassificationSource: "invoice" | "cache" | "model" | "stub";
+        ClassificationSource: "invoice" | "cache" | "model" | "stub" | "correction";
         ClassificationView: {
             categoryId: string;
             categoryLabel: string;

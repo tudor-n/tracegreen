@@ -16,6 +16,7 @@ public enum NodeStatus
     [JsonStringEnumMemberName("VERIFIED")] Verified,
 }
 
-public enum ClassificationSource { Invoice, Cache, Model, Stub }
+/// <summary><see cref="Correction"/>: the buyer set the category for this description (F6); it wins over every other source.</summary>
+public enum ClassificationSource { Invoice, Cache, Model, Stub, Correction }
 
 public enum FactorKind { Spend, Transport, Material, Grid }

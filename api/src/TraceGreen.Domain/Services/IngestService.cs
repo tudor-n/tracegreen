@@ -89,7 +89,8 @@ public sealed class IngestService(
             return Fail(IngestErrorCode.NoLane, $"No freight lane for supplier country {country}.");
         }
 
-        var classifications = await LineClassification.ClassifyLinesAsync(extracted.Lines, ai, seed, options.AiTimeout, ct);
+        var corrections = await repo.ListCorrectionsAsync(ctx, ct);
+        var classifications = await LineClassification.ClassifyLinesAsync(extracted.Lines, ai, seed, options.AiTimeout, corrections, ct);
         var dominant = InvoiceFacts.DominantLine(extracted.Lines);
         var picked = classifications.First(c => c.LineId == dominant.Id);
         var classification = new NodeClassification(
