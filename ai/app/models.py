@@ -61,7 +61,8 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
             from langchain_ollama import ChatOllama
 
             # ChatOllama has no retry setting: its HTTP client never retries. reasoning=False
-            # turns off Qwen 3.5's thinking mode, which would use up the budget.
+            # turns off a thinking mode, such as Qwen 3.5's, which would use up the budget; a
+            # model without one, such as ministral-3, accepts it.
             model = ChatOllama(
                 model=spec.model,
                 base_url=settings.ollama_base_url,
