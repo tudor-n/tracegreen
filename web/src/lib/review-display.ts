@@ -8,6 +8,12 @@ import { CATEGORY_SET_BY_BUYER, CHECK_CATEGORY } from '@/copy/labels'
 /** The category for "none of these"; it is on the API's allow-list like any other. */
 export const UNCLASSIFIED = 'UNCLASSIFIED'
 
+/** The supplier list's search parameter, and its value for the categories to check. */
+export const CHECK_FILTER = { param: 'filter', value: 'check' } as const
+
+/** Where the Overview's counter leads: the supplier list, filtered to the categories to check. */
+export const CHECK_LIST_PATH = `/suppliers?${CHECK_FILTER.param}=${CHECK_FILTER.value}`
+
 /**
  * Whether the node's category waits for a person: the API marks every AI-mapped category `pending`, and a node left
  * unclassified (the AI was unavailable) is flagged too until a person looks at it. Once a person confirmed or chose a

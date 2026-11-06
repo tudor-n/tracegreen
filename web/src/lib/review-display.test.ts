@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CategoryOption, ClassificationView } from '@/api/client'
 import { node } from '@/store/testFixtures'
 import {
+  CHECK_LIST_PATH,
   categoriesToCheck,
   categoryCheckLabel,
   categorySourceNote,
@@ -58,6 +59,10 @@ describe('categoryCheckLabel and categoriesToCheck', () => {
     ]
     expect(categoriesToCheck(nodes).map((n) => n.id)).toEqual(['n3', 'n5'])
     expect(categoriesToCheck([])).toEqual([])
+  })
+
+  it("leads the Overview's counter to the filtered supplier list", () => {
+    expect(CHECK_LIST_PATH).toBe('/suppliers?filter=check')
   })
 })
 
