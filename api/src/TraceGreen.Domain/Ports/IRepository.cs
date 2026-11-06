@@ -29,6 +29,12 @@ public enum ReviewClassificationStatus { Ok, NodeNotFound, CategoryChanged }
 /// <summary><see cref="Node"/> is the node after the write, or as it is when the category changed.</summary>
 public sealed record ReviewClassificationResult(ReviewClassificationStatus Status, SupplierNode? Node, AuditEntry? Entry);
 
+/// <summary><see cref="Refused"/>: the caller's updater refused, as the node no longer matches what its page showed; nothing was written.</summary>
+public enum UpdateTrustStatus { Ok, NodeNotFound, Refused }
+
+/// <summary><see cref="Node"/> is the node after the write, or as it is when the write was refused.</summary>
+public sealed record UpdateTrustResult(UpdateTrustStatus Status, SupplierNode? Node, AuditEntry? Entry);
+
 public enum InsertInvoiceStatus { Ok, Duplicate }
 
 /// <summary><see cref="ExistingNodeId"/> is the node that already holds the invoice when <see cref="Status"/> is Duplicate.</summary>
@@ -81,6 +87,13 @@ public interface IRepository
     /// </summary>
     Task<ReviewClassificationResult> ReviewClassificationAsync(
         Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct);
+
+    /// <summary>
+    /// A change to a node's trust inputs or target (F7: the buyer's records, a person's decision on a claim, the target),
+    /// atomic with its audit entry. Under the write's lock the node is read and handed to <paramref name="update"/>, which
+    /// computes the write from it (the counted figure included) or refuses it.
+    /// </summary>
+    Task<UpdateTrustResult> UpdateTrustAsync(Ctx ctx, Guid nodeId, TrustUpdater update, CancellationToken ct);
 
     /// <summary>The buyer's remembered categories for those of <paramref name="lineKeys"/> that have one, by line key. A reset forgets them.</summary>
     Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct);

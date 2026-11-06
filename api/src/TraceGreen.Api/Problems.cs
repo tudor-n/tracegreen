@@ -38,6 +38,10 @@ public enum ProblemCode
     [JsonStringEnumMemberName("ExtractionUnavailable")] ExtractionUnavailable,
     [JsonStringEnumMemberName("DraftExpired")] DraftExpired,
     [JsonStringEnumMemberName("InvalidInvoiceFields")] InvalidInvoiceFields,
+    [JsonStringEnumMemberName("InvalidRecord")] InvalidRecord,
+    [JsonStringEnumMemberName("NoClaim")] NoClaim,
+    [JsonStringEnumMemberName("ClaimChanged")] ClaimChanged,
+    [JsonStringEnumMemberName("InvalidEvidence")] InvalidEvidence,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -83,6 +87,10 @@ public static class Problems
             ProblemCode.ExtractionUnavailable => (StatusCodes.Status503ServiceUnavailable, "No model could read the invoice"),
             ProblemCode.DraftExpired => (StatusCodes.Status410Gone, "Draft expired"),
             ProblemCode.InvalidInvoiceFields => (StatusCodes.Status422UnprocessableEntity, "Invoice fields not accepted"),
+            ProblemCode.InvalidRecord => (StatusCodes.Status422UnprocessableEntity, "Record not accepted"),
+            ProblemCode.NoClaim => (StatusCodes.Status422UnprocessableEntity, "No such answer on this delivery"),
+            ProblemCode.ClaimChanged => (StatusCodes.Status409Conflict, "Answer changed since the page read it"),
+            ProblemCode.InvalidEvidence => (StatusCodes.Status422UnprocessableEntity, "Proof not accepted"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

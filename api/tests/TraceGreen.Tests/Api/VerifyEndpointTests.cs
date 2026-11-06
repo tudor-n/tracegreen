@@ -165,7 +165,12 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         var verified = Assert.Single(events.OfType<NodeVerified>());
         Assert.Equal(NodeStatus.Verified, verified.Node.Status);
         Assert.Equal(CarbonBasis.Activity, verified.Node.Basis);
-        Assert.Equal(node.ActivityKg, verified.Node.CarbonKg);
+        // F7: renewable power without a certificate counts as grid, so the counted figure sits above the claimed one.
+        Assert.NotNull(node.CountedKg);
+        Assert.True(node.CountedKg > node.ActivityKg);
+        Assert.Equal(node.CountedKg, verified.Node.CarbonKg);
+        Assert.Equal(node.ActivityKg, verified.Node.Figures.ClaimedKg);
+        Assert.Equal(node.CountedKg - node.ActivityKg, verified.Node.Trust!.KgAtRisk);
         Assert.Equal(KpiOf(await Repo.ListNodesAsync(Ctx, Ct)), verified.Kpis);
         var appended = Assert.Single(events.OfType<AuditAppended>());
         Assert.True(verified.Seq < appended.Seq);

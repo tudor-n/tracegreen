@@ -5,6 +5,7 @@ using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Tests.Contracts;
 
@@ -488,6 +489,74 @@ public abstract class RepositoryContract
         Assert.Equal(TransportMode.Rail, stored.Change.Mode);
         Assert.Empty(await repo.ListScenariosAsync(Ctx, N3, CancellationToken.None));
         Assert.Single(await repo.ListScenariosAsync(Ctx, null, CancellationToken.None));
+    }
+
+    private static readonly TrustInputs SomeTrust = new(
+        Evidence: new AnswerEvidence(ShippingDocType.ContainerNumber, "CSQU3054383", new DateOnly(2026, 10, 1), EnergyCertType.IRec, "IREC-CN-2026-0042"),
+        Answer: new AnswerContext(SameNetworkAsLinkMaker: true, LinkAgeSeconds: 42, ModeChangedOnLane: false, PriorRejection: true, Simulated: false),
+        Records: new BuyerRecords(new DateOnly(2026, 11, 2), TransportMode.Sea, "26RO1234567890ABCD"),
+        ModeReview: ClaimDecision.Accepted,
+        EnergyReview: ClaimDecision.Rejected);
+
+    [Fact]
+    public async Task ATrustWriteStoresItsInputsCountedFigureAndTargetWithItsAuditEntry()
+    {
+        var repo = await MakeAsync();
+        var target = new TargetChoice(TransportMode.Sea, EnergySource.Renewable, null);
+        SupplierNode? seen = null;
+
+        var result = await repo.UpdateTrustAsync(Ctx, N2, current =>
+        {
+            seen = current;
+            return new TrustWrite(SomeTrust, 777.5m, target, Audit("trust.test"));
+        }, CancellationToken.None);
+
+        Assert.Equal(UpdateTrustStatus.Ok, result.Status);
+        Assert.Equal(N2, seen!.Id);
+        Assert.Equal("trust.test", result.Entry!.Action);
+        var stored = (await repo.GetNodeAsync(Ctx, N2, CancellationToken.None))!;
+        Assert.Equal(SomeTrust, stored.Trust);
+        Assert.Equal(777.5m, stored.CountedKg);
+        Assert.Equal(target, stored.Target);
+        Assert.Equal(777.5m, stored.CarbonKg); // N2 is verified, so it counts the counted figure
+        var audit = await AllAudit(repo);
+        Assert.Equal("trust.test", audit[^1].Action);
+        Assert.True(AuditChain.Verify(audit).Valid);
+    }
+
+    [Fact]
+    public async Task ARefusedTrustWriteWritesNothing()
+    {
+        var repo = await MakeAsync();
+        var before = (await repo.GetNodeAsync(Ctx, N2, CancellationToken.None))!;
+        var auditBefore = (await AllAudit(repo)).Count;
+
+        var result = await repo.UpdateTrustAsync(Ctx, N2, _ => null, CancellationToken.None);
+
+        Assert.Equal(UpdateTrustStatus.Refused, result.Status);
+        Assert.Null(result.Entry);
+        Assert.Equal(before, await repo.GetNodeAsync(Ctx, N2, CancellationToken.None));
+        Assert.Equal(auditBefore, (await AllAudit(repo)).Count);
+        Assert.Equal(UpdateTrustStatus.NodeNotFound, (await repo.UpdateTrustAsync(Ctx, Guid.NewGuid(), _ => null, CancellationToken.None)).Status);
+    }
+
+    [Fact]
+    public async Task AVerificationKeepsItsEvidenceAndItsPatchTheTrustInputs()
+    {
+        var repo = await MakeAsync();
+        var verification = NewVerification(N3, "nonce-evidence") with { Evidence = SomeTrust.Evidence };
+        var patch = VerifiedPatch with { Trust = SomeTrust, CountedKg = 150m };
+
+        var result = await repo.RecordVerificationAsync(Ctx, verification, patch, Audit("verification.submitted"), null, CancellationToken.None);
+
+        Assert.Equal(RecordVerificationStatus.Ok, result.Status);
+        Assert.Equal(SomeTrust, result.Node!.Trust);
+        Assert.Equal(150m, result.Node.CountedKg);
+        var stored = (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!;
+        Assert.Equal(SomeTrust, stored.Trust);
+        Assert.Equal(150m, stored.CarbonKg);
+        var kept = Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
+        Assert.Equal(SomeTrust.Evidence, kept.Evidence);
     }
 
     [Fact]

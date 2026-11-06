@@ -2,6 +2,7 @@ using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Plausibility;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
@@ -68,6 +69,13 @@ public sealed class NodeViewMapper
             DistanceKm: lane.DistanceKm.GetValueOrDefault(mode),
             Illustrative: true);
 
+        var trust = TrustAssessor.Assess(node, invoice, lane, category, Factors);
+        var figures = new NodeFigures(
+            EstimateKg: node.SpendKg,
+            ClaimedKg: trust?.ClaimedKg,
+            CountedKg: trust?.CountedKg,
+            Target: TargetFigure.Compute(node, lane, category, _seed, Factors));
+
         return new NodeView(
             Id: node.Id,
             Label: node.Label,
@@ -88,8 +96,11 @@ public sealed class NodeViewMapper
             SpendEur: node.SpendEur,
             CostEur: node.CostEur,
             LeadDays: node.LeadDays,
-            Warnings: PlausibilityRules.Check(node.TransportMode, node.MassT),
-            CreatedAt: node.CreatedAt);
+            Warnings: PlausibilityRules.For(node, InvoiceFacts.MassTFromLines(invoice.Extracted.Lines), lane),
+            CreatedAt: node.CreatedAt,
+            Figures: figures,
+            Trust: trust?.Assessment,
+            Evidence: EvidenceView.Of(node.Trust));
     }
 
     private AlternativeView Alternative(Alternative alternative)

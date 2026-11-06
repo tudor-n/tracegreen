@@ -174,6 +174,31 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         return new ReviewClassificationResult(ReviewClassificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
     }
 
+    public async Task<UpdateTrustResult> UpdateTrustAsync(Ctx ctx, Guid nodeId, TrustUpdater update, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockWorkspaceAsync(db, ctx.WorkspaceId, ct);
+
+        // Read under the workspace's advisory lock, which every write takes, so the write is computed from the node as it is
+        // at the commit. Returning before the commit disposes the transaction uncommitted.
+        var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == nodeId, ct);
+        if (nodeRow is null)
+        {
+            return new UpdateTrustResult(UpdateTrustStatus.NodeNotFound, null, null);
+        }
+        var current = Mapping.ToDomain(nodeRow);
+        if (update(current) is not { } write)
+        {
+            return new UpdateTrustResult(UpdateTrustStatus.Refused, current, null);
+        }
+        Mapping.Apply(nodeRow, write);
+        var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, write.Audit, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return new UpdateTrustResult(UpdateTrustStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
     {
         if (lineKeys.Count == 0)

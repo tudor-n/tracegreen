@@ -44,6 +44,9 @@ public class NodeRow
     public string Review { get; set; } = "";
     public DateTimeOffset? ReviewedAt { get; set; }
     public string? ClassificationRationale { get; set; }
+    public string? TrustJson { get; set; }
+    public decimal? CountedKg { get; set; }
+    public string? TargetJson { get; set; }
 }
 
 public class VerificationRow
@@ -60,6 +63,7 @@ public class VerificationRow
     public DateTimeOffset CreatedAt { get; set; }
     public string? TermsVersion { get; set; }
     public string? TermsSha256 { get; set; }
+    public string? EvidenceJson { get; set; }
 }
 
 public class AuditRow

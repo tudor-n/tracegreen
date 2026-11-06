@@ -113,6 +113,8 @@ public sealed class MemoryRepository : IRepository
                 MassT = patch.MassT ?? node.MassT,
                 CostEur = patch.CostEur,
                 LeadDays = patch.LeadDays,
+                Trust = patch.Trust,
+                CountedKg = patch.CountedKg,
             };
             ws.Nodes[node.Id] = patched;
             ws.Verifications[verification.Id] = verification;
@@ -147,11 +149,32 @@ public sealed class MemoryRepository : IRepository
                 ReviewedAt = patch.ReviewedAt,
                 SpendKg = patch.SpendKg,
                 ActivityKg = patch.ActivityKg,
+                CountedKg = patch.CountedKg,
             };
             ws.Nodes[node.Id] = patched;
             ws.BuyerCategories[write.LineKey] = patch.CategoryId;
             var entry = ws.Append(write.Audit);
             return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<UpdateTrustResult> UpdateTrustAsync(Ctx ctx, Guid nodeId, TrustUpdater update, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var ws = Get(ctx.WorkspaceId);
+            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
+            {
+                return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.NodeNotFound, null, null));
+            }
+            if (update(node) is not { } write)
+            {
+                return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.Refused, node, null));
+            }
+            var patched = node with { Trust = write.Trust, CountedKg = write.CountedKg, Target = write.Target };
+            ws.Nodes[node.Id] = patched;
+            var entry = ws.Append(write.Audit);
+            return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.Ok, patched, entry));
         }
     }
 

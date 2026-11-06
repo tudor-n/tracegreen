@@ -4,10 +4,13 @@ namespace TraceGreen.Domain.Carbon;
 
 public static class KpiCalculator
 {
-    /// <summary>Primary-data share is by emissions (verified kg over total kg), not by node count.</summary>
+    /// <summary>
+    /// Primary-data share is by emissions (verified kg over total kg), not by node count. Every node adds its counted figure
+    /// (F7); <see cref="Kpis.KgAtRisk"/> sums what the verified nodes' unbacked reductions would take off.
+    /// </summary>
     public static Kpis Compute(IEnumerable<SupplierNode> nodes)
     {
-        decimal totalKg = 0m, verifiedKg = 0m, spendEur = 0m;
+        decimal totalKg = 0m, verifiedKg = 0m, spendEur = 0m, kgAtRisk = 0m;
         var nodeCount = 0;
         var verifiedCount = 0;
         foreach (var node in nodes)
@@ -19,11 +22,15 @@ public static class KpiCalculator
             {
                 verifiedKg += node.CarbonKg;
                 verifiedCount++;
+                if (node.CountedKg is { } counted && node.ActivityKg is { } claimed && counted > claimed)
+                {
+                    kgAtRisk += counted - claimed;
+                }
             }
         }
 
         var primaryShare = totalKg > 0 ? (double)(verifiedKg / totalKg) : 0d;
         var estimatedShare = totalKg > 0 ? 1d - primaryShare : 0d;
-        return new Kpis(totalKg, primaryShare, estimatedShare, spendEur, nodeCount, verifiedCount);
+        return new Kpis(totalKg, primaryShare, estimatedShare, spendEur, nodeCount, verifiedCount, kgAtRisk);
     }
 }
