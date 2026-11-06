@@ -283,6 +283,152 @@ public abstract class RepositoryContract
         Assert.True(AuditChain.Verify(await AllAudit(repo)).Valid);
     }
 
+    /// <summary>A reviewer that moves the node to <paramref name="categoryId"/> with fixed figures; the contract tests storage, not math.</summary>
+    private static ClassificationReviewer Reviewer(string categoryId, DateTimeOffset? at = null, string lineKey = "line-key") => current => new ClassificationWrite(
+        new ClassificationPatch(categoryId, "plastics_other", ClassificationSource.Buyer, null, ClassificationReview.Corrected,
+            at ?? Now, 777.5m, current.ActivityKg is null ? null : 888.25m),
+        lineKey,
+        Audit("classification.reviewed", new JsonObject { ["fromCategoryId"] = current.CategoryId }));
+
+    [Fact]
+    public async Task AReviewRemembersItsCategoryForTheLineKeyUntilAReset()
+    {
+        var repo = await MakeAsync();
+        var key = "line-" + Ids.NewId().ToString("N");
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+
+        await repo.ReviewClassificationAsync(Ctx, N2, "pcb", Reviewer("plastics", lineKey: key), CancellationToken.None);
+        var first = await repo.ListBuyerClassificationsAsync(Ctx, [key, "other-key", key], CancellationToken.None);
+        await repo.ReviewClassificationAsync(Ctx, N2, "plastics", Reviewer("connectors", lineKey: key), CancellationToken.None);
+        var second = await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None);
+        await repo.SeedAsync(Bundle, reset: true, CancellationToken.None);
+
+        Assert.Equal("plastics", Assert.Single(first, kv => kv.Key == key).Value);
+        Assert.Single(first);
+        Assert.Equal("connectors", second[key]);
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [], CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AStaleReviewRemembersNothing()
+    {
+        var repo = await MakeAsync();
+        var key = "line-" + Ids.NewId().ToString("N");
+
+        await repo.ReviewClassificationAsync(Ctx, N3, "pcb", Reviewer("plastics", lineKey: key), CancellationToken.None);
+
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SeededNodesCarryTheirReviewState()
+    {
+        var repo = await MakeAsync();
+
+        var n3 = (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!;
+        var n2 = (await repo.GetNodeAsync(Ctx, N2, CancellationToken.None))!;
+
+        // N3's category comes from the AI cache, N2's from the invoice's CPV code.
+        Assert.Equal(ClassificationReview.Pending, n3.Review);
+        Assert.Null(n3.ReviewedAt);
+        Assert.Equal(ClassificationReview.NotNeeded, n2.Review);
+    }
+
+    [Fact]
+    public async Task ReviewClassificationWritesThePatchAndAppendsAudit()
+    {
+        var repo = await MakeAsync();
+        var before = await AllAudit(repo);
+        var at = new DateTimeOffset(2026, 11, 6, 12, 30, 15, 123, TimeSpan.Zero);
+
+        var result = await repo.ReviewClassificationAsync(Ctx, N2, "pcb", Reviewer("plastics", at), CancellationToken.None);
+
+        Assert.Equal(ReviewClassificationStatus.Ok, result.Status);
+        var stored = (await repo.GetNodeAsync(Ctx, N2, CancellationToken.None))!;
+        Assert.Equal("plastics", stored.CategoryId);
+        Assert.Equal("plastics_other", stored.SectorId);
+        Assert.Equal(ClassificationSource.Buyer, stored.ClassificationSource);
+        Assert.Null(stored.AiConfidence);
+        Assert.Equal(ClassificationReview.Corrected, stored.Review);
+        Assert.Equal(at, stored.ReviewedAt);
+        Assert.Equal(777.5m, stored.SpendKg);
+        Assert.Equal(888.25m, stored.ActivityKg);
+        // Status, answers, cost and lead time are not the review's to change.
+        Assert.Equal(NodeStatus.Verified, stored.Status);
+        Assert.Equal(TransportMode.Sea, stored.TransportMode);
+        Assert.Equal(stored, result.Node);
+        var after = await AllAudit(repo);
+        Assert.Equal(before.Count + 1, after.Count);
+        Assert.Equal("classification.reviewed", result.Entry!.Action);
+        Assert.Equal("pcb", result.Entry.Payload["fromCategoryId"]!.GetValue<string>());
+        Assert.True(AuditChain.Verify(after).Valid);
+    }
+
+    [Fact]
+    public async Task ReviewClassificationWithAStaleCategoryWritesNothing()
+    {
+        var repo = await MakeAsync();
+        var before = await repo.GetNodeAsync(Ctx, N3, CancellationToken.None);
+        var auditBefore = (await AllAudit(repo)).Count;
+        var called = false;
+
+        var result = await repo.ReviewClassificationAsync(Ctx, N3, "pcb", current =>
+        {
+            called = true;
+            return Reviewer("plastics")(current);
+        }, CancellationToken.None);
+
+        Assert.Equal(ReviewClassificationStatus.CategoryChanged, result.Status);
+        Assert.Equal("wire_harness", result.Node!.CategoryId);
+        Assert.Null(result.Entry);
+        Assert.False(called);
+        Assert.Equal(before, await repo.GetNodeAsync(Ctx, N3, CancellationToken.None));
+        Assert.Equal(auditBefore, (await AllAudit(repo)).Count);
+    }
+
+    [Fact]
+    public async Task ReviewClassificationOfAnUnknownNodeIsNotFound()
+    {
+        var repo = await MakeAsync();
+
+        var result = await repo.ReviewClassificationAsync(Ctx, N1, "zinc_diecast", Reviewer("plastics"), CancellationToken.None);
+
+        Assert.Equal(ReviewClassificationStatus.NodeNotFound, result.Status);
+        Assert.Null(result.Node);
+    }
+
+    [Fact]
+    public async Task TenConcurrentReviewsBuiltOnTheSameCategoryExactlyOneLands()
+    {
+        var repo = await MakeAsync();
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ =>
+            Task.Run(() => repo.ReviewClassificationAsync(Ctx, N3, "wire_harness", Reviewer("plastics"), CancellationToken.None))));
+
+        Assert.Equal(1, results.Count(r => r.Status == ReviewClassificationStatus.Ok));
+        Assert.Equal(9, results.Count(r => r.Status == ReviewClassificationStatus.CategoryChanged));
+        Assert.True(AuditChain.Verify(await AllAudit(repo)).Valid);
+    }
+
+    [Fact]
+    public async Task ReviewSeesAVerificationThatLandedBeforeIt()
+    {
+        var repo = await MakeAsync();
+        await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "before-review"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        SupplierNode? seen = null;
+
+        await repo.ReviewClassificationAsync(Ctx, N3, "wire_harness", current =>
+        {
+            seen = current;
+            return Reviewer("plastics")(current);
+        }, CancellationToken.None);
+
+        Assert.Equal(NodeStatus.Verified, seen!.Status);
+        Assert.Equal(123m, seen.ActivityKg);
+        Assert.Equal(888.25m, (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!.ActivityKg);
+    }
+
     [Fact]
     public async Task TwentyParallelAppendAuditNeverFork()
     {

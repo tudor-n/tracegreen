@@ -20,6 +20,15 @@ public sealed record NodeAnswerState(NodeStatus Status, TransportMode? Transport
     public static NodeAnswerState Of(SupplierNode node) => new(node.Status, node.TransportMode, node.EnergySource);
 }
 
+/// <summary>
+/// <see cref="NodeNotFound"/>: no such node in the workspace (a reset can remove one). <see cref="CategoryChanged"/>: the
+/// node's category is no longer the one the caller expected; nothing was written.
+/// </summary>
+public enum ReviewClassificationStatus { Ok, NodeNotFound, CategoryChanged }
+
+/// <summary><see cref="Node"/> is the node after the write, or as it is when the category changed.</summary>
+public sealed record ReviewClassificationResult(ReviewClassificationStatus Status, SupplierNode? Node, AuditEntry? Entry);
+
 public enum InsertInvoiceStatus { Ok, Duplicate }
 
 /// <summary><see cref="ExistingNodeId"/> is the node that already holds the invoice when <see cref="Status"/> is Duplicate.</summary>
@@ -63,6 +72,18 @@ public interface IRepository
         Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct);
 
     Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct);
+
+    /// <summary>
+    /// A person's classification review (F6), atomic with its audit entry. Under the write's lock the node is read, its
+    /// category compared with <paramref name="expectedCategoryId"/> (else <see cref="ReviewClassificationStatus.CategoryChanged"/>
+    /// with nothing written), and <paramref name="review"/> computes the patch and the audit entry from that node. The
+    /// category is also remembered for the write's <see cref="ClassificationWrite.LineKey"/>, replacing an earlier one.
+    /// </summary>
+    Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct);
+
+    /// <summary>The buyer's remembered categories for those of <paramref name="lineKeys"/> that have one, by line key. A reset forgets them.</summary>
+    Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct);
 
     Task<AuditEntry> AppendAuditAsync(Ctx ctx, AuditBuilder build, CancellationToken ct);
 

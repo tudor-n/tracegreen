@@ -6,6 +6,8 @@ import { type BrowserContext, devices, expect, test } from '@playwright/test'
 
 /** N1, the demo invoice's node; its id is fixed in seed/demo-state.json. */
 const N1 = '11111111-1111-4111-8111-000000000001'
+/** N4, Sibiu Pack SRL: a seed node whose category comes from the AI cache, so it starts with a category to check. */
+const N4 = '11111111-1111-4111-8111-000000000004'
 
 /**
  * Collects the browser's reports of Content Security Policy violations on every page of `context`. The demo image's
@@ -17,7 +19,7 @@ function watchCsp(context: BrowserContext, into: string[]): void {
   })
 }
 
-test('demo path: import, verify on the phone, live flip, terms, simulator, audit chain, CSP', async ({ page, browser }) => {
+test('demo path: import, verify on the phone, live flip, terms, simulator, category review, audit chain, CSP', async ({ page, browser }) => {
   const n1 = page.getByTestId(`node-${N1}`)
   const cspViolations: string[] = []
   watchCsp(page.context(), cspViolations)
@@ -100,14 +102,46 @@ test('demo path: import, verify on the phone, live flip, terms, simulator, audit
     await expect(n1).toHaveAttribute('data-status', 'VERIFIED')
   })
 
-  await test.step('8. the audit log screen shows the chain as valid', async () => {
+  await test.step('8. a category to check (F6): flagged, changed in two clicks, the flag clears, the figure and the KPI bar follow', async () => {
+    // N4's category came from the AI cache, so it waits for a person; N1's came from its invoice code and does not.
+    const n4 = page.getByTestId(`node-${N4}`)
+    const checks = page.getByTestId('overview-checks')
+    await page.getByTestId('nav-overview').click()
+    await expect(checks).toHaveAttribute('data-count', '3')
+    const total = (await page.getByTestId('kpi-total').innerText()).trim()
+
+    // The counter opens the supplier list filtered to the categories to check, with the side panel closed.
+    await checks.click()
+    await expect(page.getByTestId('suppliers-filter')).toBeVisible()
+    await expect(n1).toHaveCount(0)
+    await expect(page.getByTestId(`node-${N4}-check`)).toBeVisible()
+    await n4.click()
+    await expect(page.getByTestId('drawer-check')).toBeVisible()
+    await expect(page.getByTestId('review-control')).toHaveAttribute('data-review', 'pending')
+    const figure = (await page.getByTestId('drawer-figure').innerText()).trim()
+
+    await page.getByTestId('review-change').click()
+    await page.getByTestId('review-option-pcb').click()
+    // The store moves only with node.updated: once it lands, the flag is gone and the buyer is named as the source.
+    await expect(page.getByTestId('review-control')).toHaveAttribute('data-review', 'corrected')
+    await expect(page.getByTestId('drawer-check')).toHaveCount(0)
+    await expect(page.getByTestId('drawer-category-source')).toBeVisible()
+    await expect(page.getByTestId('drawer-figure')).not.toHaveText(figure)
+    await expect(page.getByTestId(`node-${N4}-check`)).toHaveCount(0)
+
+    await page.getByTestId('nav-overview').click()
+    await expect(checks).toHaveAttribute('data-count', '2')
+    await expect(page.getByTestId('kpi-total')).not.toHaveText(total)
+  })
+
+  await test.step('9. the audit log screen shows the chain as valid', async () => {
     await page.getByTestId('toolbar-audit').click()
     await expect(page.getByTestId('audit-panel')).toBeVisible()
     await page.getByTestId('audit-verify').click()
     await expect(page.getByTestId('audit-chain')).toHaveAttribute('data-valid', 'true')
   })
 
-  await test.step('9. no Content Security Policy violation on the dashboard or the phone', () => {
+  await test.step('10. no Content Security Policy violation on the dashboard or the phone', () => {
     expect(cspViolations).toEqual([])
   })
 })

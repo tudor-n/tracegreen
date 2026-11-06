@@ -32,7 +32,7 @@ export function Sidebar({ connection }: { connection: Connection }) {
         <ConnectionBadge connection={connection} />
       </div>
       <ul className="flex flex-row flex-wrap gap-0.5 md:flex-col">
-        <Item to="/" icon={LayoutGridIcon} label={shellCopy.overview} end />
+        <Item to="/" icon={LayoutGridIcon} label={shellCopy.overview} end testId="nav-overview" />
         <Item to="/suppliers" icon={WaypointsIcon} label={shellCopy.suppliers} count={supplierCount} />
         <Item to="/audit" icon={ScrollTextIcon} label={auditPanelCopy.open} testId="toolbar-audit" />
       </ul>

@@ -29,6 +29,8 @@ public enum ProblemCode
     [JsonStringEnumMemberName("AlreadyConfirmed")] AlreadyConfirmed,
     [JsonStringEnumMemberName("DeliveryChanged")] DeliveryChanged,
     [JsonStringEnumMemberName("TermsNotAccepted")] TermsNotAccepted,
+    [JsonStringEnumMemberName("CategoryNotAllowed")] CategoryNotAllowed,
+    [JsonStringEnumMemberName("CategoryChanged")] CategoryChanged,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -65,6 +67,8 @@ public static class Problems
             ProblemCode.AlreadyConfirmed => (StatusCodes.Status409Conflict, "Delivery already confirmed"),
             ProblemCode.DeliveryChanged => (StatusCodes.Status409Conflict, "Delivery changed since the page read it"),
             ProblemCode.TermsNotAccepted => (StatusCodes.Status422UnprocessableEntity, "Supplier terms not accepted"),
+            ProblemCode.CategoryNotAllowed => (StatusCodes.Status422UnprocessableEntity, "Category outside the allow-list"),
+            ProblemCode.CategoryChanged => (StatusCodes.Status409Conflict, "Category changed since the page read it"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

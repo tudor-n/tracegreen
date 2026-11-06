@@ -121,6 +121,50 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
+    public Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var ws = Get(ctx.WorkspaceId);
+            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.NodeNotFound, null, null));
+            }
+            if (!string.Equals(node.CategoryId, expectedCategoryId, StringComparison.Ordinal))
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.CategoryChanged, node, null));
+            }
+            var write = review(node);
+            var patch = write.Patch;
+            var patched = node with
+            {
+                CategoryId = patch.CategoryId,
+                SectorId = patch.SectorId,
+                ClassificationSource = patch.Source,
+                AiConfidence = patch.Confidence,
+                Review = patch.Review,
+                ReviewedAt = patch.ReviewedAt,
+                SpendKg = patch.SpendKg,
+                ActivityKg = patch.ActivityKg,
+            };
+            ws.Nodes[node.Id] = patched;
+            ws.BuyerCategories[write.LineKey] = patch.CategoryId;
+            var entry = ws.Append(write.Audit);
+            return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var known = Get(ctx.WorkspaceId).BuyerCategories;
+            return Task.FromResult<IReadOnlyDictionary<string, string>>(
+                lineKeys.Distinct(StringComparer.Ordinal).Where(known.ContainsKey).ToDictionary(k => k, k => known[k], StringComparer.Ordinal));
+        }
+    }
+
     public Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
     {
         lock (_gate)
@@ -223,6 +267,8 @@ public sealed class MemoryRepository : IRepository
         public readonly HashSet<string> Nonces = new(StringComparer.Ordinal);
         public readonly List<AuditEntry> Audit = new();
         public readonly Dictionary<Guid, Scenario> Scenarios = new();
+        /// <summary>The buyer's category by <c>CacheKey</c> of a line description (F6).</summary>
+        public readonly Dictionary<string, string> BuyerCategories = new(StringComparer.Ordinal);
         public long LastAuditId;
 
         public AuditEntry Append(AuditBuilder build)
@@ -240,6 +286,7 @@ public sealed class MemoryRepository : IRepository
             Nonces.Clear();
             Audit.Clear();
             Scenarios.Clear();
+            BuyerCategories.Clear();
             LastAuditId = 0;
         }
     }

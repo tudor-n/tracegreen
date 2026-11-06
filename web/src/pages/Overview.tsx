@@ -2,11 +2,13 @@ import { InfoIcon } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router'
 import type { Kpis, NodeView } from '@/api/client'
+import { CategoryChecks } from '@/components/dashboard/CategoryChecks'
 import { PageHeader, PageMessage, Surface } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { canvasCopy, kpiCopy, overviewCopy } from '@/copy/dashboard'
 import { supplierConfirmedShare } from '@/copy/labels'
+import { categoriesToCheck } from '@/lib/review-display'
 import { byCarbonDesc, CO2E_UNIT, formatKpis, formatShareSplit, selectLoaded, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
@@ -20,6 +22,7 @@ export default function Overview() {
   const buyer = useGraphStore((s) => s.buyer)
   const nodes = useGraphStore((s) => s.nodes)
   const next = useMemo(() => nextToConfirm(Object.values(nodes)), [nodes])
+  const checks = useMemo(() => categoriesToCheck(Object.values(nodes)).length, [nodes])
 
   let body
   if (!loaded || kpis === null) {
@@ -32,7 +35,12 @@ export default function Overview() {
   } else if (Object.keys(nodes).length === 0) {
     body = <PageMessage>{canvasCopy.empty}</PageMessage>
   } else {
-    body = <Cards kpis={kpis} next={next} />
+    body = (
+      <>
+        <CategoryChecks count={checks} />
+        <Cards kpis={kpis} next={next} />
+      </>
+    )
   }
 
   return (

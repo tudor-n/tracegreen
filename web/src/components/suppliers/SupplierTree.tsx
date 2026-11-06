@@ -4,6 +4,7 @@ import type { AlternativeView, Buyer, NodeStatus, NodeView } from '@/api/client'
 import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
 import { nodeCopy, scenarioCopy, suppliersCopy } from '@/copy/dashboard'
 import { isPlaceholder, justVerified, shownFigure } from '@/lib/node-display'
+import { categoryCheckLabel } from '@/lib/review-display'
 import { scenarioTitle } from '@/lib/scenario-display'
 import { cn } from '@/lib/utils'
 import { CO2E_UNIT, edgeWidth, formatTonnes, formatTonnesDelta, type ScenarioPreview } from '@/store'
@@ -14,6 +15,7 @@ import { CO2E_UNIT, edgeWidth, formatTonnes, formatTonnesDelta, type ScenarioPre
 // supplier with a dotted line of its own. In a narrow tree (a phone, or beside the panel on a small laptop) the lines
 // and the buyer card step aside and the rows remain; in a wide one the lines stretch so the tree fills the card. Rows are buttons: a click selects the supplier and opens the side panel.
 // Frozen test hooks (RUNBOOK): `node-<id>` with `data-status`, `ghost-<id>` with `data-badge`, `ghost-<id>-saved`.
+// The classification review's flag (F6): `node-<id>-check`.
 
 const ROW_H = 72
 const GHOST_H = 64
@@ -131,6 +133,7 @@ function supplyLines(nodes: readonly NodeView[], preview: ScenarioPreview | null
 function SupplierRow({ node, hotspot, selected, onSelect }: { node: NodeView; hotspot: boolean; selected: boolean; onSelect: () => void }) {
   const flashing = useVerifiedFlash(node.status)
   const placeholder = shownFigure(node).factors.some(isPlaceholder)
+  const check = categoryCheckLabel(node.classification)
   return (
     <button
       type="button"
@@ -152,6 +155,12 @@ function SupplierRow({ node, hotspot, selected, onSelect }: { node: NodeView; ho
           {node.label}
         </span>
         <span className="truncate text-[13px] text-muted-foreground">
+          {/* First on the line, so a narrow row truncates the rest and never the flag (F6). */}
+          {check !== null && (
+            <span data-testid={`node-${node.id}-check`} className="font-semibold text-estimated-ink">
+              {check} ·{' '}
+            </span>
+          )}
           {nodeCopy.status[node.status]}
           {hotspot && ` · ${nodeCopy.hotspot}`}
           {placeholder && <span className="text-estimated-ink"> · {nodeCopy.placeholder}</span>}

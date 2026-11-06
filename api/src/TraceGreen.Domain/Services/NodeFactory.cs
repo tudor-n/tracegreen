@@ -72,6 +72,7 @@ public static class NodeFactory
             TransportMode: transportMode,
             EnergySource: energySource,
             CreatedAt: createdAt,
+            Review: InitialReview(classification.Source),
             ClassificationRationale: Reason(classification.Rationale));
     }
 
@@ -92,4 +93,11 @@ public static class NodeFactory
         }
         return BannedTerms.Clean(text);
     }
+
+    /// <summary>
+    /// Every AI-mapped category waits for a person, whatever its confidence; an invoice code, the stub and a buyer's own
+    /// choice need no review.
+    /// </summary>
+    public static ClassificationReview InitialReview(ClassificationSource source) =>
+        source is ClassificationSource.Cache or ClassificationSource.Model ? ClassificationReview.Pending : ClassificationReview.NotNeeded;
 }

@@ -41,13 +41,16 @@ public sealed class NodeViewMapper
         var basis = node.Status == NodeStatus.Verified && activity is not null ? CarbonBasis.Activity : CarbonBasis.Spend;
 
         var line = InvoiceFacts.DominantLine(invoice.Extracted.Lines);
+        var aiMapped = node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model;
         var classification = new ClassificationView(
             CategoryId: node.CategoryId,
             CategoryLabel: category.Label,
             Source: node.ClassificationSource,
             Confidence: node.AiConfidence,
-            AiMapped: node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model,
+            AiMapped: aiMapped,
             LineDescription: line.Description,
+            Review: node.Review,
+            ReviewedAt: node.ReviewedAt,
             Rationale: node.ClassificationRationale);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).

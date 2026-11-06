@@ -85,6 +85,7 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - **Numeric bounds**: a total that is not positive or is above 10¹² EUR, a line amount above 10¹², or a quantity that is negative or above 10⁹ is 422 `Schema`. This keeps every later sum inside `decimal`, so one hostile invoice cannot break `/api/graph` for everyone.
 - **Duplicates** are refused under the repository lock (raw XML hash, invoice id or node id).
 - **Answers**: `POST /api/verify` rejects a mode the lane lacks and a mass outside (0, 10⁶] t (422 `InvalidAnswer`).
+- **Classification review (F6)**: `POST /api/nodes/{nodeId}/classification` takes only a category id on the allow-list (`seed/categories.json`; 422 `CategoryNotAllowed` otherwise), so the review cannot put a category on the graph that the AI could not. A decision made on a stale page is refused under the repository lock (409 `CategoryChanged`). The decision is remembered for the line's description and applied to later imports before the AI is asked; a remembered category no longer on the list is ignored.
 
 ## The AI boundary
 
@@ -101,10 +102,10 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 
 ## Data at rest (C4, C8)
 
-- **Row-level security** is enabled on `invoices`, `nodes`, `verifications`, `scenarios` and `audit_log` (migration `Rls`). The application connects as the table owner and bypasses it. Any other role, such as a hosted anon role, sees nothing until policies exist.
+- **Row-level security** is enabled on `invoices`, `nodes`, `verifications`, `scenarios` and `audit_log` (migration `Rls`), and on `buyer_classifications` (migration `BuyerClassifications`, F6). The application connects as the table owner and bypasses it. Any other role, such as a hosted anon role, sees nothing until policies exist.
 - **Append-only audit log**: a trigger rejects every `UPDATE` and `DELETE` on `audit_log`. The demo reset uses `TRUNCATE`, which row triggers do not see; the demo is single-tenant.
 - **Hash chain** (`Domain/Audit/AuditChain.cs`): each entry's hash is `SHA-256(prevHash + canonicalJson({ts, actor, action, payload}))`, chained from a genesis hash of 64 zeros, with timestamps normalised to UTC milliseconds. Editing, reordering or deleting an entry breaks every later hash. `POST /api/audit/verify` recomputes the chain and returns `{ valid, length, brokenAt }`, and the audit panel shows the result. Postgres also keeps `(workspace_id, prev_hash)` unique, so two writers cannot fork the chain.
-- **Audit payloads** hold ids, the expiry, the answers, the warnings and the accepted terms' version and SHA-256 (with `simulated: true` when the demo tool answered). They hold no token, nonce or address.
+- **Audit payloads** hold ids, the expiry, the answers, the warnings and the accepted terms' version and SHA-256 (with `simulated: true` when the demo tool answered), and for a classification review the categories before and after with the earlier source and confidence. They hold no token, nonce or address.
 - **Client address**: a verification row stores `Hashing.IpHash`, keyed with a key derived from `LINK_SECRET` (`"ip-hash:" + secret`), never the address itself.
 
 ## Browser headers (C6)
@@ -137,7 +138,7 @@ What is never logged:
 
 ## Known gaps
 
-- **The buyer dashboard has no authentication.** Anyone who reaches the laptop's address can import, reset (with `DEMO_TOOLS=1`) and request links. The demo relies on the hotspot being the only network. `workspace_id` and `Ctx` exist so a login can become a policy later.
+- **The buyer dashboard has no authentication.** Anyone who reaches the laptop's address can import, reset (with `DEMO_TOOLS=1`), request links and confirm or change a node's category (`POST /api/nodes/{nodeId}/classification`, F6), which recomputes its figures. The demo relies on the hotspot being the only network. `workspace_id` and `Ctx` exist so a login can become a policy later. Until then the `classification.reviewed` entry names the role, `buyer`, never a person.
 - **The Vite dev server prints a token on proxy errors.** It writes the full URL (`/api/verify/context?t=…`) when the API is down. The demo image uses nginx instead.
 - **Links work only on the hotspot (ruling R6).** A phone that is not on the laptop's hotspot cannot open one. The link card warns when the base URL is a loopback address.
 - **The supplier page groups deliveries by the seller tax id on the invoices.** Two sellers whose invoices carried the same tax id would share one page. The tax id comes from the e-invoice, which ANAF validates for Romanian sellers.
