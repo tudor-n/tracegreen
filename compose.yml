@@ -1,6 +1,6 @@
 # Development stack: `docker compose build && docker compose up`
 #   db   Postgres 17                               localhost:5432
-#   ai   FastAPI with --reload                     (internal) ai:8000
+#   ai   FastAPI with --reload                     (internal) ai:8000; reaches Ollama on the host as host.docker.internal:11434
 #   api  ASP.NET Core (dotnet run; `docker compose restart api` after C# edits), applies migrations + seed on boot   localhost:8080
 #   web  Vite dev server, proxies /api -> api       localhost:3000   <- open this
 # Source trees are bind-mounted; build outputs live in anonymous volumes; every watcher polls (Windows bind mounts emit no inotify events).
@@ -34,9 +34,19 @@ services:
     environment:
       SEED_DIR: /seed
       WATCHFILES_FORCE_POLLING: "true"
+      # Models and keys come from the root .env (git-ignored); see .env.example and docs/RUNBOOK.md, "AI models".
+      AI_MODELS: ${AI_MODELS:-}
       AI_MODEL: ${AI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_TIMEOUT_S: "10"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
+      AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      AI_DEV_ROUTES: ${AI_DEV_ROUTES:-0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 5s

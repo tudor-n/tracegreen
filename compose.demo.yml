@@ -48,11 +48,20 @@ services:
       target: runtime
     volumes: !override
       - ./seed:/seed:ro
+    # The same model variables as compose.yml, from the root .env; extra_hosts (Ollama on the host) comes from there too.
+    # The scoring route stays off in the demo image.
     environment: !override
       SEED_DIR: /seed
+      AI_MODELS: ${AI_MODELS:-}
       AI_MODEL: ${AI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_TIMEOUT_S: "10"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
+      AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      AI_DEV_ROUTES: "0"
 
   web:
     build:

@@ -67,8 +67,19 @@ class SuggestResponse(Wire):
     suggestions: list[Suggestion]
 
 
+class ModelHealth(Wire):
+    """One AI_MODELS entry: `reason` says why a model is not ready, e.g. a missing key."""
+
+    id: str
+    ready: bool
+    reason: str | None = None
+
+
 class HealthResponse(Wire):
     ok: bool
     provider: str
     cache_entries: int = Field(ge=0)
+    # True when any model is ready.
     model_configured: bool
+    # The C# HealthDto ignores this field; the evaluation script reads it.
+    models: list[ModelHealth] = []
