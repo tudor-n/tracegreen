@@ -181,6 +181,7 @@ public static partial class AnswerCheck
     private static string? Claims(IReadOnlyList<AnswerSegment> segments, FactPack pack)
     {
         int? previousLargest = null;
+        List<int> earlier = [];
         var about = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sentence in Sentences(segments))
         {
@@ -227,6 +228,19 @@ public static partial class AnswerCheck
             if (said.Count > 0 && ranks.Any(r => pack.StatusOf(r) is { } status && !said.Contains(status)))
             {
                 return "a status claim the data does not hold";
+            }
+            // "The larger of the two", "of the two, {{S4.name}} has the larger figure": the better ranked of the suppliers
+            // this sentence and the one before cite, not S1 (Claude Sonnet 5.5 gave the smaller of two the larger figure).
+            var among = ranks.Union(earlier).ToList();
+            earlier = ranks;
+            if (OfTheTwo().Match(words) is { Success: true } relative)
+            {
+                var expected = relative.Groups["less"].Success ? among.Max() : among.Min();
+                if (!ranks.Contains(expected) || (ComparedSupplier(sentence) is { } compared && compared != expected))
+                {
+                    return "a comparison the data does not hold";
+                }
+                continue;
             }
             if (Largest().IsMatch(words) && !NextSmallest().IsMatch(words))
             {
@@ -290,19 +304,41 @@ public static partial class AnswerCheck
 
     /// <summary>
     /// Whether a sentence says a change goes one way while its fact goes the other: "cuts emissions by {{W1.carbonDelta}}"
-    /// with a positive change, "raises cost by {{C1.costDelta}}" with a negative one. Each change fact is read against
-    /// the last direction word before it in the sentence ("would cut … by", "saves", "and adds").
+    /// with a positive change, "raises cost by {{C1.costDelta}}" with a negative one. A direction word ("would cut",
+    /// "saves", "and adds") holds for the quantity it is about: the first one named after it (emissions, cost, lead time),
+    /// else the first change fact. "and cost by" carries it over to another quantity; a quantity named without a direction
+    /// word of its own (", with lead time {{W1.leadDelta}}", "though lead time changes by") and a neutral "change by" leave
+    /// the change unread, since the signed value says which way it goes.
     /// </summary>
     private static bool WrongDirection(List<AnswerSegment> sentence, FactPack pack)
     {
         bool? less = null;
+        string? about = null;
         foreach (var segment in sentence)
         {
             if (segment.Text is { } text)
             {
-                if (DirectionWord().Matches(text.ToLowerInvariant()).LastOrDefault() is { } word)
+                var words = text.ToLowerInvariant();
+                if (CarriedOver().Match(words) is { Success: true } carried)
                 {
-                    less = word.Groups["less"].Success;
+                    about = QuantityField(carried);
+                    continue;
+                }
+                foreach (Match word in ChangeWord().Matches(words))
+                {
+                    if (QuantityField(word) is { } quantity)
+                    {
+                        if (about is not null && about != quantity)
+                        {
+                            less = null;
+                        }
+                        about = quantity;
+                    }
+                    else
+                    {
+                        less = word.Groups["neutral"].Success ? null : word.Groups["less"].Success;
+                        about = null;
+                    }
                 }
                 continue;
             }
@@ -311,13 +347,55 @@ public static partial class AnswerCheck
             {
                 continue;
             }
-            if (less.Value ? change > 0 : change < 0)
+            about ??= fact.Field;
+            if (about == fact.Field && (less.Value ? change > 0 : change < 0))
             {
                 return true;
             }
         }
         return false;
     }
+
+    /// <summary>
+    /// The rank of the supplier a comparison among those just named (<see cref="OfTheTwo"/>) is said of: the last one cited
+    /// before it in "{{S5.name}} is the larger of the two" and "it is the larger of the two", the next one in "the larger of
+    /// the two is {{S4.name}}" and "of the two, {{S4.name}} has the larger figure". Null when the sentence does not say
+    /// ("so the larger of the two is the one to ask first").
+    /// </summary>
+    private static int? ComparedSupplier(List<AnswerSegment> sentence)
+    {
+        int? last = null;
+        for (var i = 0; i < sentence.Count; i++)
+        {
+            if (sentence[i].FactId is { } id)
+            {
+                last = FactPack.RankOf(id) ?? last;
+                continue;
+            }
+            var text = sentence[i].Text!.ToLowerInvariant();
+            if (OfTheTwoFirst().IsMatch(text))
+            {
+                return NextRank(sentence, i);
+            }
+            if (OfTheTwo().Match(text) is { Success: true } phrase)
+            {
+                return SaidOf().IsMatch(text[..phrase.Index]) ? last
+                    : IsNext().IsMatch(text[(phrase.Index + phrase.Length)..]) ? NextRank(sentence, i)
+                    : null;
+            }
+        }
+        return null;
+    }
+
+    private static int? NextRank(List<AnswerSegment> sentence, int after) =>
+        sentence.Skip(after + 1).Select(s => s.FactId is { } id ? FactPack.RankOf(id) : null).FirstOrDefault(r => r is not null);
+
+    /// <summary>The change field a quantity word names: emissions → carbonDelta, cost → costDelta, lead time → leadDelta.</summary>
+    private static string? QuantityField(Match word) =>
+        word.Groups["carbon"].Success ? "carbonDelta"
+        : word.Groups["cost"].Success ? "costDelta"
+        : word.Groups["lead"].Success ? "leadDelta"
+        : null;
 
     /// <summary>The suppliers a sentence names (by name fact), compared by name so two deliveries from one count as one.</summary>
     private static HashSet<string> NamedIn(List<AnswerSegment> sentence, FactPack pack) =>
@@ -447,9 +525,39 @@ public static partial class AnswerCheck
     [GeneratedRegex(@"^[WC]\d+\.")]
     private static partial Regex WhatIfFact();
 
-    /// <summary>Words that say which way a change goes: less (cut, save, lower…) or more (raise, add, increase…).</summary>
-    [GeneratedRegex(@"\b(?:(?<less>cut|cuts|cutting|save|saves|saving|savings|reduce|reduces|reducing|reduction|lower|lowers|lowering|decrease|decreases|drop|drops|less|fewer|cheaper|faster|shorter)|raise|raises|raising|increase|increases|increasing|add|adds|adding|more|higher|costlier|pricier|slower|longer|extra)\b")]
-    private static partial Regex DirectionWord();
+    /// <summary>
+    /// The words <see cref="WrongDirection"/> reads, in order: which way a change goes (less: cut, save, lower…; more:
+    /// raise, add, increase…; neutral: change), and the quantity it is about (emissions, cost, lead time).
+    /// </summary>
+    [GeneratedRegex(@"\b(?:(?<less>cut|cuts|cutting|save|saves|saving|savings|reduce|reduces|reducing|reduction|lower|lowers|lowering|decrease|decreases|drop|drops|fall|falls|falling|less|fewer|cheaper|faster|shorter)|(?<neutral>change|changes|changed|changing)|(?<carbon>emissions?|carbon|co2e?|footprint)|(?<cost>costs?|prices?|spend|spending)|(?<lead>lead[\s-]?times?|delivery\s+times?|transit\s+times?)|raise|raises|raising|rise|rises|rising|increase|increases|increasing|grow|grows|growing|add|adds|adding|more|higher|costlier|pricier|slower|longer|extra)\b")]
+    private static partial Regex ChangeWord();
+
+    /// <summary>
+    /// A comparison among the suppliers just named, not all of them: "the larger of the two", "the lowest of them", "of the
+    /// two, … has the larger figure", "the most of the two". <c>less</c>: the smaller one.
+    /// </summary>
+    [GeneratedRegex(@"\b(?:(?<less>smaller|smallest|lower|lowest)|larger|largest|bigger|biggest|higher|highest|greater|greatest)\b(?:\s+\w+){0,2}?\s+of\s+(?:the\s+|these\s+|those\s+)?(?:two|both|them|these|those)\b|\bof\s+(?:the|these|those)\s+two\b[^.;]{0,80}?\b(?:(?<less>smaller|smallest|lower|lowest)|larger|largest|bigger|biggest|higher|highest|greater|greatest)\b|\bthe\s+(?:(?<less>least)|most)\s+of\s+(?:the\s+two|both)\b")]
+    private static partial Regex OfTheTwo();
+
+    /// <summary>"Of the two, " before the supplier a comparison is said of.</summary>
+    [GeneratedRegex(@"\bof\s+(?:the|these|those)\s+two\s*,?\s*$")]
+    private static partial Regex OfTheTwoFirst();
+
+    /// <summary>A comparison said of the supplier before it: "… is the", "it was by far the".</summary>
+    [GeneratedRegex(@"\b(?:is|was|['’]s)\s+(?:by\s+far\s+)?(?:the\s+)?$")]
+    private static partial Regex SaidOf();
+
+    /// <summary>A comparison said of the supplier after it: "the larger of the two is {{S4.name}}".</summary>
+    [GeneratedRegex(@"^\s*(?:is|was|would\s+be)\s*$")]
+    private static partial Regex IsNext();
+
+    /// <summary>
+    /// Text between two facts that at most names the next quantity, so the direction before it holds for the next change
+    /// too: "cuts emissions by {{W1.carbonDelta}} and cost by {{W1.costDelta}}", ") and cost (", ", lead time by", "saves
+    /// {{W1.costDelta}} and {{W1.carbonDelta}}", "cut {{S1.carbon}} by {{W3.carbonDelta}}".
+    /// </summary>
+    [GeneratedRegex(@"^[\s,;:()]*(?:(?:and|or|plus)\s+)?(?:(?:the|its|their)\s+)?(?:(?<carbon>emissions?|carbon|co2e?|footprint)|(?<cost>costs?|prices?|spend|spending)|(?<lead>lead[\s-]?times?|delivery\s+times?|transit\s+times?))?\s*(?:by|of)?[\s(]*$")]
+    private static partial Regex CarriedOver();
 
     /// <summary>
     /// The assistant saying it will do, or did, what only the buyer can: "I'll add a what-if", "I've changed", "let me send".

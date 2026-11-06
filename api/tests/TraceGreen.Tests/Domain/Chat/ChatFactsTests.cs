@@ -195,6 +195,14 @@ public class ChatFactsTests
     [InlineData("The second smallest is {{S3.name}}.")]
     [InlineData("The largest emitters are {{S1.name}} and {{S2.name}}.")]
     [InlineData("The largest estimated suppliers are {{S2.name}} and {{S3.name}}.")]
+    // A comparison among the suppliers just named, not all of them (2026-11-07).
+    [InlineData("{{S2.name}} emits {{S2.carbon}} and {{S4.name}} emits {{S4.carbon}}, so the larger of the two is the one to ask first.")]
+    [InlineData("{{S2.name}} has {{S2.carbon}} and {{S4.name}} has {{S4.carbon}}. Of the two, {{S2.name}} has the larger figure.")]
+    [InlineData("{{S3.name}} and {{S4.name}} are left. The largest of the two is {{S3.name}}.")]
+    [InlineData("{{S3.name}} and {{S4.name}} are left. The smaller of the two is {{S4.name}}.")]
+    [InlineData("Ask {{S3.name}} first, since it emits {{S3.carbon}}, the most of the two.")]
+    [InlineData("By emissions, {{S3.name}} is the larger of the two at {{S3.carbon}}, compared with {{S4.carbon}} for {{S4.name}}.")]
+    [InlineData("{{S3.name}} and {{S4.name}} are left. Ask {{S3.name}} first, since it is the larger of the two.")]
     public void ClaimsTheDataHoldsPass(string text) =>
         Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
 
@@ -214,6 +222,11 @@ public class ChatFactsTests
     [InlineData("The largest is {{S1.name}}. The next largest is {{S3.name}}.", "a largest claim the data does not hold")]
     [InlineData("The next largest is {{S3.name}}.", "a largest claim the data does not hold")]
     [InlineData("The largest is {{S1.name}}. The next largest is {{S3.name}}, which is estimated.", "a largest claim the data does not hold")]
+    [InlineData("{{S2.name}} has {{S2.carbon}} and {{S4.name}} has {{S4.carbon}}. Of the two, {{S4.name}} has the larger figure.", "a comparison the data does not hold")]
+    [InlineData("{{S3.name}} and {{S4.name}} are left. The smaller of the two is {{S3.name}}.", "a comparison the data does not hold")]
+    // Claude Sonnet 5.5 (2026-11-07): the smaller of two named suppliers called the larger, with both cited.
+    [InlineData("By emissions, {{S4.name}} is the larger of the two at {{S4.carbon}}, compared with {{S3.carbon}} for {{S3.name}}.", "a comparison the data does not hold")]
+    [InlineData("{{S3.name}} and {{S4.name}} are left. Ask {{S4.name}} first, since it is the larger of the two.", "a comparison the data does not hold")]
     public void ClaimsTheDataDoesNotHoldAreRefused(string text, string problem) =>
         Assert.Equal(problem, AnswerCheck.Check(text, Pack).Problem);
 
@@ -309,6 +322,13 @@ public class ChatWhatIfTests
     [InlineData("Switching to air would raise emissions by {{W3.carbonDelta}} and add {{W3.costDelta}} to the cost.")]
     [InlineData("Sea cuts {{W1.carbonDelta}} but adds {{W1.leadDelta}} to the lead time.")]
     [InlineData("For {{W1.supplier}}: {{W1.change}}, {{W1.carbonDelta}}, {{W1.costDelta}}.")]
+    // Claude Sonnet 5.5's answers to "How can I lower my emissions?" (2026-11-07), refused before a direction word held
+    // only for its own quantity: the lead time that rises was read against "cuts" and "lowers".
+    [InlineData("The what-if that cuts emissions the most is for {{W1.supplier}}: {{W1.change}} would change emissions by {{W1.carbonDelta}} and cost by {{W1.costDelta}}, though lead time changes by {{W1.leadDelta}}.")]
+    [InlineData("For {{W1.supplier}}, {{W1.change}} lowers emissions ({{W1.carbonDelta}}) and lowers cost ({{W1.costDelta}}), with lead time {{W1.leadDelta}}.")]
+    [InlineData("{{W1.change}} would cut cost by {{W1.costDelta}} and emissions by {{W1.carbonDelta}}.")]
+    [InlineData("Rail cuts emissions by {{W2.carbonDelta}} but costs {{W2.costDelta}} more.")]
+    [InlineData("Cost would rise by {{W2.costDelta}}, while emissions fall by {{W2.carbonDelta}}.")]
     public void ChangesTheDataHoldsPass(string text) =>
         Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
 
@@ -317,6 +337,8 @@ public class ChatWhatIfTests
     [InlineData("Switching to air saves {{W3.costDelta}} and reduces {{W3.carbonDelta}}.", "a change the data does not hold")]
     [InlineData("Rail lowers the cost by {{W2.costDelta}}.", "a change the data does not hold")]
     [InlineData("Going by sea raises emissions by {{W1.carbonDelta}}.", "a change the data does not hold")]
+    [InlineData("{{W1.change}} cuts emissions by {{W1.carbonDelta}}, cost by {{W1.costDelta}} and lead time by {{W1.leadDelta}}.", "a change the data does not hold")]
+    [InlineData("Rail lowers emissions by {{W2.carbonDelta}} and cost by {{W2.costDelta}}.", "a change the data does not hold")]
     [InlineData("I'll add a what-if for {{S2.name}}.", "an action the assistant cannot take")]
     [InlineData("I have changed the transport mode of {{S1.name}}.", "an action the assistant cannot take")]
     [InlineData("Let me send a request to {{S1.name}}.", "an action the assistant cannot take")]
