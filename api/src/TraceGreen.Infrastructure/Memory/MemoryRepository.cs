@@ -149,8 +149,19 @@ public sealed class MemoryRepository : IRepository
                 ActivityKg = patch.ActivityKg,
             };
             ws.Nodes[node.Id] = patched;
+            ws.BuyerCategories[write.LineKey] = patch.CategoryId;
             var entry = ws.Append(write.Audit);
             return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var known = Get(ctx.WorkspaceId).BuyerCategories;
+            return Task.FromResult<IReadOnlyDictionary<string, string>>(
+                lineKeys.Distinct(StringComparer.Ordinal).Where(known.ContainsKey).ToDictionary(k => k, k => known[k], StringComparer.Ordinal));
         }
     }
 
@@ -256,6 +267,8 @@ public sealed class MemoryRepository : IRepository
         public readonly HashSet<string> Nonces = new(StringComparer.Ordinal);
         public readonly List<AuditEntry> Audit = new();
         public readonly Dictionary<Guid, Scenario> Scenarios = new();
+        /// <summary>The buyer's category by <c>CacheKey</c> of a line description (F6).</summary>
+        public readonly Dictionary<string, string> BuyerCategories = new(StringComparer.Ordinal);
         public long LastAuditId;
 
         public AuditEntry Append(AuditBuilder build)
@@ -273,6 +286,7 @@ public sealed class MemoryRepository : IRepository
             Nonces.Clear();
             Audit.Clear();
             Scenarios.Clear();
+            BuyerCategories.Clear();
             LastAuditId = 0;
         }
     }

@@ -15,6 +15,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
     public DbSet<LaneRow> Lanes => Set<LaneRow>();
     public DbSet<AlternativeRow> Alternatives => Set<AlternativeRow>();
     public DbSet<BuyerRow> Buyers => Set<BuyerRow>();
+    public DbSet<BuyerClassificationRow> BuyerClassifications => Set<BuyerClassificationRow>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -65,6 +66,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
         });
         model.Entity<AlternativeRow>(e => { e.ToTable("alternatives"); e.HasKey(x => x.Id); });
         model.Entity<BuyerRow>(e => { e.ToTable("buyers"); e.HasKey(x => x.WorkspaceId); });
+        model.Entity<BuyerClassificationRow>(e => { e.ToTable("buyer_classifications"); e.HasKey(x => new { x.WorkspaceId, x.LineKey }); });
 
         // snake_case columns, keys and indexes so the schema reads naturally in psql and on Supabase.
         foreach (var entity in model.Model.GetEntityTypes())

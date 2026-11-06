@@ -41,7 +41,7 @@ Test counts after the F6 seed data (Terminal C): 266 .NET tests, 252 in memory m
 
 Test counts after F12 and the supplier terms (2026-11-06): 326 .NET tests, 309 in memory mode (the 17 Postgres contract tests skipped), 326 with `DATABASE_URL` on `tracegreen_test`; 253 web unit tests; 28 script tests, which CI runs in the web job; two Playwright specs: the demo-path smoke with nine steps (the terms tick and link in step 3, the printable terms in step 6) and `supplier-portal.spec.ts`.
 
-Test counts after the classification review (F6, 2026-11-06): 353 .NET tests, 330 in memory mode (the 23 Postgres contract tests skipped), 353 with `DATABASE_URL` on a scratch database; 255 web unit tests.
+Test counts after the classification review (F6, 2026-11-06): 361 .NET tests, 336 in memory mode (the 25 Postgres contract tests skipped), 361 with `DATABASE_URL` on a scratch database; 255 web unit tests.
 
 ## Wire contract (slice 1)
 
@@ -262,18 +262,19 @@ Every AI-mapped node waits for a person to confirm or change its category; a cha
 - **Figures:** the node is rebuilt through `NodeFactory` with the new category: sector, spend figure, and the activity figure when the node has one (the material factor follows the category). Cost, lead time, status and the supplier's answers stay.
 - **Audit:** `classification.reviewed`, actor `buyer`, payload `{nodeId, review, fromCategoryId, toCategoryId, fromSource, fromConfidence}`; the entry's `ts` is the review time and equals `reviewedAt`. No token, address or person.
 - **Postgres:** migration `ClassificationReview` adds `nodes.review` (text, default `NotNeeded`) and `nodes.reviewed_at`, and backfills `Pending` for stored `Cache` and `Model` nodes.
+- **Reuse (the stretch, done):** a review also remembers its category under the `CacheKey` of the node's dominant line, so a later import gets it for any line with the same description before the cache and the AI are asked (order: invoice code → buyer → cache → AI → stub). Such a node has source `buyer`, no confidence and `review: notNeeded`. Kept in both repositories (migration `BuyerClassifications`: table `buyer_classifications`, row-level security on), never in `seed/ai-cache.json`; a demo reset forgets it.
 
 Checked on 2026-11-06:
 
 | Check | Result |
 |---|---|
-| `dotnet test` (memory) | 353 tests, 330 run, the 23 Postgres contract tests skipped, all passing |
-| `dotnet test` with `DATABASE_URL` on a scratch Postgres 17 | all 353 passing, the review contract tests included |
-| The migration on a database that `development` had migrated and seeded | applied with no pending model changes; N3–N5 `Pending`, N2 `NotNeeded` |
-| HTTP in Postgres mode | correct N3 → 200 (`plastics`, `buyer`, `corrected`); same page again → 409; `steel` → 422; N1 before import → 404; `POST /api/audit/verify` valid |
+| `dotnet test` (memory) | 361 tests, 336 run, the 25 Postgres contract tests skipped, all passing |
+| `dotnet test` with `DATABASE_URL` on a scratch Postgres 17 | all 361 passing, the review contract tests included |
+| The migrations on a database that `development` had migrated and seeded | applied with no pending model changes; N3–N5 `Pending`, N2 `NotNeeded`; `buyer_classifications` with row-level security |
+| HTTP in Postgres mode | correct N3 → 200 (`plastics`, `buyer`, `corrected`); same page again → 409; `steel` → 422; N1 before import → 404; `POST /api/audit/verify` valid; N3's invoice under a new number then imports as `plastics`, source `buyer`, `notNeeded`; a reset empties `buyer_classifications` |
 | `pnpm gen:api` after the review | no change to `schema.d.ts` (the contract commit holds it) |
 
-Tests (`ClassificationEndpointTests`, `RepositoryContract`): confirm; correct with the spend figure recomputed; a VERIFIED node's activity figure recomputed with the new material; a correction changed again; `UNCLASSIFIED` accepted; 409 for a stale category, and for the second of two reviews from the same page; 422 for a category outside the list; 404; the audit entry and a valid chain; `node.updated` with fresh KPIs; the supplier's link still working after a correction, its answer computed with the buyer's category; in both repositories, the patch and audit entry, nothing written on a stale category, ten concurrent reviews giving one write, and a verification that landed first seen by the review.
+Tests (`ClassificationEndpointTests`, `RepositoryContract`): confirm; correct with the spend figure recomputed; a VERIFIED node's activity figure recomputed with the new material; a correction changed again; `UNCLASSIFIED` accepted; 409 for a stale category, and for the second of two reviews from the same page; 422 for a category outside the list; 404; the audit entry and a valid chain; `node.updated` with fresh KPIs; the supplier's link still working after a correction, its answer computed with the buyer's category; in both repositories, the patch and audit entry, nothing written on a stale category, ten concurrent reviews giving one write, and a verification that landed first seen by the review. For the reuse: a later import of the same line gets the buyer's category until a reset (`ClassificationEndpointTests`); the buyer's choice before the cache and the AI, an invoice code before the buyer, a remembered category off the list ignored (`LineClassificationTests`); a decision remembered, replaced and forgotten on reset, and none for a stale review (`RepositoryContract`).
 
 ## Seed XML validation (2026-10-23)
 

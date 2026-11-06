@@ -19,14 +19,23 @@ public static class InvoiceClassification
             .FirstOrDefault();
     }
 
-    /// <summary>Invoice code first, then the pre-computed cache; otherwise UNCLASSIFIED (the live AI is consulted by the service).</summary>
-    public static (string CategoryId, double? Confidence, ClassificationSource Source, string Rationale) Offline(ExtractedLine line, SeedBundle bundle)
+    /// <summary>
+    /// Invoice code first, then a category the buyer chose for the same description (<paramref name="buyerCategories"/>, by
+    /// <see cref="CacheKey"/>), then the pre-computed cache; otherwise UNCLASSIFIED (the live AI is consulted by the service).
+    /// </summary>
+    public static (string CategoryId, double? Confidence, ClassificationSource Source, string Rationale) Offline(
+        ExtractedLine line, SeedBundle bundle, IReadOnlyDictionary<string, string>? buyerCategories = null)
     {
         if (Match(line, bundle.ClassificationMap) is { } mapped)
         {
             return (mapped.CategoryId, 1.0, ClassificationSource.Invoice, $"Item classification code {line.ClassificationCode} ({mapped.ListId})");
         }
-        if (bundle.AiCache.TryGetValue(CacheKey.Compute(line.Description), out var cached) && bundle.AllowList.Contains(cached.CategoryId))
+        var key = CacheKey.Compute(line.Description);
+        if (buyerCategories is not null && buyerCategories.TryGetValue(key, out var chosen) && bundle.AllowList.Contains(chosen))
+        {
+            return (chosen, null, ClassificationSource.Buyer, "The buyer's review of the same description");
+        }
+        if (bundle.AiCache.TryGetValue(key, out var cached) && bundle.AllowList.Contains(cached.CategoryId))
         {
             return (cached.CategoryId, cached.Confidence, ClassificationSource.Cache, cached.Rationale);
         }

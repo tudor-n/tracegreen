@@ -76,10 +76,14 @@ public interface IRepository
     /// <summary>
     /// A person's classification review (F6), atomic with its audit entry. Under the write's lock the node is read, its
     /// category compared with <paramref name="expectedCategoryId"/> (else <see cref="ReviewClassificationStatus.CategoryChanged"/>
-    /// with nothing written), and <paramref name="review"/> computes the patch and the audit entry from that node.
+    /// with nothing written), and <paramref name="review"/> computes the patch and the audit entry from that node. The
+    /// category is also remembered for the write's <see cref="ClassificationWrite.LineKey"/>, replacing an earlier one.
     /// </summary>
     Task<ReviewClassificationResult> ReviewClassificationAsync(
         Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct);
+
+    /// <summary>The buyer's remembered categories for those of <paramref name="lineKeys"/> that have one, by line key. A reset forgets them.</summary>
+    Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct);
 
     Task<AuditEntry> AppendAuditAsync(Ctx ctx, AuditBuilder build, CancellationToken ct);
 

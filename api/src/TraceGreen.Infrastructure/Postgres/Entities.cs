@@ -118,6 +118,15 @@ public class AlternativeRow
     public decimal MassT { get; set; }
 }
 
+/// <summary>A category the buyer chose for a line description, keyed by the description's <c>CacheKey</c> (F6).</summary>
+public class BuyerClassificationRow
+{
+    public Guid WorkspaceId { get; set; }
+    public string LineKey { get; set; } = "";
+    public string CategoryId { get; set; } = "";
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 public class BuyerRow
 {
     public Guid WorkspaceId { get; set; }

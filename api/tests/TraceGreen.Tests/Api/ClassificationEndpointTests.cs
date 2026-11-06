@@ -270,6 +270,43 @@ public class ClassificationEndpointTests : IClassFixture<VerifyWebAppFactory>
         Assert.Equal("classification.reviewed", Assert.IsType<AuditAppended>(events[1]).Entry.Action);
     }
 
+    /// <summary>N3's invoice under another number: a later delivery with the same line, which the AI cache answers.</summary>
+    private static readonly string LaterN3Xml =
+        File.ReadAllText(Path.Combine(TestPaths.SeedDir, "invoices", "N3-oradea.xml")).Replace("OH-2026-1005", "OH-2026-1105");
+
+    private async Task<JsonElement> Import(string xml)
+    {
+        var response = await _client.PostAsync("/api/ingest/ubl", new StringContent(xml, System.Text.Encoding.UTF8, "text/xml"), Ct);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        return (await Json(response)).GetProperty("node");
+    }
+
+    [Fact]
+    public async Task ALaterLineWithTheSameDescriptionGetsTheBuyersCategoryUntilAReset()
+    {
+        await Reset();
+        await Ok(await Review(N3, "plastics", "wire_harness"));
+
+        var later = (await Import(LaterN3Xml)).GetProperty("classification");
+
+        Assert.Equal("plastics", later.GetProperty("categoryId").GetString());
+        Assert.Equal("buyer", later.GetProperty("source").GetString());
+        Assert.False(later.GetProperty("aiMapped").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, later.GetProperty("confidence").ValueKind);
+        Assert.Equal("notNeeded", later.GetProperty("review").GetString());
+        var imported = (await Repo.ListAuditAsync(Ctx, 0, 1000, Ct))[^1];
+        Assert.Equal("buyer", imported.Payload["classificationSource"]!.GetValue<string>());
+
+        // A reset forgets the buyer's choices: the same invoice is answered from the AI cache again.
+        await Reset();
+        var fresh = (await Import(LaterN3Xml)).GetProperty("classification");
+        Assert.Equal("wire_harness", fresh.GetProperty("categoryId").GetString());
+        Assert.Equal("cache", fresh.GetProperty("source").GetString());
+        Assert.Equal("pending", fresh.GetProperty("review").GetString());
+        // Nothing was written to the curated cache file.
+        Assert.DoesNotContain("plastics", File.ReadAllText(Path.Combine(TestPaths.SeedDir, "ai-cache.json")));
+    }
+
     [Fact]
     public async Task TheSuppliersLinkStillWorksAfterACorrection()
     {

@@ -114,6 +114,31 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.BuyerClassificationRow", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("LineKey")
+                        .HasColumnType("text")
+                        .HasColumnName("line_key");
+
+                    b.Property<string>("CategoryId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("WorkspaceId", "LineKey")
+                        .HasName("pk_buyer_classifications");
+
+                    b.ToTable("buyer_classifications", (string)null);
+                });
+
             modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.BuyerRow", b =>
                 {
                     b.Property<Guid>("WorkspaceId")

@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using TraceGreen.Domain.Ai;
 using TraceGreen.Domain.Audit;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
 
@@ -21,7 +23,9 @@ public sealed record ClassificationError(ClassificationErrorCode Code, string Me
 /// <see cref="ClassificationReview.Confirmed"/> when the category stayed and <see cref="ClassificationReview.Corrected"/>
 /// when it changed, and a corrected node stays corrected. The write and its <c>classification.reviewed</c> audit entry are
 /// atomic; then <c>node.updated</c> with fresh KPIs and <c>audit.appended</c> are published. Nothing personal is recorded:
-/// the dashboard has no login, so the actor is the role.
+/// the dashboard has no login, so the actor is the role. The same write remembers the category under the dominant line's
+/// description (<see cref="CacheKey"/>), so a later import of that description gets it before the cache and the AI; it is
+/// kept in the repository, never in <c>seed/ai-cache.json</c>, and a demo reset forgets it.
 /// </summary>
 public sealed class ClassificationService(
     IRepository repo, IEventBus bus, SeedBundle seed, NodeViewMapper mapper, GraphService graph, TimeProvider clock)
@@ -46,6 +50,8 @@ public sealed class ClassificationService(
 
         // Normalised like audit timestamps, so the node's reviewedAt equals the entry's ts after any storage round trip.
         var now = AuditChain.Normalize(clock.GetUtcNow());
+        // The node's category is its dominant line's, so that line's description is what the decision is remembered under.
+        var lineKey = CacheKey.Compute(InvoiceFacts.DominantLine(invoice.Extracted.Lines).Description);
         ClassificationWrite Review(SupplierNode current)
         {
             var rebuilt = NodeFactory.NewNode(
@@ -65,7 +71,7 @@ public sealed class ClassificationService(
                 ["fromSource"] = current.ClassificationSource.ToString().ToLowerInvariant(),
                 ["fromConfidence"] = current.AiConfidence?.ToString("R", CultureInfo.InvariantCulture),
             };
-            return new ClassificationWrite(patch, prev => AuditChain.Build(prev, ctx.WorkspaceId, now, ctx.Actor, AuditAction, payload));
+            return new ClassificationWrite(patch, lineKey, prev => AuditChain.Build(prev, ctx.WorkspaceId, now, ctx.Actor, AuditAction, payload));
         }
 
         var written = await repo.ReviewClassificationAsync(ctx, nodeId, expectedCategoryId, Review, ct);

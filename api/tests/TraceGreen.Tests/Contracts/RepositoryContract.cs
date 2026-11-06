@@ -267,10 +267,42 @@ public abstract class RepositoryContract
     }
 
     /// <summary>A reviewer that moves the node to <paramref name="categoryId"/> with fixed figures; the contract tests storage, not math.</summary>
-    private static ClassificationReviewer Reviewer(string categoryId, DateTimeOffset? at = null) => current => new ClassificationWrite(
+    private static ClassificationReviewer Reviewer(string categoryId, DateTimeOffset? at = null, string lineKey = "line-key") => current => new ClassificationWrite(
         new ClassificationPatch(categoryId, "plastics_other", ClassificationSource.Buyer, null, ClassificationReview.Corrected,
             at ?? Now, 777.5m, current.ActivityKg is null ? null : 888.25m),
+        lineKey,
         Audit("classification.reviewed", new JsonObject { ["fromCategoryId"] = current.CategoryId }));
+
+    [Fact]
+    public async Task AReviewRemembersItsCategoryForTheLineKeyUntilAReset()
+    {
+        var repo = await MakeAsync();
+        var key = "line-" + Ids.NewId().ToString("N");
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+
+        await repo.ReviewClassificationAsync(Ctx, N2, "pcb", Reviewer("plastics", lineKey: key), CancellationToken.None);
+        var first = await repo.ListBuyerClassificationsAsync(Ctx, [key, "other-key", key], CancellationToken.None);
+        await repo.ReviewClassificationAsync(Ctx, N2, "plastics", Reviewer("connectors", lineKey: key), CancellationToken.None);
+        var second = await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None);
+        await repo.SeedAsync(Bundle, reset: true, CancellationToken.None);
+
+        Assert.Equal("plastics", Assert.Single(first, kv => kv.Key == key).Value);
+        Assert.Single(first);
+        Assert.Equal("connectors", second[key]);
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [], CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task AStaleReviewRemembersNothing()
+    {
+        var repo = await MakeAsync();
+        var key = "line-" + Ids.NewId().ToString("N");
+
+        await repo.ReviewClassificationAsync(Ctx, N3, "pcb", Reviewer("plastics", lineKey: key), CancellationToken.None);
+
+        Assert.Empty(await repo.ListBuyerClassificationsAsync(Ctx, [key], CancellationToken.None));
+    }
 
     [Fact]
     public async Task SeededNodesCarryTheirReviewState()

@@ -155,10 +155,37 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         }
         var write = review(current);
         Mapping.Apply(nodeRow, write.Patch);
+        var remembered = await db.BuyerClassifications.FirstOrDefaultAsync(b => b.WorkspaceId == ctx.WorkspaceId && b.LineKey == write.LineKey, ct);
+        if (remembered is null)
+        {
+            db.BuyerClassifications.Add(new BuyerClassificationRow
+            {
+                WorkspaceId = ctx.WorkspaceId, LineKey = write.LineKey, CategoryId = write.Patch.CategoryId, UpdatedAt = write.Patch.ReviewedAt.ToUniversalTime(),
+            });
+        }
+        else
+        {
+            remembered.CategoryId = write.Patch.CategoryId;
+            remembered.UpdatedAt = write.Patch.ReviewedAt.ToUniversalTime();
+        }
         var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, write.Audit, ct);
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return new ReviewClassificationResult(ReviewClassificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
+    {
+        if (lineKeys.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        var keys = lineKeys.Distinct(StringComparer.Ordinal).ToList();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.BuyerClassifications.AsNoTracking()
+            .Where(b => b.WorkspaceId == ctx.WorkspaceId && keys.Contains(b.LineKey))
+            .ToListAsync(ct);
+        return rows.ToDictionary(r => r.LineKey, r => r.CategoryId, StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
@@ -256,7 +283,7 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         {
             // Row triggers keep audit_log immutable; TRUNCATE is statement-level and is the one sanctioned reset path (single-tenant demo).
             await db.Database.ExecuteSqlRawAsync(
-                "TRUNCATE TABLE invoices, nodes, verifications, scenarios, audit_log RESTART IDENTITY", ct);
+                "TRUNCATE TABLE invoices, nodes, verifications, scenarios, buyer_classifications, audit_log RESTART IDENTITY", ct);
         }
 
         var alreadySeeded = await db.AuditLog.AnyAsync(a => a.WorkspaceId == workspaceId, ct)

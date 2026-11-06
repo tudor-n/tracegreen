@@ -4,21 +4,24 @@ using TraceGreen.Domain.Seed;
 namespace TraceGreen.Domain.Ai;
 
 /// <summary>
-/// Classifies invoice lines in this order: the invoice's own classification code, the pre-computed cache, then the AI
-/// service under a hard timeout. Whatever the AI answers is checked against the allow-list; whatever it fails to answer
-/// becomes UNCLASSIFIED. This never throws and never blocks longer than <c>timeout</c>, so an import cannot hang on AI.
+/// Classifies invoice lines in this order: the invoice's own classification code, a category the buyer chose for the same
+/// description, the pre-computed cache, then the AI service under a hard timeout. Whatever the AI answers is checked
+/// against the allow-list; whatever it fails to answer becomes UNCLASSIFIED. This never throws and never blocks longer
+/// than <c>timeout</c>, so an import cannot hang on AI.
 /// </summary>
 public static class LineClassification
 {
+    /// <param name="buyerCategories">The buyer's remembered categories by <see cref="CacheKey"/> of the description (F6).</param>
     public static async Task<IReadOnlyList<Classification>> ClassifyLinesAsync(
-        IReadOnlyList<ExtractedLine> lines, IAiClient ai, SeedBundle seed, TimeSpan timeout, CancellationToken ct)
+        IReadOnlyList<ExtractedLine> lines, IAiClient ai, SeedBundle seed, TimeSpan timeout, CancellationToken ct,
+        IReadOnlyDictionary<string, string>? buyerCategories = null)
     {
         var results = new Dictionary<string, Classification>(StringComparer.Ordinal);
         var pending = new List<ClassificationInput>();
 
         foreach (var line in lines)
         {
-            var (categoryId, confidence, source, rationale) = InvoiceClassification.Offline(line, seed);
+            var (categoryId, confidence, source, rationale) = InvoiceClassification.Offline(line, seed, buyerCategories);
             if (source == ClassificationSource.Stub)
             {
                 pending.Add(new ClassificationInput(line.Id, line.Description, line.Quantity, line.UnitCode, line.ClassificationCode, line.ClassificationListId));

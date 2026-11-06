@@ -89,8 +89,12 @@ public sealed record ClassificationPatch(
     decimal SpendKg,
     decimal? ActivityKg);
 
-/// <summary>What a review writes: the node's new classification fields and the audit entry that records the change.</summary>
-public sealed record ClassificationWrite(ClassificationPatch Patch, AuditBuilder Audit);
+/// <summary>
+/// What a review writes: the node's new classification fields, the audit entry that records the change, and the
+/// buyer's category remembered under <see cref="LineKey"/> (the <c>CacheKey</c> of the dominant line's description), so a
+/// later line with the same description gets it before the AI is asked.
+/// </summary>
+public sealed record ClassificationWrite(ClassificationPatch Patch, string LineKey, AuditBuilder Audit);
 
 /// <summary>
 /// Computes a review's write from the node as the repository holds it under the write's lock, so the recomputed figures
