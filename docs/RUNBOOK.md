@@ -60,6 +60,7 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 | Terms page | `terms-page` with `data-phase` and `data-version` |
 | Classification review (F6) | `nav-overview` (the sidebar's Overview link); `overview-checks` with `data-count` (the Overview's counter); `suppliers-filter` and `suppliers-filter-clear` (the filtered list); `node-<id>-check` (the flag on a tree row); `drawer-check` (the flag in the side panel), `drawer-figure`, `drawer-category-source`; `review-control` with `data-review`, `review-line`, `review-confirm`, `review-change`, `review-option-<categoryId>`, `review-error` |
 | Not frozen yet (no spec uses them): chat (F13) | `sidebar-chat` (with `aria-pressed`), `chat-panel`, `chat-input`, `chat-send`, `chat-turn-<n>` with `data-phase`, `chat-answer`, `chat-fact-<factId>`, `chat-suggest-<top|total|confirmed|estimated>`; PDF review (F9) `pdf-review`, `pdf-<field>`, `pdf-line-<n>`, `pdf-line-<n>-<field>`, `pdf-confirm`; simulator `sim-alt-<id>-suggested` (F11) |
+| Not frozen yet (no spec uses them): supplier trust (F7) | Overview `overview-answers` with `data-count`, `kpi-at-risk`; tree `node-<id>-answers-check`; side panel `drawer-answers-check`, `drawer-warning-<code>`, `figures`, `figures-estimate`, `figures-claimed`, `figures-counted`, `figures-target`, `target-change`, `target-mode`, `target-energy`, `target-alternative`, `target-save`, `target-reset`, `target-error`, `trust-control` with `data-band` and `data-score`, `trust-at-risk`, `trust-claim-<kind>` with `data-level`, `trust-accept-<kind>`, `trust-reject-<kind>`, `trust-why`, `trust-signal-<code>`, `trust-error`, `records-open`, `records-demo`, `records-received`, `records-border`, `records-mrn`, `records-save`, `records-error`; `suppliers-filter` with `data-filter="answers"`; phone page `verify-proof-toggle`, `verify-proof-doc-type`, `verify-proof-doc-id`, `verify-proof-dispatch`, `verify-proof-cert-type`, `verify-proof-cert-id`, `verify-proof-error` (with `data-field`), `verify-proof-refused`, `verify-proof-demo`, `verify-proof-demo-tag`, and the same under `delivery-<nodeId>-proof-…` on the supplier page list |
 | Supplier page list (F12) | `supplier-page` with `data-phase` and `data-result`; `delivery-<nodeId>` with `data-status`; `delivery-<nodeId>-open`, `delivery-<nodeId>-transport-<mode>` and `delivery-<nodeId>-energy-<source>` with `aria-pressed`, `delivery-<nodeId>-confirm`; `supplier-terms` (the page's one terms checkbox, shown while a delivery is open for answers) and `supplier-terms-link` |
 
 ## Demo laptop (production images)
@@ -84,7 +85,7 @@ Reset to the demo start state at any time with the "Reset demo" button (or `POST
 
 ## Demo steps (F1–F4)
 
-The main demo path, with what each screen shows. The figures were read off the screens of the Compose stack on 2026-11-06, with the DESNZ 2026 factor rows and the carbon price of €90.01 per tonne (T4); every figure comes from the API, so both data modes and the demo image show the same ones. If a factor, a lane or the carbon price changes, read the figures again and change this section, never the data (D5).
+The main demo path, with what each screen shows. The figures were read off the screens of the Compose stack on 2026-11-06 and recomputed to two decimals from the API on 2026-11-07, with the DESNZ 2026 factor rows and the carbon price of €90.01 per tonne (T4); every figure comes from the API, so both data modes and the demo image show the same ones. If a factor, a lane or the carbon price changes, read the figures again and change this section, never the data (D5).
 
 **Before the demo**
 
@@ -94,13 +95,13 @@ The main demo path, with what each screen shows. The figures were read off the s
 
 **Steps**
 
-1. **Overview, the seed.** Transilvania Electro-Assembly SRL has four deliveries. The total is 32.4 tCO₂e, "From 4 deliveries · €83,500 spend", and the supplier-confirmed share is 70 %, "by emissions, not by node count" (the split reads 30 % estimated, 70 % supplier-confirmed). The next step reads "ask Oradea Harness SRL to confirm".
+1. **Overview, the seed.** Transilvania Electro-Assembly SRL has four deliveries. The total is 32.36 tCO₂e, "From 4 deliveries · €83,500 spend", and the supplier-confirmed share is 70 %, "by emissions, not by node count" (the split reads 30 % estimated, 70 % supplier-confirmed). The next step reads "ask Oradea Harness SRL to confirm".
 2. **Import the Shenzhen invoice.** Use "Load demo invoice" in the sidebar, or Import → `seed/invoices/N1-shenzhen.xml`.
-   - On Overview, the total goes to 54.9 tCO₂e, "From 5 deliveries · €131,500 spend". The confirmed share falls to 41 %, so one unconfirmed invoice cuts it by almost half. The next step now reads "ask Shenzhen Diecast Co. to confirm".
-   - On Suppliers, Shenzhen Diecast Co. arrives amber ("Estimated") at 22.6 tCO₂e. It is second in the tree, just below Taiwan PCB Ltd. ("Supplier-confirmed · largest emitter", also 22.6 tCO₂e). Taiwan PCB is 34 kg larger (22,596.5 kg against 22,562.8 kg), so the hotspot stays on it.
+   - On Overview, the total goes to 54.93 tCO₂e, "From 5 deliveries · €131,500 spend". The confirmed share falls to 41 %, so one unconfirmed invoice cuts it by almost half. The next step now reads "ask Shenzhen Diecast Co. to confirm".
+   - On Suppliers, Shenzhen Diecast Co. arrives amber ("Estimated") at 22.56 tCO₂e. It is second in the tree, just below Taiwan PCB Ltd. ("Supplier-confirmed · largest emitter", 22.60 tCO₂e), which is 34 kg larger, so the hotspot stays on it.
    - Say that the new invoice is as large as the biggest emitter and that, unlike it, nobody has confirmed it. Don't say the import becomes the largest emitter: that was true with the placeholder factors, not since T4 (`docs/NEXT.md`, "Sourced factors (T4)").
 3. **Open it.** Use "Open supplier" on Overview, or click the row. Summary shows:
-   - 22.6 tCO₂e;
+   - 22.56 tCO₂e;
    - "Spend-based estimate · US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (…)";
    - "High uncertainty".
 
@@ -110,21 +111,49 @@ The main demo path, with what each screen shows. The figures were read off the s
    - "Trimite" (submit) stays disabled until the box accepting the supplier terms is ticked. Tick it, then submit.
    - The phone thanks the supplier. It also asks them to reconfirm, without blocking the answer, because air is unusual for such a heavy delivery (`AIR_HEAVY`).
 5. **The dashboard updates within 2 s.** Shenzhen Diecast Co. turns green and shows:
-   - "Supplier-confirmed", 17.1 tCO₂e;
+   - "Supplier-confirmed", 17.15 tCO₂e;
    - "Supplier-confirmed · DESNZ UK GHG conversion factors 2026";
    - "Low uncertainty";
-   - "Spend-based estimate before confirmation: 22.6 tCO₂e", and the answers (Air, Grid electricity).
+   - "Spend-based estimate before confirmation: 22.56 tCO₂e", and the answers (Air, Grid electricity).
 
-   The total drops to 49.5 tCO₂e and the confirmed share rises to 80 %. Opening the same link again on the phone says it was already used.
+   The total drops to 49.51 tCO₂e and the confirmed share rises to 80 %. Opening the same link again on the phone says it was already used.
 6. **What if.** Open the What if tab. Air is marked "now"; Road is greyed out, because this lane has no road leg.
-   - **Sea:** "Win-win": 8.6 tCO₂e (−8.6 t), €48,690 (−€3,910), 40 days (+33 days), abatement cost −€456 per tCO₂e. It is cheaper and cleaner, but takes a month longer.
-   - **Cluj Metal Works SRL** (the alternative supplier, in Romania, by road): "Premium option": 8.0 tCO₂e (−9.1 t), €57,040 (+€4,440), 2 days (−5 days). Its abatement cost of €486 per tCO₂e is above the EU carbon price of €90.01 per tonne (the primary auction of 5 Nov 2026).
+   - **Sea:** "Win-win": 8.58 tCO₂e (−8.57 t), €48,690 (−€3,910), 40 days (+33 days), abatement cost −€456 per tCO₂e. It is cheaper and cleaner, but takes a month longer.
+   - **Cluj Metal Works SRL** (the alternative supplier, in Romania, by road): "Premium option": 8.02 tCO₂e (−9.13 t), €57,040 (+€4,440), 2 days (−5 days). Its abatement cost of €486 per tCO₂e is above the EU carbon price of €90.01 per tonne (the primary auction of 5 Nov 2026).
    - Cost, lead time and abatement cost carry the "illustrative" tag; say so. Press "Apply". The result reads "Saved", and the supplier stays as it is.
 7. **Audit log.** Press "Verify chain". It reads "Chain valid, 6 entries checked". From the newest down: the supplier's answer, the link request, the import, then the three seed entries.
 
+**Supplier trust (F7), the "how do you know?" question.** The demo image runs with demo tools (`DEMO_TOOLS=1` in `.env.demo`), so both sides offer "Fill demo values": fictional codes in a valid shape, tagged "demo values" on screen, never shown without demo tools.
+
+*On the stage answer above.* Summary shows three tiles:
+
+- Estimate 22.56.
+- From supplier 17.15.
+- Best possible, sea with renewable power.
+
+The card "Trust in the answers" reads "Well backed · 80/100". Air on an air lane lowers nothing, so there is nothing to back. "Why this score" lists what took points off:
+
+- "Answered within two minutes of the link": the presenter made it.
+- "The seller's tax id fails its check": the seed's ids are fictional.
+
+*To show the case of a supplier in China:*
+
+1. **The phone.** Answer step 4 with **Maritim** (sea) and grid. Leave "Adăugați o dovadă" closed.
+2. **The dashboard.** N1 turns green, but the "From supplier" tile stays at 17.15, now with "answered 8.58 t" under it: sea is not backed yet, so the lane's default, air, counts.
+   - The card reads "Needs a check".
+   - The transport answer reads "Not backed yet".
+   - The row and the panel show "Check answers".
+   - The Overview shows "1 supplier answer to check".
+3. **Your records.** In the card, press "Add your records", then "Fill demo values", then "Save records". This puts in a receipt date, sea at the border and a demo MRN, as from the buyer's own customs declaration. The transport answer now "Matches your records", and the tile drops to 8.58.
+4. **A contradiction.** Change "Customs: mode at border" to Air and save again. The answer is "Contradicted", the score falls to 25 or below, and the figure goes back to 17.15.
+
+*Proof from the phone instead.* Open "Adăugați o dovadă (opțional)" and press "Completați cu valori demo". It fills the container number `TGNU1001004`, which has a valid check digit, and the dispatch date. Send: the answer counts at once as "Backed by a document". Change one digit to show the check refusing it before it is sent.
+
+After a Sea answer, the What if steps start from Sea.
+
 **If the phone step fails**, skip steps 4 and 5, because the simulator also works on the estimate:
-- Sea is still "Win-win": −14.0 t, −€3,910, +33 days, −€280 per tCO₂e.
-- Cluj Metal Works SRL is still "Premium option": −14.5 t, +€4,440, −5 days, €305 per tCO₂e.
+- Sea is still "Win-win": −13.98 t, −€3,910, +33 days, −€280 per tCO₂e.
+- Cluj Metal Works SRL is still "Premium option": −14.54 t, +€4,440, −5 days, €305 per tCO₂e.
 
 To hand over to the second phone, see "Handing over to the second phone" above.
 

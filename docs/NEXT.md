@@ -91,7 +91,7 @@ Checked over HTTP in Postgres mode (`tracegreen_test`) and through `TestWebAppFa
 
 "Simulate" in the node drawer opens the panel. A mode button or an alternative-supplier button calls `POST /api/simulate`; the answer becomes the store's `scenarioPreview` (UI state, next to the domain nodes, never inside them), which both the panel and the ghost node on the canvas render. Every figure, delta, the MAC and the badge are the API's; the SPA only formats them. "Apply" calls `POST /api/scenarios` and marks the preview saved from the answer.
 
-To see both badge states: Reset demo → Load demo invoice → click Shenzhen Diecast Co. → Simulate → **Sea** shows `Win-win` (−14.0 t, −€3,910, +33 days); **Cluj Metal Works SRL** shows `Premium option` (€305 per tCO₂e). After a verification by air the badges are the same (deltas −8.6 t and −9.1 t; €486 per tCO₂e). Figures since the DESNZ 2026 rows and the 90.01 carbon price (2026-11-06); before them the deltas read −15.1 t and €284.
+To see both badge states: Reset demo → Load demo invoice → click Shenzhen Diecast Co. → Simulate → **Sea** shows `Win-win` (−13.98 t, −€3,910, +33 days); **Cluj Metal Works SRL** shows `Premium option` (€305 per tCO₂e). After a verification by air the badges are the same (deltas −8.57 t and −9.13 t; €486 per tCO₂e; two decimals since 2026-11-07). Figures since the DESNZ 2026 rows and the 90.01 carbon price (2026-11-06); before them the deltas read −15.1 t and €284.
 
 Decisions behind it: `docs/DECISIONS.md`, "Simulator panel, slice 5 (B5)".
 
@@ -334,6 +334,55 @@ A buyer cannot miss an unreviewed AI category, and confirms or changes one in tw
 Checked on 2026-11-06 on a Compose stack from this branch (Vite dev server): `pnpm typecheck`, `pnpm lint` and `pnpm test` (283 tests) pass; `pnpm e2e` passes with the API on Postgres and in memory mode, the demo path now with a tenth step (step 8, the review); 362 .NET tests pass in memory mode. By hand in headless Chromium: the counter, the filtered list, keyboard use of the choices, the figure moving from 2.9 t to 0.6 t when N4 becomes Printed circuit boards, the 390 px phone layout, no console errors, and the 409 path with the event stream blocked (the message, then the category set elsewhere on screen). Not run locally: the smoke on the demo image (CI's e2e job runs it).
 
 Open for Dev C: the wording of every new string, the Romanian set (the dashboard has no language switch), "Correct" (read as "this is correct", and it could be read as "fix it"), and the juror line "every AI-mapped category waits for a person to confirm or change it", which lives outside the repository.
+
+## Supplier trust (F7, 2026-11-06)
+
+What a supplier's answer must have before its reduction counts, and how a person reviews it. The model, the brainstorm of every check and the stages: `docs/TRUST.md`. Decisions: `DECISIONS.md`, "Supplier trust (F7)".
+
+Built on `f7/supplier-trust`:
+
+- **The trust model** (`Domain/Trust/`). `TrustAssessor` gives each answer an evidence level, the counted figure (each reduction nothing backs yet replaced by its fallback), the kilograms at risk and a 0–100 score with its signals. `NodeFactory` stores the counted figure, and `NodeViewMapper` explains it with the same call. Constants are in `TrustPolicy`; check digits in `DocumentIds` (container, air waybill) and `TaxIds` (RO, CN, TW).
+- **Plausibility.** `SEA_TOO_FAST` is now evaluated, from the supplier's dispatch date and the buyer's receipt date. `MASS_BELOW_INVOICE` is new.
+- **Wire contract:**
+  - `NodeView` gains `figures {estimateKg, claimedKg, countedKg, target}`, `trust {score, band, kgAtRisk, needsReview, claims, signals}` and `evidence`.
+  - `Kpis` gains `kgAtRisk`.
+  - `VerifyRequest` and `PortalAnswerRequest` take an optional `evidence`.
+  - New routes: `POST /api/nodes/{id}/receipt`, `POST /api/nodes/{id}/claims/{kind}` and `PUT /api/nodes/{id}/target`.
+  - New problem codes: `InvalidRecord`, `NoClaim` and `ClaimChanged`.
+  - New audit actions: `receipt.recorded`, `claim.reviewed` and `target.set`. `verification.submitted` also records the evidence and the score.
+- **Storage.** Migration `Trust`: `nodes.trust_json`, `counted_kg`, `target_json` and `verifications.evidence_json`, all nullable. Both repositories pass the contract, `UpdateTrustAsync` included. `LinkOriginStore` keeps the keyed hash of who made each link, in memory.
+- **The dashboard:**
+  - the three figures and target editing in the side panel (`NodeFigures`);
+  - the score, the claims with Accept / Reject, and the signals (`TrustReview`);
+  - on the Details tab, the evidence and the buyer's records;
+  - the plausibility warnings as chips;
+  - "Check answers" on the row and in the panel;
+  - the Overview's "answers to check" counter and the "not backed yet" KPI line;
+  - `/suppliers?filter=answers`, the most kilograms at risk first.
+- **The supplier pages.** An optional "Add proof" section on `/verify` and on each `/supplier` delivery: one number field for the usual document of the chosen mode (another type one tap away), inline check-digit feedback, the dispatch date, and a certificate for renewable power. Refused proof (422 `InvalidEvidence`) keeps the answers. The two-tap path is unchanged.
+- **Demo autofill (2026-11-07).** "Fill demo values" on the phone page, the supplier page and the buyer's records puts in fictional codes from `web/src/lib/demo-samples.ts`: a valid container number, waybill, CMR, MRN and certificate ids. It is tagged "demo values" and shown only while `/api/health` reports `demoTools`.
+
+Demo effects (D5: reported, never tuned):
+
+- **No figure on the demo path moves.** N1 answers air + grid on an air lane; N2's sea and N5's road answers are their lanes' defaults. The hotspot ring, the badges and the KPIs stay as they were (`SeedNodesKeepTheirFigures`).
+- **New signals on the stage answer.**
+  - N1's answer shows "answered within two minutes of the link", since the presenter makes the link and answers at once.
+  - N1's and N2's fictional seller ids fail their checks, which costs 10 points each.
+  - N1 then reads about 80, "well backed", with nothing to back. Say so on stage: the score looks at how the answer arrived, and air on an air lane lowers nothing.
+- **The "same network" signal needs real client addresses.** Behind Vite or nginx the API reads them from `X-Forwarded-For` (`TRUSTED_PROXIES`). A phone on the hotspot keeps its own address. A browser on the laptop, and the Playwright run, can share Docker's gateway address with the dashboard, so their answers get "answered from the network the link was made on" (−20 points, no figure change). Check with the RUNBOOK's 429 row if every answer shows it.
+- **`supplier-portal.spec.ts`.** N3's road + renewable answer has no certificate, so N3 counts grid power. Its figure is above the answered one, and it appears in "answers to check". The spec asserts the status only.
+
+Left (stage S2 in `TRUST.md`, in order):
+
+1. Random follow-up requests for the documents behind documented claims.
+2. Incoterms and the delivery place from the invoice (A4, A5): this changes `ExtractedInvoice`, so every invoice hash; reset the demo after it.
+3. The forwarder's invoice as a second document (A6).
+4. The customs gross mass (C2).
+5. The "your role" and "how do you know?" taps (D6).
+6. A Supplier Terms line that the buyer may ask for the document: a new terms version.
+7. A person sets the constants in `TrustPolicy.cs`. They are policy, not factor data.
+
+Registry and carrier lookups are S3: they need the network and keys.
 
 ## Seed XML validation (2026-10-23)
 
