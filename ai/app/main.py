@@ -18,13 +18,17 @@ from app.config import (
     Settings,
     settings,
 )
+from app.extract import build_extractor
 from app.models import ModelFactory, chat_model_factory
+from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
 from app.schemas import (
     ChatRequest,
     ChatResponse,
     ClassifyRequest,
     ClassifyResponse,
+    ExtractRequest,
+    ExtractResponse,
     HealthResponse,
     ModelHealth,
     SuggestRequest,
@@ -64,6 +68,7 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
     factory = model_factory or chat_model_factory(config)
     suggester = build_suggester(config, factory)
     chat_task = build_chat(config, factory)
+    extractor = build_extractor(config, factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
 
     @app.get("/health", response_model=HealthResponse)
@@ -108,9 +113,24 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         # the values in. No model, or no valid answer, says the question was not answered.
         return chat_task.answer(request)
 
-    @app.post("/extract-pdf")
-    def extract_pdf() -> None:
-        raise HTTPException(status_code=501, detail="PDF extraction is not implemented (F9).")
+    @app.post("/extract-pdf", response_model=ExtractResponse)
+    def extract_pdf(request: ExtractRequest) -> ExtractResponse:
+        # F9: the PDF's text layer, then a model copies its fields into the draft. A refused
+        # PDF is 422 with a code; no model, or none that answered, is 503. Nothing is imported.
+        try:
+            data = decode(request.pdf_base64)
+            text, pages = text_of(data)
+        except PdfRefused as refused:
+            raise HTTPException(
+                status_code=422, detail={"code": refused.code, "message": str(refused)}
+            ) from None
+        draft = extractor.extract(text, pages=pages)
+        if draft is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "unavailable", "message": "No model could read the invoice."},
+            )
+        return draft
 
     return app
 
