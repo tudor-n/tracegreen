@@ -15,7 +15,7 @@ Where every emission factor in `seed/factors.json`, and the carbon price behind 
 - `year` is the year of the source edition (2026 for DESNZ 2026). When the data describe an earlier year, the "data year" column says so.
 - The "i" icon next to every number shows the row's `source`, `year` and `rowLabel`, so a placeholder row shows the word PLACEHOLDER on screen. That is intended until T4 lands; do not hide it.
 - `scripts/preflight.mjs` (C6) fails while any `source` in `factors.json` contains PLACEHOLDER, while the carbon price below has no source and date, and while this file and `factors.json` disagree. An unset variable cannot be the test for the price, because `AppConfig` falls back to 70 when it is empty. So `v0.9-prehack` cannot be tagged on placeholder data.
-- If the real rows change a demo badge (D5), report it in `docs/NEXT.md` and change what the demo script says. Lanes, masses and prices are never adjusted to bring a badge back.
+- If the real rows change a demo badge (D5), report it in `docs/NEXT.md` and change what the demo script says (`docs/RUNBOOK.md`, "Demo steps (F1–F4)"). Lanes, masses and prices are never adjusted to bring a badge back.
 - Once the rows are confirmed, `seed/factors.json` is updated from this file in one PR, together with the tests that pin numbers derived from it.
 
 ## Transport

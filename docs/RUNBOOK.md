@@ -78,6 +78,52 @@ Reset to the demo start state at any time with the "Reset demo" button (or `POST
 - `scripts/firewall.ps1` adds one inbound rule, "TraceGreen demo (TCP 3000)", for TCP 3000 from the local subnet on every network profile (Windows often files a Mobile Hotspot network as Public). It needs an elevated PowerShell; if the execution policy blocks it, run `powershell -ExecutionPolicy Bypass -File scripts/firewall.ps1`. Running it twice changes nothing, and `-Remove` deletes the rule after the demo.
 - The Playwright smoke runs against the demo image too: `docker compose -f compose.yml -f compose.demo.yml up --build -d`, then `cd web && pnpm e2e`. Its last step fails on any Content Security Policy violation the browser reports, on the dashboard or on the phone page. To go back to development afterwards, run `docker compose build` before `docker compose up -d --remove-orphans`, because the demo build reuses the image names.
 
+## Demo steps (F1–F4)
+
+The main demo path, with what each screen shows. The figures were read off the screens of the Compose stack on 2026-11-06, with the DESNZ 2026 factor rows and the carbon price of €90.01 per tonne (T4); every figure comes from the API, so both data modes and the demo image show the same ones. If a factor, a lane or the carbon price changes, read the figures again and change this section, never the data (D5).
+
+**Before the demo**
+
+- Set up the laptop as described in "Demo laptop" above. `node scripts/demo-check.mjs` passes, and the dashboard is open at the LAN URL, not `localhost`.
+- The phone is on the hotspot, and the second phone too, as the fallback.
+- Press "Reset demo".
+
+**Steps**
+
+1. **Overview, the seed.** Transilvania Electro-Assembly SRL has four deliveries. The total is 32.4 tCO₂e, "From 4 deliveries · €83,500 spend", and the supplier-confirmed share is 70 %, "by emissions, not by node count" (the split reads 30 % estimated, 70 % supplier-confirmed). The next step reads "ask Oradea Harness SRL to confirm".
+2. **Import the Shenzhen invoice.** Use "Load demo invoice" in the sidebar, or Import → `seed/invoices/N1-shenzhen.xml`.
+   - On Overview, the total goes to 54.9 tCO₂e, "From 5 deliveries · €131,500 spend". The confirmed share falls to 41 %, so one unconfirmed invoice cuts it by almost half. The next step now reads "ask Shenzhen Diecast Co. to confirm".
+   - On Suppliers, Shenzhen Diecast Co. arrives amber ("Estimated") at 22.6 tCO₂e. It is second in the tree, just below Taiwan PCB Ltd. ("Supplier-confirmed · largest emitter", also 22.6 tCO₂e). Taiwan PCB is 34 kg larger (22,596.5 kg against 22,562.8 kg), so the hotspot stays on it.
+   - Say that the new invoice is as large as the biggest emitter and that, unlike it, nobody has confirmed it. Don't say the import becomes the largest emitter: that was true with the placeholder factors, not since T4 (`docs/NEXT.md`, "Sourced factors (T4)").
+3. **Open it.** Use "Open supplier" on Overview, or click the row. Summary shows:
+   - 22.6 tCO₂e;
+   - "Spend-based estimate · US EPA Supply Chain GHG Emission Factors v1.3, NAICS-6 (…)";
+   - "High uncertainty".
+
+   Press "Request data". The QR code appears with its printed URL, and the localhost warning must not show.
+4. **The supplier answers on the phone.** Scan the QR code. The page opens in Romanian ("Confirmați livrarea"; the "English" button switches it) and shows the delivery: Shenzhen Diecast Co., zinc die-cast sensor housings, invoice SDC-2026-1028, Shenzhen → Sibiu.
+   - Tap "Aerian" (air) and "Rețeaua electrică" (grid electricity).
+   - "Trimite" (submit) stays disabled until the box accepting the supplier terms is ticked. Tick it, then submit.
+   - The phone thanks the supplier. It also asks them to reconfirm, without blocking the answer, because air is unusual for such a heavy delivery (`AIR_HEAVY`).
+5. **The dashboard updates within 2 s.** Shenzhen Diecast Co. turns green and shows:
+   - "Supplier-confirmed", 17.1 tCO₂e;
+   - "Supplier-confirmed · DESNZ UK GHG conversion factors 2026";
+   - "Low uncertainty";
+   - "Spend-based estimate before confirmation: 22.6 tCO₂e", and the answers (Air, Grid electricity).
+
+   The total drops to 49.5 tCO₂e and the confirmed share rises to 80 %. Opening the same link again on the phone says it was already used.
+6. **What if.** Open the What if tab. Air is marked "now"; Road is greyed out, because this lane has no road leg.
+   - **Sea:** "Win-win": 8.6 tCO₂e (−8.6 t), €48,690 (−€3,910), 40 days (+33 days), abatement cost −€456 per tCO₂e. It is cheaper and cleaner, but takes a month longer.
+   - **Cluj Metal Works SRL** (the alternative supplier, in Romania, by road): "Premium option": 8.0 tCO₂e (−9.1 t), €57,040 (+€4,440), 2 days (−5 days). Its abatement cost of €486 per tCO₂e is above the EU carbon price of €90.01 per tonne (the primary auction of 5 Nov 2026).
+   - Cost, lead time and abatement cost carry the "illustrative" tag; say so. Press "Apply". The result reads "Saved", and the supplier stays as it is.
+7. **Audit log.** Press "Verify chain". It reads "Chain valid, 6 entries checked". From the newest down: the supplier's answer, the link request, the import, then the three seed entries.
+
+**If the phone step fails**, skip steps 4 and 5, because the simulator also works on the estimate:
+- Sea is still "Win-win": −14.0 t, −€3,910, +33 days, −€280 per tCO₂e.
+- Cluj Metal Works SRL is still "Premium option": −14.5 t, +€4,440, −5 days, €305 per tCO₂e.
+
+To hand over to the second phone, see "Handing over to the second phone" above.
+
 ## Running services on the host instead
 
 - API: .NET 10 SDK on `PATH` (see `api/global.json`), then `cd api && dotnet run --project src/TraceGreen.Api`. Without `DATABASE_URL` it runs in memory mode with the seed loaded.
