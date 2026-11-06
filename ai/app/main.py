@@ -10,6 +10,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
+from app.chat import build_chat
 from app.config import (
     API_CHAT_TIMEOUT_S,
     API_EXTRACT_TIMEOUT_S,
@@ -20,6 +21,8 @@ from app.config import (
 from app.models import ModelFactory, chat_model_factory
 from app.providers import build_chain
 from app.schemas import (
+    ChatRequest,
+    ChatResponse,
     ClassifyRequest,
     ClassifyResponse,
     HealthResponse,
@@ -60,6 +63,7 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
     # model is first called.
     factory = model_factory or chat_model_factory(config)
     suggester = build_suggester(config, factory)
+    chat_task = build_chat(config, factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
 
     @app.get("/health", response_model=HealthResponse)
@@ -97,6 +101,12 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         # F11: a pick among the curated candidates the API sends, never a new supplier or a
         # figure; no model or no valid answer gives none, and the API shows the list as it is.
         return suggester.suggest(request)
+
+    @app.post("/chat", response_model=ChatResponse)
+    def chat(request: ChatRequest) -> ChatResponse:
+        # F13: a sentence that cites the API's facts by id; the API checks it again and fills
+        # the values in. No model, or no valid answer, says the question was not answered.
+        return chat_task.answer(request)
 
     @app.post("/extract-pdf")
     def extract_pdf() -> None:

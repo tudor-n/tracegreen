@@ -89,6 +89,31 @@ class SuggestResponse(Wire):
     provider: str = "stub"
 
 
+class ChatFact(Wire):
+    """A fact the chat may cite (Domain/Ai/ChatFactInput): its id, what it is about and its
+    value as the prompt shows it. Built by the API from its own data; names in it come from
+    invoices, so it is data, never instructions."""
+
+    id: str
+    about: str
+    value: str
+
+
+class ChatRequest(Wire):
+    question: str
+    history: list[str] = []
+    facts: list[ChatFact] = []
+
+
+class ChatResponse(Wire):
+    """A sentence with {{id}} placeholders and the ids it cites, or answerable false."""
+
+    answerable: bool
+    text: str
+    fact_ids: list[str]
+    provider: str = "stub"
+
+
 class ModelHealth(Wire):
     """One AI_MODELS entry: `reason` says why a model is not ready, e.g. a missing key."""
 
