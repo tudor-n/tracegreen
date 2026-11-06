@@ -41,6 +41,9 @@ class ModelSpec:
     # the model's own limit. Applied to Ollama models (num_predict), so a confused local model
     # stops in seconds instead of writing until its cap.
     max_tokens: int | None = None
+    # A task's own effort for the Claude models that take one (the chat: ANTHROPIC_CHAT_EFFORT);
+    # None: ANTHROPIC_EFFORT.
+    effort: str | None = None
 
     @property
     def id(self) -> str:
@@ -76,6 +79,9 @@ class Settings:
     # 5.5 and Opus 5.5 always think, at high and medium effort when none is sent, which is slow
     # for the 4 s cap; these tasks' answers are short, so low is the default.
     anthropic_effort: str = "low"
+    # ANTHROPIC_CHAT_EFFORT: the same for the chat, whose answer reasons over the whole fact list
+    # (which supplier is larger, which what-if lowers what) within a 12 s cap; medium by default.
+    anthropic_chat_effort: str = "medium"
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
@@ -127,6 +133,7 @@ class Settings:
             ollama_discover=_flag(source, "OLLAMA_DISCOVER", default="1"),
             ollama_keep_alive=_text(source, "OLLAMA_KEEP_ALIVE") or "30m",
             anthropic_effort=_effort(source, "ANTHROPIC_EFFORT", "low"),
+            anthropic_chat_effort=_effort(source, "ANTHROPIC_CHAT_EFFORT", "medium"),
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
             openai_api_key=keys["OPENAI_API_KEY"],

@@ -168,6 +168,15 @@ def test_the_chat_can_be_kept_on_its_own_models_with_a_longer_cap() -> None:
     assert fakes.specs[0].timeout_s == 11
 
 
+def test_the_chat_asks_its_models_at_the_chat_effort() -> None:
+    fakes = ChatFakes({"openai:model-a": answer("{{S1.name}}.")})
+
+    ask(fakes)
+    assert fakes.specs[0].effort == "medium"
+    ask(fakes, env={"ANTHROPIC_CHAT_EFFORT": "high"})
+    assert fakes.specs[-1].effort == "high"
+
+
 def test_without_a_model_or_facts_nothing_is_asked() -> None:
     fakes = ChatFakes({})
 

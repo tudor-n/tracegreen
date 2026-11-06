@@ -9,6 +9,7 @@ something about the data must."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import re
@@ -404,6 +405,9 @@ def build_chat(
     Ollama server's models, which a person may pick."""
 
     def bind(specs: Sequence[ModelSpec]) -> list[LazyModel]:
+        # The chat's own effort for the Claude models (ANTHROPIC_CHAT_EFFORT): its answer reasons
+        # over every fact, within 12 s where classification has 4.
+        specs = [dataclasses.replace(spec, effort=config.anthropic_chat_effort) for spec in specs]
         return bind_models(
             specs,
             factory,

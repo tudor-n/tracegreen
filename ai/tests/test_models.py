@@ -14,6 +14,7 @@ import time
 import warnings
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -704,8 +705,22 @@ def test_a_claude_model_that_takes_an_effort_gets_anthropic_effort(
 
 def test_anthropic_effort_must_be_a_level_the_api_knows() -> None:
     assert settings().anthropic_effort == "low"
+    assert settings().anthropic_chat_effort == "medium"
     with pytest.raises(ValueError, match="ANTHROPIC_EFFORT"):
         settings(ANTHROPIC_EFFORT="fast")
+    with pytest.raises(ValueError, match="ANTHROPIC_CHAT_EFFORT"):
+        settings(ANTHROPIC_CHAT_EFFORT="fast")
+
+
+def test_a_task_effort_on_the_spec_replaces_anthropic_effort() -> None:
+    config = settings(AI_MODELS="anthropic:claude-sonnet-5-5", ANTHROPIC_API_KEY="test-key")
+    (spec,) = config.models
+    schema = answer_schema(load_categories(SEED))
+    runnable = chat_model_factory(config)(replace(spec, effort="medium"), schema)
+    binding = runnable.first
+    kwargs = {k: v for k, v in binding.kwargs.items() if not k.startswith("ls_")}
+    payload = binding.bound._get_request_payload(request_messages(), **kwargs)
+    assert payload["output_config"]["effort"] == "medium"
 
 
 def test_the_openai_request_is_a_strict_json_schema_at_temperature_0() -> None:
