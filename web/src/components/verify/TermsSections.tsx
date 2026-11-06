@@ -4,15 +4,15 @@ import type { TermsSection } from '@/api/client'
 
 export function TermsSections({ sections }: { sections: TermsSection[] }) {
   return (
-    <ol className="flex flex-col gap-4">
+    <ol className="flex flex-col gap-6">
       {sections.map((section) => (
-        <li key={section.number} className="flex flex-col gap-1.5">
-          <h3 className="text-base font-semibold">
+        <li key={section.number} className="flex flex-col gap-2">
+          <h3 className="text-[17px] font-semibold tracking-[-0.015em]">
             {section.number}. {section.heading}
           </h3>
           {section.paragraphs.map((paragraph, i) => (
             // A published version's paragraphs never move, so their position is a stable key.
-            <p key={`${section.number}.${i}`} className="text-base leading-relaxed">
+            <p key={`${section.number}.${i}`} className="text-[15px] leading-relaxed text-ink-2">
               {paragraph}
             </p>
           ))}

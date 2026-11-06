@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import type { SupplierTerms as Terms } from '@/api/client'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { LanguageHeader } from '@/components/verify/LanguageHeader'
 import { ResultMessage } from '@/components/verify/ResultMessage'
@@ -41,40 +42,43 @@ export default function SupplierTerms() {
       data-testid="terms-page"
       data-phase={load.phase}
       data-version={load.phase === 'ready' ? load.terms.version : undefined}
-      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 px-4 py-5"
+      className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 px-4 pt-3 pb-10"
     >
       <LanguageHeader lang={lang} className="print:hidden" />
 
       {load.phase === 'loading' && (
-        <p role="status" aria-busy="true" className="py-16 text-center text-lg text-muted-foreground">
+        <p role="status" aria-busy="true" className="flex flex-col items-center gap-4 py-24 text-center text-[17px] text-muted-foreground">
+          <Wordmark size={28} variant="loader" label={null} />
           {copy.termsPage.loading}
         </p>
       )}
 
       {load.phase === 'failed' && (
         <ResultMessage tone="retry" title={copy.termsPage.failed.title} body={copy.termsPage.failed.body}>
-          <Button className="mt-2 h-14 w-full rounded-xl text-lg" onClick={() => setLoad({ phase: 'loading' })}>
+          <Button className="mt-2 h-[52px] w-full text-[17px]" onClick={() => setLoad({ phase: 'loading' })}>
             {copy.retry}
           </Button>
         </ResultMessage>
       )}
 
       {load.phase === 'ready' && (
-        <article className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">{load.terms[lang].title}</h1>
-            <p className="text-sm text-muted-foreground">{copy.terms.version(load.terms.version)}</p>
-            <p className="text-sm break-all text-muted-foreground">
-              {copy.termsPage.fingerprint}: <span className="font-mono">{load.terms.sha256}</span>
+        <article className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1.5 px-1">
+            <h1 className="font-display text-[28px] leading-tight font-bold tracking-[-0.025em]">{load.terms[lang].title}</h1>
+            <p className="text-[13px] text-muted-foreground">{copy.terms.version(load.terms.version)}</p>
+            <p className="text-[13px] break-all text-muted-foreground">
+              {copy.termsPage.fingerprint}: <span className="font-mono text-[12px]">{load.terms.sha256}</span>
             </p>
           </div>
-          <ul className="flex list-disc flex-col gap-1.5 pl-5 text-base">
+          <ul className="flex list-disc flex-col gap-2 rounded-[18px] bg-card py-4 pr-5 pl-9 text-[15px] leading-relaxed shadow-card marker:text-verified print:shadow-none">
             {load.terms[lang].keyPoints.map((point) => (
               <li key={point}>{point}</li>
             ))}
           </ul>
-          <TermsSections sections={load.terms[lang].sections} />
-          <Button className="h-14 w-full rounded-xl text-lg print:hidden" onClick={() => window.print()}>
+          <div className="rounded-[18px] bg-card p-6 shadow-card print:p-0 print:shadow-none">
+            <TermsSections sections={load.terms[lang].sections} />
+          </div>
+          <Button variant="outline" className="h-[52px] w-full text-[17px] print:hidden" onClick={() => window.print()}>
             {copy.termsPage.print}
           </Button>
         </article>
