@@ -16,7 +16,7 @@ export const MAX_RUNS = 10;
 
 /** The options in `argv` (process.argv without node and the script), or `{ error }` for an argument it cannot use. */
 export function parseArgs(argv) {
-  const options = { url: DEFAULT_URL, runs: 1, write: false, help: false };
+  const options = { url: DEFAULT_URL, runs: 1, write: false, help: false, note: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--write') {
@@ -30,12 +30,14 @@ export function parseArgs(argv) {
     const eq = arg.startsWith('--') ? arg.indexOf('=') : -1;
     const name = eq < 0 ? arg : arg.slice(0, eq);
     const inline = eq < 0 ? undefined : arg.slice(eq + 1);
-    if (name !== '--url' && name !== '--runs') {
-      return { error: `Unknown argument ${arg}. Use --url <address>, --runs <n> or --write.` };
+    if (name !== '--url' && name !== '--runs' && name !== '--note') {
+      return { error: `Unknown argument ${arg}. Use --url <address>, --runs <n>, --note <text> or --write.` };
     }
     const value = inline ?? argv[++i];
-    if (value === undefined || value === '' || value.startsWith('--')) return { error: `${name} needs a value.` };
-    if (name === '--url') {
+    if (value === undefined || value.trim() === '' || value.startsWith('--')) return { error: `${name} needs a value.` };
+    if (name === '--note') {
+      options.note = value.trim();
+    } else if (name === '--url') {
       const problem = urlProblem(value);
       if (problem !== null) return { error: problem };
       options.url = value.replace(/\/+$/, '');
@@ -300,11 +302,12 @@ export function categoryLineCounts(lines, order = []) {
 }
 
 /**
- * The Markdown report (docs/ai-eval.md with --write). `report` is `{ date, url, linesFile, lineCount, runs, note,
- * skipped, summaries, lineCounts }`, with `lineCounts` from categoryLineCounts.
+ * The Markdown report (docs/ai-eval.md with --write). `report` is `{ date, url, linesFile, lineCount, runs, notes,
+ * skipped, summaries, lineCounts }`, with `lineCounts` from categoryLineCounts and `notes` the planTargets note and
+ * the --note text, each shown when present.
  */
 export function markdownReport(report) {
-  const { date, url, linesFile, lineCount, runs, note, skipped, summaries, lineCounts } = report;
+  const { date, url, linesFile, lineCount, runs, notes = [], skipped, summaries, lineCounts } = report;
   const out = [
     '# AI classifier evaluation',
     '',
@@ -325,7 +328,7 @@ export function markdownReport(report) {
     `- Scored: ${summaries.map((s) => targetName(s.target)).join(', ') || 'none'}`,
   ];
   if (skipped.length > 0) out.push(`- Not ready: ${skipped.map((m) => `\`${m.id}\` (${m.reason})`).join(', ')}`);
-  if (note !== null && note !== undefined) out.push(`- Note: ${note}`);
+  for (const note of notes.filter((n) => isText(n))) out.push(`- Note: ${note}`);
 
   out.push('', '## Results', '');
   out.push(

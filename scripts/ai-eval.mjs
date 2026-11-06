@@ -1,5 +1,5 @@
 // Scores the AI service's models on the Romanian test set (F6; docs/plan/ai-f6.md, "Terminal B").
-// Usage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--write]
+// Usage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--note <text>] [--write]
 // It reads GET /health for the ready models, then sends every line of ai/eval/ro-lines.json in one call to
 // POST /classify?model=<id> for each model (the dev route: start the service with AI_DEV_ROUTES=1) and times each
 // call. A service without /health.models (the stub before F6) or without a ready model is scored once on its default
@@ -33,11 +33,11 @@ const CLASSIFY_TIMEOUT_MS = 120000;
 
 const options = parseArgs(process.argv.slice(2));
 if (options.error !== undefined) {
-  console.error(`${options.error}\nUsage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--write]`);
+  console.error(`${options.error}\nUsage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--note <text>] [--write]`);
   process.exit(1);
 }
 if (options.help) {
-  console.log('Usage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--write]');
+  console.log('Usage: node scripts/ai-eval.mjs [--url http://localhost:8000] [--runs 1] [--note <text>] [--write]');
   process.exit(0);
 }
 
@@ -114,7 +114,7 @@ const report = markdownReport({
   linesFile: LINES_FILE,
   lineCount: lines.length,
   runs: options.runs,
-  note,
+  notes: [note, options.note],
   skipped,
   summaries,
   lineCounts: categoryLineCounts(lines, order),

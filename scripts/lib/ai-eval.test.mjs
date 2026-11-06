@@ -56,23 +56,27 @@ const answer = (lineId, categoryId, rationale = 'reason', confidence = 0.9) => (
 });
 
 test('parseArgs reads --url, --runs and --write, with defaults', () => {
-  assert.deepEqual(parseArgs([]), { url: DEFAULT_URL, runs: 1, write: false, help: false });
+  assert.deepEqual(parseArgs([]), { url: DEFAULT_URL, runs: 1, write: false, help: false, note: null });
   assert.deepEqual(parseArgs(['--url', 'http://localhost:8002/', '--write']), {
     url: 'http://localhost:8002',
     runs: 1,
     write: true,
     help: false,
+    note: null,
   });
   assert.equal(parseArgs(['--url=http://127.0.0.1:8001']).url, 'http://127.0.0.1:8001');
   assert.equal(parseArgs(['--runs', '3']).runs, 3);
   assert.equal(parseArgs(['--runs=2']).runs, 2);
   assert.equal(parseArgs(['-h']).help, true);
+  assert.equal(parseArgs(['--note', ' Caps raised to 110 s. ']).note, 'Caps raised to 110 s.');
+  assert.equal(parseArgs(['--note=No cloud keys yet']).note, 'No cloud keys yet');
 });
 
 test('parseArgs refuses what it cannot use', () => {
   assert.match(parseArgs(['--model', 'x']).error, /Unknown argument --model/);
   assert.match(parseArgs(['--url']).error, /--url needs a value/);
   assert.match(parseArgs(['--url', '--write']).error, /--url needs a value/);
+  assert.match(parseArgs(['--note', ' ']).error, /--note needs a value/);
   assert.match(parseArgs(['--url', 'localhost:8002']).error, /http/);
   assert.match(parseArgs(['--url', 'not a url']).error, /not a URL/);
   assert.match(parseArgs(['--url', 'http://localhost:8002/?model=x']).error, /without a query/);
@@ -335,7 +339,7 @@ test('markdownReport writes the date, the models, the tables, the wrong answers 
     linesFile: 'ai/eval/ro-lines.json',
     lineCount: sample.length,
     runs: 1,
-    note: null,
+    notes: [],
     skipped: [{ id: 'google_genai:m2', reason: 'GOOGLE_API_KEY not set' }],
     summaries: [
       summarizeTarget({ id: 'openai:m1' }, [{ durationMs: 1234, scored: scoreAnswers(sample, good) }], null, categoryIds),
@@ -375,7 +379,7 @@ test('markdownReport says so when nothing needs a second look', () => {
     linesFile: 'ai/eval/ro-lines.json',
     lineCount: sample.length,
     runs: 3,
-    note: 'No model is ready, so the default chain was scored.',
+    notes: ['No model is ready, so the default chain was scored.', null, 'Caps raised for scoring.'],
     skipped: [],
     summaries: [
       summarizeTarget(
@@ -388,7 +392,7 @@ test('markdownReport says so when nothing needs a second look', () => {
     lineCounts: categoryLineCounts(sample, categoryIds),
   });
   assert.match(report, /- Lines: 5, 3 calls per model\n/);
-  assert.match(report, /- Note: No model is ready, so the default chain was scored\.\n/);
+  assert.match(report, /- Note: No model is ready, so the default chain was scored\.\n- Note: Caps raised for scoring\.\n\n/);
   assert.equal(report.includes('Not ready'), false);
   assert.match(report, /\| default chain \(`cache,stub`\) \| 100% \| 15\/15 \| 15\/15 \| 3\/3 \| 0\.00 s \| 0\.00 s \|\n/);
   assert.match(report, /None: every scored model reached 80% and held every injection line\.\n$/);
