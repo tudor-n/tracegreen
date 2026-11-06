@@ -72,6 +72,10 @@ class Settings:
     # OLLAMA_KEEP_ALIVE: how long Ollama keeps a model loaded after a call ("30m", "-1" for ever),
     # sent with every call, so the next question does not pay the load (seconds, past the cap).
     ollama_keep_alive: str = "30m"
+    # ANTHROPIC_EFFORT: output_config.effort for every Claude model that takes one. Claude Sonnet
+    # 5.5 and Opus 5.5 always think, at high and medium effort when none is sent, which is slow
+    # for the 4 s cap; these tasks' answers are short, so low is the default.
+    anthropic_effort: str = "low"
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
@@ -122,6 +126,7 @@ class Settings:
             ollama_num_ctx=_tokens(source, "OLLAMA_NUM_CTX", 12288),
             ollama_discover=_flag(source, "OLLAMA_DISCOVER", default="1"),
             ollama_keep_alive=_text(source, "OLLAMA_KEEP_ALIVE") or "30m",
+            anthropic_effort=_effort(source, "ANTHROPIC_EFFORT", "low"),
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
             openai_api_key=keys["OPENAI_API_KEY"],
@@ -203,6 +208,17 @@ def _tokens(source: Mapping[str, str], name: str, default: int) -> int:
     if not raw.isdigit() or int(raw) < MIN_OLLAMA_NUM_CTX:
         raise ValueError(f"{name} must be a whole number >= {MIN_OLLAMA_NUM_CTX}, not {raw!r}")
     return int(raw)
+
+
+# The effort levels of the Messages API's output_config.effort.
+ANTHROPIC_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+
+def _effort(source: Mapping[str, str], name: str, default: str) -> str:
+    raw = _text(source, name) or default
+    if raw not in ANTHROPIC_EFFORTS:
+        raise ValueError(f"{name} must be one of {', '.join(ANTHROPIC_EFFORTS)}, not {raw!r}")
+    return raw
 
 
 def _flag(source: Mapping[str, str], name: str, default: str = "0") -> bool:

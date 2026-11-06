@@ -53,6 +53,13 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
                 max_retries=0,
                 default_request_timeout=spec.timeout_s,
             )
+            # ANTHROPIC_EFFORT, for a model whose profile lists that level (claude-sonnet-5-5
+            # and claude-opus-5-5 do; claude-haiku-4-5 takes none). It goes in output_config, not
+            # reasoning_effort, which would also turn on thinking with a summary nobody reads;
+            # the model keeps its own thinking default.
+            effort = settings.anthropic_effort
+            if effort in ((model.profile or {}).get("reasoning_effort_levels") or ()):
+                model = model.model_copy(update={"output_config": {"effort": effort}})
             return model.with_structured_output(schema, method="json_schema")
         if spec.provider == "openai":
             from langchain_openai import ChatOpenAI
