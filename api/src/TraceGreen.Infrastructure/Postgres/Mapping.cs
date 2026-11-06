@@ -48,6 +48,7 @@ internal static class Mapping
         ClassificationSource = Name(n.ClassificationSource), MassT = n.MassT, LaneId = n.LaneId, Status = Name(n.Status),
         SpendKg = n.SpendKg, ActivityKg = n.ActivityKg, SpendEur = n.SpendEur, CostEur = n.CostEur, LeadDays = n.LeadDays,
         TransportMode = Name(n.TransportMode), EnergySource = Name(n.EnergySource), CreatedAt = Utc(n.CreatedAt),
+        ClassificationRationale = n.ClassificationRationale,
     };
 
     public static void Apply(NodeRow row, NodePatch patch)
@@ -65,7 +66,7 @@ internal static class Mapping
         r.Id, r.WorkspaceId, r.InvoiceId, r.Label, r.Country, r.CategoryId, r.SectorId, r.AiConfidence,
         Parse<ClassificationSource>(r.ClassificationSource), r.MassT, r.LaneId, Parse<NodeStatus>(r.Status),
         r.SpendKg, r.ActivityKg, r.SpendEur, r.CostEur, r.LeadDays,
-        ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt);
+        ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt, r.ClassificationRationale);
 
     public static VerificationRow ToRow(Verification v) => new()
     {

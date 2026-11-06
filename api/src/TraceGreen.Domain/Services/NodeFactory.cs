@@ -1,4 +1,5 @@
 using TraceGreen.Domain.Carbon;
+using TraceGreen.Domain.Copy;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
@@ -6,8 +7,11 @@ using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
 
-/// <summary>How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted.</summary>
-public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source);
+/// <summary>
+/// How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted. <see cref="Rationale"/>
+/// is the one-line reason of whatever classified it (the invoice code, the cache or a model).
+/// </summary>
+public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source, string? Rationale = null);
 
 /// <summary>
 /// Builds an invoice and its supplier node the same way for the seed and for imports: spend estimate from the total,
@@ -67,6 +71,25 @@ public static class NodeFactory
             LeadDays: leadDays,
             TransportMode: transportMode,
             EnergySource: energySource,
-            CreatedAt: createdAt);
+            CreatedAt: createdAt,
+            ClassificationRationale: Reason(classification.Rationale));
+    }
+
+    /// <summary>Longest reason kept, the same cap the AI service applies to a model's rationale.</summary>
+    public const int MaxRationaleChars = 200;
+
+    /// <summary>The reason as a reader may see it: whitespace collapsed, capped, and null when empty or against the copy rules.</summary>
+    public static string? Reason(string? rationale)
+    {
+        if (string.IsNullOrWhiteSpace(rationale))
+        {
+            return null;
+        }
+        var text = string.Join(' ', rationale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (text.Length > MaxRationaleChars)
+        {
+            text = text[..MaxRationaleChars].TrimEnd();
+        }
+        return BannedTerms.Clean(text);
     }
 }

@@ -93,7 +93,7 @@ public sealed class IngestService(
         var dominant = InvoiceFacts.DominantLine(extracted.Lines);
         var picked = classifications.First(c => c.LineId == dominant.Id);
         var classification = new NodeClassification(
-            picked.CategoryId, picked.Source == ClassificationSource.Stub ? null : picked.Confidence, picked.Source);
+            picked.CategoryId, picked.Source == ClassificationSource.Stub ? null : picked.Confidence, picked.Source, picked.Rationale);
 
         var now = clock.GetUtcNow();
         var invoice = NodeFactory.NewInvoice(pins?.InvoiceId ?? Ids.NewId(), ctx.WorkspaceId, extracted, xml, now);

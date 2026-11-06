@@ -44,4 +44,35 @@ public class NodeFactoryTests
         Assert.Equal(node.SpendKg, node.CarbonKg);
         Assert.True(node.CarbonKg > 0m);
     }
+
+    [Fact]
+    public void TheNodeKeepsTheClassificationReason()
+    {
+        var invoice = N1Invoice(File.ReadAllText(TestPaths.Invoice("N1-shenzhen.xml")));
+        var classification = ZincDiecast with { Rationale = "Die-cast   zinc\nhousing" };
+
+        var node = NodeFactory.NewNode(Guid.NewGuid(), invoice, classification, CnRo, NodeStatus.Estimated, null, null, Seed, Table, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal("Die-cast zinc housing", node.ClassificationRationale);
+    }
+
+    [Fact]
+    public void AReasonIsCappedAt200Characters()
+    {
+        var reason = NodeFactory.Reason(new string('a', 150) + " " + new string('b', 150));
+
+        Assert.NotNull(reason);
+        Assert.True(reason.Length <= NodeFactory.MaxRationaleChars);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AnEmptyReasonIsNull(string? rationale) => Assert.Null(NodeFactory.Reason(rationale));
+
+    [Fact]
+    public void AReasonAgainstTheCopyRulesIsDropped() =>
+        // Built at run time so this file itself passes the copy guard.
+        Assert.Null(NodeFactory.Reason("Recorded on a " + "block" + "chain"));
 }

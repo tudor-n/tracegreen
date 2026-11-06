@@ -123,7 +123,7 @@ public sealed class VerifyService(
         var node = link.Node;
         var status = Estimate.DeriveStatus(answer.TransportMode, answer.EnergySource);
         var rebuilt = NodeFactory.NewNode(
-            node.Id, link.Invoice, new NodeClassification(node.CategoryId, node.AiConfidence, node.ClassificationSource), link.Lane,
+            node.Id, link.Invoice, new NodeClassification(node.CategoryId, node.AiConfidence, node.ClassificationSource, node.ClassificationRationale), link.Lane,
             status, answer.TransportMode, answer.EnergySource, seed, mapper.Factors, node.CreatedAt, answer.MassT ?? node.MassT);
         var patch = new NodePatch(status, rebuilt.ActivityKg, answer.TransportMode, answer.EnergySource, rebuilt.MassT, rebuilt.CostEur, rebuilt.LeadDays);
         var warnings = PlausibilityRules.Check(answer.TransportMode, rebuilt.MassT);
