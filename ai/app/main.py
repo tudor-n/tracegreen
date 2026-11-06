@@ -10,7 +10,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.chat import build_chat
+from app.chat import ChatModelRefused, build_chat
 from app.config import (
     API_CHAT_TIMEOUT_S,
     API_EXTRACT_TIMEOUT_S,
@@ -23,6 +23,8 @@ from app.models import ModelFactory, chat_model_factory
 from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
 from app.schemas import (
+    ChatModel,
+    ChatModelsResponse,
     ChatRequest,
     ChatResponse,
     ClassifyRequest,
@@ -107,11 +109,34 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         # figure; no model or no valid answer gives none, and the API shows the list as it is.
         return suggester.suggest(request)
 
+    @app.get("/chat/models", response_model=ChatModelsResponse)
+    def chat_models() -> ChatModelsResponse:
+        # The models the chat box offers, in the order the chat tries them; a model without
+        # its key is listed, not ready, with the reason, so the picker can say why.
+        return ChatModelsResponse(
+            models=[
+                ChatModel(
+                    id=spec.id,
+                    provider=spec.provider,
+                    model=spec.model,
+                    ready=spec.ready,
+                    reason=spec.reason,
+                )
+                for spec in config.chat_specs
+            ]
+        )
+
     @app.post("/chat", response_model=ChatResponse)
     def chat(request: ChatRequest) -> ChatResponse:
         # F13: a sentence that cites the API's facts by id; the API checks it again and fills
         # the values in. No model, or no valid answer, says the question was not answered.
-        return chat_task.answer(request)
+        # A named model (`model`) answers alone; one the chat lacks or cannot use is 422.
+        try:
+            return chat_task.answer(request)
+        except ChatModelRefused as refused:
+            raise HTTPException(
+                status_code=422, detail={"code": refused.code, "message": str(refused)}
+            ) from None
 
     @app.post("/extract-pdf", response_model=ExtractResponse)
     def extract_pdf(request: ExtractRequest) -> ExtractResponse:

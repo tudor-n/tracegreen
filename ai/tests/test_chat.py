@@ -164,3 +164,97 @@ def test_without_a_model_or_facts_nothing_is_asked() -> None:
 
     assert ask(fakes, facts=[])["provider"] == "stub"
     assert fakes.prompts == []
+
+
+def client(fakes: ChatFakes, **env: str) -> TestClient:
+    return TestClient(create_app(Settings.from_env({**ENV, **env}), fakes))
+
+
+def post(test_client: TestClient, model: str | None) -> Any:
+    return test_client.post(
+        "/chat", json={"question": "Who emits the most?", "facts": FACTS, "model": model}
+    )
+
+
+def test_the_chat_lists_its_models_in_order_with_why_one_is_not_ready() -> None:
+    env = {"AI_CHAT_MODELS": "anthropic:claude-x,ollama:local:3b"}
+
+    body = client(ChatFakes({}), **env).get("/chat/models").json()
+
+    assert body == {
+        "models": [
+            {
+                "id": "anthropic:claude-x",
+                "provider": "anthropic",
+                "model": "claude-x",
+                "ready": False,
+                "reason": "ANTHROPIC_API_KEY not set",
+            },
+            {
+                "id": "ollama:local:3b",
+                "provider": "ollama",
+                "model": "local:3b",
+                "ready": True,
+                "reason": None,
+            },
+        ]
+    }
+
+
+def test_without_chat_models_the_list_is_ai_models_and_without_any_it_is_empty() -> None:
+    listed = client(ChatFakes({})).get("/chat/models").json()["models"]
+    assert [m["id"] for m in listed] == ["openai:model-a", "ollama:local:3b"]
+
+    assert client(ChatFakes({}), AI_MODELS="").get("/chat/models").json() == {"models": []}
+
+
+def test_a_named_model_answers_alone_and_does_not_hand_over() -> None:
+    fakes = ChatFakes(
+        {
+            "openai:model-a": answer("{{S1.name}} emits {{S1.carbon}}."),
+            "ollama:local:3b": answer("{{S1.name}} emits 4.7 t."),
+        }
+    )
+
+    response = post(client(fakes), "ollama:local:3b")
+
+    assert response.status_code == 200
+    assert response.json() == {"answerable": False, "text": "", "factIds": [], "provider": "none"}
+    assert [s.id for s in fakes.specs] == ["ollama:local:3b"]
+
+
+def test_a_named_model_that_passes_is_the_provider() -> None:
+    fakes = ChatFakes({"ollama:local:3b": answer("{{S1.name}} emits {{S1.carbon}}.")})
+
+    body = post(client(fakes), "ollama:local:3b").json()
+
+    assert body["provider"] == "ollama:local:3b"
+    assert [s.id for s in fakes.specs] == ["ollama:local:3b"]
+
+
+def test_an_unknown_or_unready_model_is_422_with_a_code_and_asks_nobody() -> None:
+    fakes = ChatFakes({})
+    test_client = client(fakes, AI_MODELS="openai:model-a,anthropic:claude-x")
+
+    unknown = post(test_client, "openai:model-z")
+    not_ready = post(test_client, "anthropic:claude-x")
+
+    assert unknown.status_code == 422
+    assert unknown.json()["detail"]["code"] == "unknown_model"
+    assert not_ready.status_code == 422
+    assert not_ready.json()["detail"] == {
+        "code": "model_not_ready",
+        "message": "anthropic:claude-x is not ready: ANTHROPIC_API_KEY not set.",
+    }
+    assert fakes.prompts == []
+
+
+def test_no_model_named_keeps_the_order() -> None:
+    fakes = ChatFakes(
+        {
+            "openai:model-a": answer("{{S1.name}} emits 4.7 t."),
+            "ollama:local:3b": answer("{{S1.name}} emits {{S1.carbon}}."),
+        }
+    )
+
+    assert post(client(fakes), None).json()["provider"] == "ollama:local:3b"

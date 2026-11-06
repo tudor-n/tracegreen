@@ -96,6 +96,15 @@ def chat_messages(request: ChatRequest) -> list[BaseMessage]:
     return [SystemMessage(content=SYSTEM), HumanMessage(content=f"Answer the question.\n{body}")]
 
 
+class ChatModelRefused(Exception):
+    """The request named a model the chat does not have (`unknown_model`) or cannot use yet
+    (`model_not_ready`, e.g. its key is missing)."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class Chat:
     def __init__(self, models: Sequence[LazyModel], budget_s: float) -> None:
         self.models = tuple(models)
@@ -105,13 +114,28 @@ class Chat:
     def ready(self) -> bool:
         return any(m.spec.ready for m in self.models)
 
+    def chosen(self, model_id: str | None) -> tuple[LazyModel, ...]:
+        """The models to ask: the named one alone, or all of them in order when none is named.
+        Raises ChatModelRefused for a model the chat does not have or cannot use."""
+        if model_id is None:
+            return self.models
+        model = next((m for m in self.models if m.id == model_id), None)
+        if model is None:
+            raise ChatModelRefused("unknown_model", f"The chat has no model {model_id!r}.")
+        if not model.spec.ready:
+            raise ChatModelRefused(
+                "model_not_ready", f"{model_id} is not ready: {model.spec.reason}."
+            )
+        return (model,)
+
     def answer(self, request: ChatRequest) -> ChatResponse:
-        if not self.ready or not request.facts:
+        models = self.chosen(request.model)
+        if not any(m.spec.ready for m in models) or not request.facts:
             return ChatResponse(answerable=False, text="", fact_ids=[], provider="stub")
         ids = {f.id for f in request.facts}
         deadline = time.monotonic() + self._budget_s
         found = first_valid(
-            self.models, chat_messages(request), deadline, lambda out: _checked(out, ids)
+            models, chat_messages(request), deadline, lambda out: _checked(out, ids)
         )
         if found is None:
             # Models were asked and none gave an answer that passed: "none", not the stub, so

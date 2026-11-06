@@ -103,6 +103,23 @@ class ChatRequest(Wire):
     question: str
     history: list[str] = []
     facts: list[ChatFact] = []
+    # One of GET /chat/models' ids: that model alone answers. None: the chat's models in order.
+    model: str | None = None
+
+
+class ChatModel(Wire):
+    """A model the chat may use (AI_CHAT_MODELS, else AI_MODELS), in the order the chat tries
+    them; `reason` says why one is not ready, e.g. a missing key."""
+
+    id: str
+    provider: str
+    model: str
+    ready: bool
+    reason: str | None = None
+
+
+class ChatModelsResponse(Wire):
+    models: list[ChatModel]
 
 
 class ChatResponse(Wire):
