@@ -71,6 +71,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The categories a buyer may set for a node, which are also the AI's allow-list */
+        get: operations["ListCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingest/ubl": {
         parameters: {
             query?: never;
@@ -363,6 +380,10 @@ export interface components {
             /** Format: double */
             kg: number;
             factors: components["schemas"]["FactorLookup"][];
+        };
+        CategoryOption: {
+            id: string;
+            label: string;
         };
         ChainVerification: {
             valid: boolean;
@@ -899,6 +920,26 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ListCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOption"][];
                 };
             };
         };

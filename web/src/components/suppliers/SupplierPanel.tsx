@@ -9,6 +9,8 @@ import { drawerCopy, energySourceCopy, nodeCopy, suppliersCopy, transportModeCop
 import { ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
 import { requestLink, requestPortalLink } from '@/lib/dashboard-actions'
 import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
+import { categoryCheckLabel, categorySourceNote } from '@/lib/review-display'
+import { CategoryCheckChip, CategoryReview } from './CategoryReview'
 import { cn } from '@/lib/utils'
 import {
   CO2E_UNIT,
@@ -30,6 +32,8 @@ import {
 // button closes the panel, unless the Escape already closed something inside it (a tooltip); a reset that removes the
 // node closes it too (hydrateState). Frozen test hooks (RUNBOOK): `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate`;
 // `drawer-portal` and `portal-url` for the supplier page link (F12), which lists every delivery from this supplier.
+// The classification review (F6): `drawer-check` (the flag), `drawer-figure`, `drawer-category-source`, and the control's
+// own hooks in CategoryReview.
 
 type Tab = 'summary' | 'details' | 'factors' | 'whatIf'
 
@@ -42,6 +46,7 @@ const statusTone: Record<NodeView['status'], ChipTone> = {
 export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: boolean }) {
   const select = useGraphStore((s) => s.select)
   const ai = aiMappedLabel(node.classification)
+  const check = categoryCheckLabel(node.classification)
   const panel = useRef<HTMLElement>(null)
 
   // Below the lg breakpoint the panel sits under the tree; bring it into view when another supplier is picked.
@@ -86,6 +91,11 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
         </span>
         {hotspot && <Chip tone="hotspot">{nodeCopy.hotspot}</Chip>}
         {ai !== null && <Chip>{ai}</Chip>}
+        {check !== null && (
+          <span data-testid="drawer-check">
+            <CategoryCheckChip label={check} />
+          </span>
+        )}
       </div>
       <PanelBody key={node.id} node={node} />
     </aside>
@@ -171,18 +181,26 @@ interface SummaryProps {
 function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
   const figure = shownFigure(node)
   const provenance = provenanceLine(node)
+  const categorySource = categorySourceNote(node.classification)
   const answered = node.transportMode !== null || node.energySource !== null
 
   return (
     <>
       <div className="flex flex-col gap-2">
         <p className="flex items-baseline gap-1.5 font-display leading-none">
-          <span className="text-[40px] font-semibold tracking-[-0.03em]">{formatTonnes(node.carbonKg)}</span>
+          <span data-testid="drawer-figure" className="text-[40px] font-semibold tracking-[-0.03em]">
+            {formatTonnes(node.carbonKg)}
+          </span>
           <span className="text-[13px] font-medium text-muted-foreground">{CO2E_UNIT}</span>
         </p>
         {provenance !== null && (
           <p data-testid="drawer-provenance" className="text-[13px] leading-relaxed break-words text-ink-2">
             {provenance}
+          </p>
+        )}
+        {categorySource !== null && (
+          <p data-testid="drawer-category-source" className="text-[13px] leading-relaxed text-ink-2">
+            {categorySource}
           </p>
         )}
         <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -197,6 +215,8 @@ function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
           </p>
         )}
       </div>
+
+      <CategoryReview node={node} />
 
       {answered && (
         <Group title={drawerCopy.answers}>

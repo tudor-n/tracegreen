@@ -287,6 +287,26 @@ Checked on 2026-11-06:
 
 Tests (`ClassificationEndpointTests`, `RepositoryContract`): confirm; correct with the spend figure recomputed; a VERIFIED node's activity figure recomputed with the new material; a correction changed again; `UNCLASSIFIED` accepted; 409 for a stale category, and for the second of two reviews from the same page; 422 for a category outside the list; 404; the audit entry and a valid chain; `node.updated` with fresh KPIs; the supplier's link still working after a correction, its answer computed with the buyer's category; in both repositories, the patch and audit entry, nothing written on a stale category, ten concurrent reviews giving one write, and a verification that landed first seen by the review. For the reuse: a later import of the same line gets the buyer's category until a reset (`ClassificationEndpointTests`); the buyer's choice before the cache and the AI, an invoice code before the buyer, a remembered category off the list ignored (`LineClassificationTests`); a decision remembered, replaced and forgotten on reset, and none for a stale review (`RepositoryContract`).
 
+### The dashboard (ticket 2, `b/f6-review-dashboard`)
+
+A buyer cannot miss an unreviewed AI category, and confirms or changes one in two clicks.
+
+| Where | What |
+|---|---|
+| Overview | "N categories to check" (`CategoryChecks`), shown while any category waits; it opens `/suppliers?filter=check` with the side panel closed |
+| Suppliers | The filtered list says so and links back to every supplier; each waiting row starts its second line with "Check category" |
+| Side panel | "Check category" beside "AI-mapped · 0.88" in the header; on Summary the review control (`CategoryReview`): the category, the dominant line in full, "Correct" while it waits, and "Change category", which opens the allow-list from `GET /api/categories` with Unclassified last; after a review the flag and the "AI-mapped" chip go, and "Category set by buyer" stands under the provenance line |
+
+- **Flag rule:** `review: pending`, or `UNCLASSIFIED` that no person has looked at; never the confidence.
+- **Store:** the POST sends `expectedCategoryId`; the store changes only through `node.updated`, and the control says "Saving…" until it lands. A 409 hydrates the store from `GET /api/graph` and shows the "changed elsewhere" message (`role="alert"`).
+- **Accessibility:** native buttons throughout; the flag is text and icon, never colour alone, and is part of each row button's name; "Saving…" and "Category saved." in a `role="status"` line; Escape closes the choices without closing the panel; the focus moves to the first choice and back to "Change category". The amber text on its tint is about 6.2:1.
+- **Backend addition:** `GET /api/categories` (`CategoryOption { id, label }[]`), the shape `f6/corrections` uses.
+- **New test hooks:** the "Classification review (F6)" row of `RUNBOOK.md`'s table; the frozen hooks are unchanged.
+
+Checked on 2026-11-06 on a Compose stack from this branch (Vite dev server): `pnpm typecheck`, `pnpm lint` and `pnpm test` (283 tests) pass; `pnpm e2e` passes with the API on Postgres and in memory mode, the demo path now with a tenth step (step 8, the review); 362 .NET tests pass in memory mode. By hand in headless Chromium: the counter, the filtered list, keyboard use of the choices, the figure moving from 2.9 t to 0.6 t when N4 becomes Printed circuit boards, the 390 px phone layout, no console errors, and the 409 path with the event stream blocked (the message, then the category set elsewhere on screen). Not run locally: the smoke on the demo image (CI's e2e job runs it).
+
+Open for Dev C: the wording of every new string, the Romanian set (the dashboard has no language switch), "Correct" (read as "this is correct", and it could be read as "fix it"), and the juror line "every AI-mapped category waits for a person to confirm or change it", which lives outside the repository.
+
 ## Seed XML validation (2026-10-23)
 
 `node scripts/validate-seed-anaf.mjs` (Node 24 or later, no dependencies) posts every file in `seed/invoices/` to ANAF's public validator (`POST https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`, the XML as `text/plain`, no authentication). For each file it prints OK, or ANAF's exact messages and raw answer, and it exits 1 if any file fails. Pass file paths to check single files. Final output:
