@@ -217,4 +217,5 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   InvalidChange: 'Change not accepted.',
   ModeNotAvailable: 'This lane has no such mode.',
   MassUnknown: 'Mass unknown for this item.',
+  TermsNotAccepted: 'Supplier terms not accepted.',
 }

@@ -12,7 +12,8 @@ import type {
 import { DEFAULT_LANG, type Lang, type VerifyResult } from '@/copy/verify'
 
 // Pure decision logic behind the supplier page /verify/:nodeId: the language, which answers to offer and pre-select,
-// what each API answer means for the page, and the page's states. The page performs the two requests the states ask for
+// the supplier terms the supplier must tick before sending (never ticked for them), what each API answer means for the
+// page, and the page's states. The page performs the two requests the states ask for
 // (the context while loading, the answers while submitting) and renders the rest, so every rule here is unit-tested
 // without a browser.
 
@@ -37,6 +38,7 @@ export interface VerifyApi {
 const RETRYABLE: Record<Failure, boolean> = {
   offline: true,
   rateLimited: true,
+  termsChanged: true,
   alreadyUsed: false,
   expired: false,
   invoiceChanged: false,
@@ -60,6 +62,9 @@ export function failureFor(status: number | null, code: ProblemCode | null): Fai
       return 'invoiceChanged'
     case 'RateLimited':
       return 'rateLimited'
+    // The page sends the terms it showed, so this means they changed on the server since the page loaded.
+    case 'TermsNotAccepted':
+      return 'termsChanged'
     // The page offers the lane's modes alone and never sends two skips, so these mean the link no longer fits.
     case 'InvalidAnswer':
     case 'NodeNotFound':
@@ -102,18 +107,29 @@ export function canSubmit(answers: Answers): boolean {
   return answers.transport !== null || answers.energy !== null
 }
 
-/** The body of `POST /api/verify`. A skipped answer is sent as null; the mass is left to the invoice. */
-export function submitBody(token: string, answers: Answers): VerifyRequest {
-  return { t: token, transportMode: answers.transport, energySource: answers.energy }
+/** Sendable: at least one answer, and the supplier ticked the terms themselves (the API refuses a submit without them). */
+export function canSend(answers: Answers, accepted: boolean): boolean {
+  return accepted && canSubmit(answers)
+}
+
+/**
+ * The body of `POST /api/verify`. A skipped answer is sent as null; the mass is left to the invoice. `acceptedTerms` is
+ * the SHA-256 of the terms the page showed, from the context, so the server records exactly what was accepted.
+ */
+export function submitBody(token: string, answers: Answers, termsSha256: string): VerifyRequest {
+  return { t: token, transportMode: answers.transport, energySource: answers.energy, acceptedTerms: termsSha256 }
 }
 
 /** Where a retry goes: the context request again, or the same answers sent again. */
-type RetryTarget = { phase: 'loading' } | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+type RetryTarget =
+  | { phase: 'loading' }
+  | { phase: 'submitting'; context: VerifyContext; answers: Answers; accepted: boolean }
 
+/** `accepted` is the supplier's tick on the terms checkbox. */
 export type VerifyState =
   | { phase: 'loading' }
-  | { phase: 'ready'; context: VerifyContext; answers: Answers }
-  | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+  | { phase: 'ready'; context: VerifyContext; answers: Answers; accepted: boolean }
+  | { phase: 'submitting'; context: VerifyContext; answers: Answers; accepted: boolean }
   | { phase: 'done'; status: NodeStatus; warnings: PlausibilityWarning[] }
   | { phase: 'failed'; failure: Failure; retry: RetryTarget | null }
 
@@ -121,6 +137,7 @@ export type VerifyInput =
   | { kind: 'contextLoaded'; context: VerifyContext }
   | { kind: 'transport'; value: TransportMode | null }
   | { kind: 'energy'; value: EnergySource | null }
+  | { kind: 'terms'; accepted: boolean }
   | { kind: 'submit' }
   | { kind: 'submitted'; outcome: VerifyOutcome }
   | { kind: 'failed'; failure: Failure }
@@ -147,7 +164,8 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
         transport: preselect(offeredModes(context), context.defaultMode),
         energy: preselect(offeredEnergy(context), context.defaultEnergy),
       }
-      return { phase: 'ready', context, answers }
+      // The terms always start unticked: acceptance has to be the supplier's own act (Civil Code art. 1203).
+      return { phase: 'ready', context, answers, accepted: false }
     }
     case 'transport':
       if (state.phase !== 'ready') return state
@@ -157,8 +175,10 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
       if (state.phase !== 'ready') return state
       if (input.value !== null && !offeredEnergy(state.context).includes(input.value)) return state
       return { ...state, answers: { ...state.answers, energy: input.value } }
+    case 'terms':
+      return state.phase === 'ready' ? { ...state, accepted: input.accepted } : state
     case 'submit':
-      return state.phase === 'ready' && canSubmit(state.answers) ? { ...state, phase: 'submitting' } : state
+      return state.phase === 'ready' && canSend(state.answers, state.accepted) ? { ...state, phase: 'submitting' } : state
     case 'submitted':
       return state.phase === 'submitting'
         ? { phase: 'done', status: input.outcome.status, warnings: input.outcome.warnings }
@@ -166,7 +186,14 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
     case 'failed':
       if (state.phase === 'loading') return failed(input.failure, { phase: 'loading' })
       if (state.phase === 'submitting') {
-        return failed(input.failure, { phase: 'submitting', context: state.context, answers: state.answers })
+        // Changed terms are read again before anything is sent: the retry reloads the context and the box is unticked.
+        if (input.failure === 'termsChanged') return failed(input.failure, { phase: 'loading' })
+        return failed(input.failure, {
+          phase: 'submitting',
+          context: state.context,
+          answers: state.answers,
+          accepted: state.accepted,
+        })
       }
       return state
     case 'retry':

@@ -3,10 +3,12 @@ import { useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { AnswerGroup } from '@/components/verify/AnswerGroup'
 import { ReconfirmBanner, ResultMessage } from '@/components/verify/ResultMessage'
+import { TermsConsent } from '@/components/verify/TermsConsent'
 import { dashboardTitle } from '@/copy/dashboard'
 import { type Lang, verifyCopy } from '@/copy/verify'
 import { verifyApi } from '@/lib/verify-api'
 import {
+  canSend,
   canSubmit,
   formatIssueDate,
   initialVerifyState,
@@ -19,7 +21,8 @@ import {
 } from '@/lib/verify-state'
 
 // The supplier's phone page. It reads the token from ?t= and the language from ?lang=, loads the link's context,
-// offers both questions pre-selected and sends the answers. No cookies, storage, login, email, camera, clipboard or
+// offers both questions pre-selected, shows the supplier terms with an unticked checkbox, and sends the answers with
+// the terms' SHA-256 once the supplier ticked it. No cookies, storage, login, email, camera, clipboard or
 // personal data, and nothing here logs the URL or the token. Strings come from web/src/copy/verify.ts, the decisions
 // from web/src/lib/verify-state.ts and the requests from web/src/lib/verify-api.ts; this page performs and renders them.
 
@@ -51,7 +54,7 @@ export default function Verify() {
   useEffect(() => {
     if (state.phase !== 'submitting' || token === null) return
     let current = true
-    void verifyApi.submit(submitBody(token, state.answers)).then((reply) => {
+    void verifyApi.submit(submitBody(token, state.answers, state.context.terms.sha256)).then((reply) => {
       if (!current) return
       dispatch(reply.ok ? { kind: 'submitted', outcome: reply.data } : { kind: 'failed', failure: reply.failure })
     })
@@ -142,16 +145,32 @@ export default function Verify() {
             onChange={(value) => dispatch({ kind: 'energy', value })}
           />
 
+          <TermsConsent
+            terms={state.context.terms[lang]}
+            version={state.context.terms.version}
+            lang={lang}
+            accepted={state.accepted}
+            disabled={state.phase === 'submitting'}
+            copy={copy.terms}
+            onChange={(accepted) => dispatch({ kind: 'terms', accepted })}
+          />
+
           <div className="flex flex-col gap-2 pb-4">
-            {!canSubmit(state.answers) && (
+            {!canSubmit(state.answers) ? (
               <p role="status" className="text-center text-base text-muted-foreground">
                 {copy.answerOne}
               </p>
+            ) : (
+              !state.accepted && (
+                <p role="status" className="text-center text-base text-muted-foreground">
+                  {copy.terms.tickToSubmit}
+                </p>
+              )
             )}
             <Button
               data-testid="verify-submit"
               className="h-14 w-full rounded-xl text-lg"
-              disabled={state.phase === 'submitting' || !canSubmit(state.answers)}
+              disabled={state.phase === 'submitting' || !canSend(state.answers, state.accepted)}
               onClick={() => dispatch({ kind: 'submit' })}
             >
               {state.phase === 'submitting' ? copy.submitting : copy.submit}
