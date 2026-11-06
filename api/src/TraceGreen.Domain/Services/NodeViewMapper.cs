@@ -47,7 +47,8 @@ public sealed class NodeViewMapper
             Source: node.ClassificationSource,
             Confidence: node.AiConfidence,
             AiMapped: node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model,
-            LineDescription: line.Description);
+            LineDescription: line.Description,
+            Rationale: node.ClassificationRationale);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).
         var laneView = new LaneView(

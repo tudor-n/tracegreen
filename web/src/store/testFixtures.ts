@@ -40,6 +40,7 @@ export function node(id: string, carbonKg: number, overrides: Partial<NodeView> 
       confidence: null,
       aiMapped: false,
       lineDescription: 'line',
+      rationale: null,
     },
     invoice: { id: `inv-${id}`, number: `INV-${id}`, issueDate: '2026-10-01', currency: 'EUR', total: 1000 },
     lane: {

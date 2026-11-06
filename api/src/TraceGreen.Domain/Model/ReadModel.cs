@@ -14,6 +14,8 @@ public sealed record CarbonFigure(decimal Kg, IReadOnlyList<FactorLookup> Factor
 /// <summary>
 /// How the node's category was decided. <see cref="AiMapped"/> is true when the category came from the AI (live or
 /// pre-computed cache), so the UI must label it "AI-mapped". <see cref="LineDescription"/> is invoice text: render it as text.
+/// <see cref="Rationale"/> is the one-line reason of whatever chose the category (a model's own words when AI-mapped),
+/// at most 200 characters, null when none was kept; render it as text.
 /// </summary>
 public sealed record ClassificationView(
     string CategoryId,
@@ -21,7 +23,8 @@ public sealed record ClassificationView(
     ClassificationSource Source,
     double? Confidence,
     bool AiMapped,
-    string LineDescription);
+    string LineDescription,
+    string? Rationale);
 
 /// <summary>
 /// The node's freight lane. <see cref="Mode"/> is the confirmed mode, or the lane default before the supplier answers;

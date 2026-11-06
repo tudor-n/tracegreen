@@ -59,6 +59,8 @@ export const drawerCopy = {
   skipped: 'Skipped',
   classification: 'Classification',
   invoiceLine: 'Invoice line',
+  /** The AI's one-line reason for the category, under the invoice line it read; shown only when the AI chose it. */
+  whyCategory: 'Why this category',
   invoice: 'Invoice',
   invoiceNumber: 'Number',
   issued: 'Issued',

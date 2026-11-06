@@ -96,7 +96,7 @@ flowchart LR
 
 - `status` (`ESTIMATED | PARTIAL | VERIFIED`) and `carbonKg` with its `basis`. The basis is `spend` until VERIFIED, then `activity`.
 - both figures, each with the `FactorLookup` rows behind it: value, unit, source, year and row label. These rows feed the "i" icon, and a `PLACEHOLDER` source is shown as it is.
-- `uncertainty` (ruling R4), `classification` (with `aiMapped` for the "AI-mapped" label), the `invoice` summary, the `lane` (illustrative), `alternatives` for the simulator, plausibility `warnings`, cost and lead days.
+- `uncertainty` (ruling R4), `classification` (with `aiMapped` for the "AI-mapped" label and `rationale`, the one-line reason behind the category, shown only when AI-mapped), the `invoice` summary, the `lane` (illustrative), `alternatives` for the simulator, plausibility `warnings`, cost and lead days.
 
 `GraphSnapshot` (`GET /api/graph`) contains the buyer, every `NodeView`, the `kpis`, the whole audit chain, `lastSeq` and the data mode. The KPIs come from `KpiCalculator` on the server, and every node event carries fresh ones, so the SPA never adds up carbon. The hotspot ring is a selector over the nodes, not a stored state.
 

@@ -125,4 +125,16 @@ public class NodeViewMapperTests
         Assert.Equal(node.SpendKg, view.Spend.Kg);
         Assert.Equal(2, view.Activity!.Factors.Count);
     }
+
+    [Fact]
+    public void TheViewCarriesTheReasonBehindTheCategory()
+    {
+        foreach (var key in new[] { "N2", "N3", "N4", "N5" })
+        {
+            var view = View(key);
+            var node = State.Nodes.Single(n => n.Id == view.Id);
+            Assert.Equal(node.ClassificationRationale, view.Classification.Rationale);
+            Assert.False(string.IsNullOrWhiteSpace(view.Classification.Rationale));
+        }
+    }
 }
