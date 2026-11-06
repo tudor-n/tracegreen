@@ -27,8 +27,9 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const LINES_FILE = 'ai/eval/ro-lines.json';
 const REPORT_FILE = 'docs/ai-eval.md';
 const HEALTH_TIMEOUT_MS = 5000;
-// The service caps one /classify call at AI_TIMEOUT_S (8 s); this only stops the script hanging on a stuck service.
-const CLASSIFY_TIMEOUT_MS = 30000;
+// The service caps one /classify call at AI_TIMEOUT_S (8 s by default, raised for slow local models when scoring);
+// this only stops the script hanging on a stuck service.
+const CLASSIFY_TIMEOUT_MS = 120000;
 
 const options = parseArgs(process.argv.slice(2));
 if (options.error !== undefined) {
@@ -93,7 +94,10 @@ for (const target of targets) {
     try {
       const answer = await postJson(classifyPath(target), request);
       error = answerProblem(target, answer.status, answer.body);
-      if (error === null) runs.push({ durationMs: answer.durationMs, scored: scoreAnswers(lines, answer.body.classifications) });
+      if (error === null) {
+        const scored = scoreAnswers(lines, answer.body.classifications, { modelRun: target.id !== null });
+        runs.push({ durationMs: answer.durationMs, scored });
+      }
     } catch (caught) {
       error = caught?.name === 'TimeoutError' ? `no answer within ${CLASSIFY_TIMEOUT_MS / 1000} s` : unreachable('/classify', caught);
     }
