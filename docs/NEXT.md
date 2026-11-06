@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-06 (the supplier page, F12, a thin slice built on hackathon day: see "Supplier page (F12)" below); before that, 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
 
 ## What exists
 
@@ -36,6 +36,8 @@ Test counts after B5: 266 .NET tests, 252 in memory mode (run with `dotnet test`
 Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven steps).
 
 Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 22 script tests (`node --test scripts/lib/*.test.mjs`, 10 of them for demo-check).
+
+Test counts after F12: 303 .NET tests, 289 in memory mode (the 14 Postgres contract tests skipped), 303 with `DATABASE_URL` on `tracegreen_test`; 234 web unit tests; two Playwright specs (the demo-path smoke and `supplier-portal.spec.ts`).
 
 ## Wire contract (slice 1)
 
@@ -102,6 +104,22 @@ Checked on 2026-11-05 against Compose: passes in Postgres mode and in memory mod
 - `scripts/demo-check.mjs` (Node, no dependencies; logic in `scripts/lib/demo-check.mjs`, tested): the URL (`PUBLIC_BASE_URL` from `.env.demo`, or the argument when it is left empty, RUNBOOK step 2) is set, not loopback, answers `/api/health`, is where the API builds QR links (with `PUBLIC_BASE_URL` set, `baseUrl.source` must be `configured`, which catches a stack not restarted after editing `.env.demo`), and `/api/events` sends its `hello` event. Checked on 2026-11-05: all five pass against the dev stack started with `PUBLIC_BASE_URL=http://<lan-ip>:3000`, and with it empty and the LAN URL as the argument (the check then says to open the dashboard at that address); health and the event stream pass through nginx on the demo image.
 - `scripts/firewall.ps1`: one inbound rule for TCP 3000 from the local subnet, idempotent, `-Remove` to delete it. It parses and its help loads; it has not been run elevated on a machine yet.
 - CSP: the header in `web/nginx.conf` is unchanged. The smoke passes against `compose.demo.yml` with no CSP violation on the dashboard or the phone page, and the header reaches the pages, the `/verify` route and the assets. The Linux firewall commands were already in `RUNBOOK.md`; ruling R6's fallback phone and the checks are now there too.
+
+## Supplier page (F12)
+
+One link per supplier, opened on the supplier's phone, that lists every delivery on the buyer's graph from that supplier. Each delivery is confirmed with the two questions of `/verify`. There is no account, sign-in or email: the link is signed, like the phone page's, and reusable until it expires (7 days). In the drawer, "Supplier page link" shows it in a second card under the verification link's. Why it is built this way: `DECISIONS.md`, "Supplier page, thin slice (F12)". Controls: `SECURITY.md`, "Supplier page links (F12)". What comes after it: `docs/after.md`.
+
+| Route | Success | Errors |
+|---|---|---|
+| `POST /api/portal-link {nodeId}` | 201 `RequestLinkResponse { nodeId, url, expiresAt, loopback }`, where `url` is `<baseUrl>/supplier?t=p1.…`; appends `portal.requested` | `NodeNotFound` → 404 |
+| `POST /api/portal/view {t}` | 200 `PortalView { supplierLabel, buyerName, expiresAt, items }`. Each `PortalItem` holds the invoice number and date, the dominant line's description, the lane's origin, destination and modes, `status`, `answeredMode` and `answeredEnergy`, and the answers to pre-select (`defaultMode`, `defaultEnergy`). Open deliveries come first. No carbon figure, nothing personal | `InvalidToken` → 401; `LinkExpired`, `InvoiceChanged` (the link's delivery is gone) → 410; `RateLimited` → 429 |
+| `POST /api/portal/answer {t, nodeId, transportMode?, energySource?}` | 200 `PortalAnswerResult { outcome: VerifyOutcome, view: PortalView }`, through a fresh single-use verification link, so `link.requested` (actor `portal`), `verification.submitted`, `node.verified` and `audit.appended` are those of a phone answer | as above, plus `NodeNotFound` → 404 (not this supplier's), `AlreadyConfirmed` → 409, `InvalidAnswer` → 422 |
+
+Pre-selection: the answer a delivery already has, else the lane's default mode and the power source of the supplier's most recent answer, else grid. The page's rate limit is 3 × `RATE_LIMIT_PER_MIN` per address, counted apart from `/api/verify*`.
+
+On stage: Reset demo → Import `seed/invoices/adversarial.xml` (a second invoice from N3's seller, Oradea Harness SRL) → click N3 → "Supplier page link" → scan with the phone → confirm both deliveries; each flips on the dashboard. The adversarial line's injected instruction shows on its card as plain text, which is itself the proof that invoice text is only rendered. Skip the import to show N3 alone.
+
+Checked on 2026-11-06 against this branch's API on the host (memory mode, and Postgres mode on `tracegreen_test`) behind its Vite dev server: both Playwright specs pass in both modes, and the supplier spec passes four times within about a minute. Screenshots at 412 px (Pixel 7) in RO and EN looked right: one card open at a time, the status as a colour and a word on its own row. **Not yet checked:** the demo image (nginx, CSP), and a real phone on the hotspot. The Romanian strings in `web/src/copy/supplier.ts` need a native read.
 
 ## Seed XML validation (2026-10-23)
 
@@ -188,7 +206,8 @@ Current order, from the 2026-10-22 review's slice order (vertical slices toward 
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** done; `pnpm e2e` passes against Compose and the demo image, and CI runs it on the demo image in both data modes (A9).
 4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout).
-5. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
+5. **Supplier page (F12):** run both specs on the demo image (`compose.demo.yml`, both data modes) and the stage path above on a real phone over the hotspot; a native read of the Romanian strings. Merge before the H12 scope freeze, or show it as what comes next.
+6. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
 
 The task list below is the original plan, kept for its specifications; where it and the order above disagree on order, the order above wins.
 

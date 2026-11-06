@@ -26,6 +26,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | F9 | PDF invoice drop | **open** | Hackathon, if time |
 | F10 | Scenario export | **open** | Only if everything else is done |
 | F11 | AI alternative suggester | **open** | The alternatives come from the curated `seed/alternatives.json` |
+| F12 | Supplier page: one link per supplier, every delivery confirmed from one list | **built** | `PortalService`, `POST /api/portal-link`, `/api/portal/{view,answer}`, `/supplier`, the drawer's "Supplier page link"; `web/e2e/supplier-portal.spec.ts` passes on the Vite dev stack in both data modes; not yet run on the demo image or a real phone (`NEXT.md`) |
 
 ## Controls
 
@@ -35,9 +36,9 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | C2 | Token bound to the invoice hash; a mismatch is 410 | **done** | `VerifyService`, `Hashing.InvoiceHash` |
 | C3 | Single use through a unique nonce; a second use is 409 | **done** | Both repositories; the context route answers 409 too |
 | C4 | Hash-chained audit log with an on-screen check | **done** | `AuditChain`, append-only trigger, `AuditPanel` |
-| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES` |
+| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES`; the supplier page's routes count apart, at 3 × the limit (F12) |
 | C6 | Untrusted text rendered as text; CSP header | **done** | `react/no-danger` lint; CSP in `web/nginx.conf` (demo image) |
-| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` |
+| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` and `/supplier` (F12) |
 | C8 | RLS; secrets only on the server | **partial** | RLS is enabled with no policies yet (the app connects as owner); secrets are server-only; see "Known gaps" in `SECURITY.md` |
 | C9 | 7-day expiry with a countdown on the QR card | **done** | `LINK_TTL_SECONDS` default 604800; "expires in …" on the link card |
 
