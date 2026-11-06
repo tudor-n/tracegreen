@@ -95,7 +95,8 @@ function Choice({ pressed, disabled, first, testId, onClick, children }: ChoiceP
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex min-h-14 w-full items-center gap-3 px-4 text-left text-[17px] transition-colors active:bg-[#ededf0] disabled:opacity-60',
+        // The list clips its corners (overflow-hidden), so the focus outline is drawn inside the option.
+        'flex min-h-14 w-full items-center gap-3 px-4 text-left text-[17px] transition-colors focus-visible:outline-offset-[-3px] active:bg-[#ededf0] disabled:opacity-60',
         !first && 'shadow-[inset_0_0.5px_0_var(--hairline)]',
         pressed && 'font-medium',
       )}
