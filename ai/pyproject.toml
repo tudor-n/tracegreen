@@ -5,6 +5,11 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic==1.15.0",
     "fastapi==0.150.0",
+    "langchain-anthropic==1.7.6",
+    "langchain-core==1.7.0",
+    "langchain-google-genai==4.4.2",
+    "langchain-ollama==1.1.0",
+    "langchain-openai==1.7.2",
     "pydantic==2.14.1",
     "uvicorn[standard]==0.54.0",
 ]
@@ -15,6 +20,9 @@ dev = [
     "pytest==9.1.1",
     "ruff==0.17.1",
 ]
+
+[tool.uv]
+exclude-newer = "2026-10-24T00:00:00Z"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

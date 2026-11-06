@@ -26,7 +26,7 @@ export interface GraphDomain {
   mode: string
 }
 
-export type Panel = 'drawer' | 'audit' | 'simulator'
+export type Panel = 'drawer' | 'simulator'
 
 /** The figures of the base node that a scenario's deltas are taken against. */
 export type ScenarioBaseline = Pick<NodeView, 'carbonKg' | 'costEur' | 'leadDays'>
@@ -87,7 +87,7 @@ export const initialDomain: GraphDomain = { buyer: null, nodes: {}, kpis: null, 
 
 export const initialUi: GraphUi = {
   selectedNodeId: null,
-  openPanels: { drawer: false, audit: false, simulator: false },
+  openPanels: { drawer: false, simulator: false },
   scenarioPreview: null,
 }
 

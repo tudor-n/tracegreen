@@ -8,6 +8,7 @@ import {
   formatKm,
   formatKpis,
   formatShare,
+  formatShareSplit,
   formatTimeLeft,
   formatTonnes,
   formatTonnesCo2e,
@@ -94,6 +95,18 @@ describe('formatShare', () => {
     expect(formatShare(0.374)).toBe('37%')
     expect(formatShare(1)).toBe('100%')
     expect(formatShare(0)).toBe('0%')
+  })
+})
+
+describe('formatShareSplit', () => {
+  it('rounds the confirmed share and gives the estimated share as the rest, so the two add up to 100%', () => {
+    expect(formatShareSplit({ totalKg: 10, primaryShare: 0.125 })).toEqual({ confirmed: '13%', estimated: '87%' })
+    expect(formatShareSplit({ totalKg: 10, primaryShare: 0.995 })).toEqual({ confirmed: '100%', estimated: '0%' })
+    expect(formatShareSplit({ totalKg: 10, primaryShare: 0 })).toEqual({ confirmed: '0%', estimated: '100%' })
+  })
+
+  it('shows the dash for both when there are no emissions', () => {
+    expect(formatShareSplit({ totalKg: 0, primaryShare: 0 })).toEqual({ confirmed: '–', estimated: '–' })
   })
 })
 

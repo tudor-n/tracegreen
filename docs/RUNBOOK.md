@@ -41,18 +41,22 @@ Another origin, such as the demo image: `E2E_BASE_URL=http://<host>:3000 pnpm e2
 
 A failed run leaves a screenshot and a trace in `web/test-results/` (git-ignored); open the trace with `pnpm exec playwright show-trace <path>/trace.zip`.
 
+`web/e2e/supplier-portal.spec.ts` (F12) runs after it with the same setup: reset → import `seed/invoices/adversarial.xml`, a second invoice from N3's seller → N3's drawer gives the supplier page link → a phone-sized page lists both deliveries → N3 confirmed with Road + Mostly renewable is VERIFIED on the dashboard within 2 s → the second delivery comes with Mostly renewable pre-selected and flips too → the same link opened again shows both confirmed → the audit chain is valid → no CSP violation. Its calls count against the supplier page's own allowance (3 × `RATE_LIMIT_PER_MIN`), so it never eats into the smoke's.
+
 Rate limit: a run makes about four calls to `/api/verify*` (under the Vite dev server, React's StrictMode loads the supplier page's context twice), and the API allows `RATE_LIMIT_PER_MIN` (10) a minute per client address. Two runs a minute pass; a third within the same minute fails at step 3 with `data-result="rateLimited"`. Wait a minute, or `docker compose restart api` (the limiter lives in memory).
 
 Frozen test hooks: the smoke and the CI job depend on these, so rename one only together with the spec.
 
 | Where | Hooks |
 |---|---|
-| Toolbar | `toolbar-reset`, `toolbar-demo`, `toolbar-audit` |
-| Graph | `node-<id>` with `data-status`; `ghost-<id>` with `data-badge`; `ghost-<id>-saved` |
-| Node drawer | `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate` |
-| Simulator | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
-| Audit panel | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
-| Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-submit` |
+| Sidebar (every screen) | `toolbar-reset`, `toolbar-demo`; `toolbar-audit` is the Audit log link; `import-file` (the supplier page spec) |
+| Supplier tree (`/suppliers`) | `node-<id>` with `data-status` on each row; `ghost-<id>` with `data-badge` on the What if row; `ghost-<id>-saved` |
+| Side panel | `node-drawer`, `drawer-request`, `qr-url`; `drawer-simulate` is the What if tab; `drawer-portal`, `portal-url` (the supplier page spec) |
+| Simulator (What if tab) | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
+| Audit log screen (`/audit`) | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
+| Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-terms-link` (its link to `/terms/supplier`), `verify-submit` |
+| Terms page | `terms-page` with `data-phase` and `data-version` |
+| Supplier page list (F12) | `supplier-page` with `data-phase` and `data-result`; `delivery-<nodeId>` with `data-status`; `delivery-<nodeId>-open`, `delivery-<nodeId>-transport-<mode>` and `delivery-<nodeId>-energy-<source>` with `aria-pressed`, `delivery-<nodeId>-confirm`; `supplier-terms` (the page's one terms checkbox, shown while a delivery is open for answers) and `supplier-terms-link` |
 
 ## Demo laptop (production images)
 

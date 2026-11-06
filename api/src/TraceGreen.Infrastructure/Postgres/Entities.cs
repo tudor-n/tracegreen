@@ -54,6 +54,8 @@ public class VerificationRow
     public DateTimeOffset ConsumedAt { get; set; }
     public string IpHash { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public string? TermsVersion { get; set; }
+    public string? TermsSha256 { get; set; }
 }
 
 public class AuditRow
