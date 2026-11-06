@@ -9,7 +9,7 @@ import { failureFor, type Reply, type VerifyApi } from './verify-state'
 /** How long the page waits for an answer before it offers a retry. */
 export const VERIFY_TIMEOUT_MS = 10_000
 
-interface Sent<T> {
+export interface Sent<T> {
   data?: T
   error?: unknown
   response: Response
@@ -22,15 +22,26 @@ function problemCode(body: unknown): ProblemCode | null {
   return typeof code === 'string' ? (code as ProblemCode) : null
 }
 
-async function reply<T>(request: () => Promise<Sent<T>>): Promise<Reply<T>> {
+/**
+ * A request's body, or what went wrong as `failureOf` reads it: by the API's `code` and the HTTP status, or with both
+ * null when no answer arrived (a thrown fetch, a timeout). The supplier page (F12) reads failures its own way.
+ */
+export async function replyWith<T, F>(
+  request: () => Promise<Sent<T>>,
+  failureOf: (status: number | null, code: ProblemCode | null) => F,
+): Promise<{ ok: true; data: T } | { ok: false; failure: F }> {
   let sent: Sent<T>
   try {
     sent = await request()
   } catch {
-    return { ok: false, failure: 'offline' }
+    return { ok: false, failure: failureOf(null, null) }
   }
   if (sent.response.ok && sent.data !== undefined) return { ok: true, data: sent.data }
-  return { ok: false, failure: failureFor(sent.response.status, problemCode(sent.error)) }
+  return { ok: false, failure: failureOf(sent.response.status, problemCode(sent.error)) }
+}
+
+function reply<T>(request: () => Promise<Sent<T>>): Promise<Reply<T>> {
+  return replyWith(request, failureFor)
 }
 
 export function createVerifyApi(client: Client<paths>, timeoutMs = VERIFY_TIMEOUT_MS): VerifyApi {

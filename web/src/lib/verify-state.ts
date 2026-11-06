@@ -76,18 +76,18 @@ export function failureFor(status: number | null, code: ProblemCode | null): Fai
 const MODE_ORDER: Record<TransportMode, number> = { road: 0, rail: 1, sea: 2, air: 3 }
 const ENERGY_ORDER: Record<EnergySource, number> = { grid: 0, renewable: 1, unknown: 2 }
 
-/** The transport modes the link's lane has, each once, in a fixed order. */
-export function offeredModes(context: VerifyContext): TransportMode[] {
+/** The transport modes the link's lane has, each once, in a fixed order. The supplier page (F12) asks the same way. */
+export function offeredModes(context: Pick<VerifyContext, 'modes'>): TransportMode[] {
   return [...new Set(context.modes)].sort((a, b) => MODE_ORDER[a] - MODE_ORDER[b])
 }
 
 /** The energy answers the link offers, each once, in a fixed order. */
-export function offeredEnergy(context: VerifyContext): EnergySource[] {
+export function offeredEnergy(context: Pick<VerifyContext, 'energySources'>): EnergySource[] {
   return [...new Set(context.energySources)].sort((a, b) => ENERGY_ORDER[a] - ENERGY_ORDER[b])
 }
 
 /** The pre-selected answer: the context's default when it is offered, else the first option; none when there is none. */
-function preselect<T>(options: T[], preferred: T): T | null {
+export function preselect<T>(options: T[], preferred: T): T | null {
   return options.includes(preferred) ? preferred : (options[0] ?? null)
 }
 

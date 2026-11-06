@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { drawerCopy, energySourceCopy, nodeCopy, transportModeCopy } from '@/copy/dashboard'
 import { ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
-import { requestLink } from '@/lib/dashboard-actions'
+import { requestLink, requestPortalLink } from '@/lib/dashboard-actions'
 import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
 import { cn } from '@/lib/utils'
 import {
@@ -28,7 +28,8 @@ import {
 // removes the node closes it too (hydrateState). Every number comes from the API as it is; nothing is computed here.
 // "Request data" asks for a verification link and shows it in the QR card at the top; the link belongs to the node it
 // was asked for, so another node starts without one. "Simulate" opens and closes the simulator panel (B5) at the top,
-// and closing it takes its ghost node off the canvas.
+// and closing it takes its ghost node off the canvas. "Supplier page link" (F12) shows, in a second card, the link to the
+// page that lists every delivery from this node's supplier.
 
 const statusDot: Record<NodeStatus, string> = {
   ESTIMATED: 'bg-(--status-estimated)',
@@ -66,18 +67,19 @@ function DrawerBody({ node }: { node: NodeView }) {
   const ai = aiMappedLabel(node.classification)
   const answered = node.transportMode !== null || node.energySource !== null
   const [link, setLink] = useState<RequestLinkResponse | null>(null)
-  const [requesting, setRequesting] = useState(false)
+  const [portalLink, setPortalLink] = useState<RequestLinkResponse | null>(null)
+  const [requesting, setRequesting] = useState<'verify' | 'portal' | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
   const simulating = useGraphStore((s) => s.openPanels.simulator)
   const setPanel = useGraphStore((s) => s.setPanel)
 
-  const onRequest = async () => {
-    setRequesting(true)
+  const onRequest = async (kind: 'verify' | 'portal') => {
+    setRequesting(kind)
     setLinkError(null)
-    const answer = await requestLink(node.id)
-    if (answer.ok) setLink(answer.data)
+    const answer = kind === 'verify' ? await requestLink(node.id) : await requestPortalLink(node.id)
+    if (answer.ok) (kind === 'verify' ? setLink : setPortalLink)(answer.data)
     else setLinkError(answer.message)
-    setRequesting(false)
+    setRequesting(null)
   }
 
   return (
@@ -95,6 +97,7 @@ function DrawerBody({ node }: { node: NodeView }) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4">
         {link !== null && <LinkCard link={link} />}
+        {portalLink !== null && <LinkCard link={portalLink} kind="portal" />}
         {simulating && <SimulatorPanel node={node} />}
 
         <Section title={drawerCopy.emissions}>
@@ -180,8 +183,13 @@ function DrawerBody({ node }: { node: NodeView }) {
           </p>
         )}
         <div className="flex gap-2">
-          <Button className="flex-1" disabled={requesting} data-testid="drawer-request" onClick={() => void onRequest()}>
-            {requesting ? drawerCopy.requesting : drawerCopy.requestData}
+          <Button
+            className="flex-1"
+            disabled={requesting !== null}
+            data-testid="drawer-request"
+            onClick={() => void onRequest('verify')}
+          >
+            {requesting === 'verify' ? drawerCopy.requesting : drawerCopy.requestData}
           </Button>
           <Button
             className="flex-1"
@@ -193,6 +201,14 @@ function DrawerBody({ node }: { node: NodeView }) {
             {drawerCopy.simulate}
           </Button>
         </div>
+        <Button
+          variant="outline"
+          disabled={requesting !== null}
+          data-testid="drawer-portal"
+          onClick={() => void onRequest('portal')}
+        >
+          {requesting === 'portal' ? drawerCopy.supplierPageRequesting : drawerCopy.supplierPage}
+        </Button>
       </SheetFooter>
     </>
   )
