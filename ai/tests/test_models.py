@@ -1,12 +1,15 @@
 """The multi-model chain (F6): AI_MODELS, the batch call, the answer checks, the time budget,
-the runtime cache, the dev route and /health.models. Every model here is a fake
-(RunnableLambda): no network and no real keys. Model names are placeholders."""
+the runtime cache, the dev route and /health.models. Every model in the chain tests is a fake
+(RunnableLambda): no network and no real keys. The production-factory tests build the real
+clients offline and inspect the request each would send; they name real Claude model ids
+because those differ in what they accept, and placeholders for the rest."""
 
 from __future__ import annotations
 
 import json
 import threading
 import time
+import warnings
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
@@ -14,12 +17,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import BaseMessage
-from langchain_core.runnables import Runnable, RunnableLambda
+from langchain_core.runnables import Runnable, RunnableBinding, RunnableLambda
 
 from app.config import ModelSpec, Settings
 from app.main import create_app
 from app.models import chat_model_factory
-from app.prompts import answer_schema, load_categories
+from app.prompts import answer_schema, load_categories, messages, system_prompt
+from app.schemas import ClassificationInput
 
 SEED = Path(__file__).resolve().parents[2] / "seed"
 ALLOW_LIST = {c["id"] for c in json.loads((SEED / "categories.json").read_text("utf-8"))}
@@ -514,24 +518,50 @@ def test_without_dev_routes_the_model_parameter_is_ignored() -> None:
 # --- The production factory ----------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    ("model_id", "timeout_field", "timeout"),
-    [
-        ("anthropic:model-c", "default_request_timeout", 4.0),
-        (CLOUD_A, "request_timeout", 4.0),
-        (CLOUD_B, "timeout", 4.0),
-        (LOCAL, None, 6.0),
-    ],
-)
-def test_the_production_factory_sets_temperature_retries_and_timeout(
-    model_id: str, timeout_field: str | None, timeout: float
-) -> None:
-    """Built offline with placeholder keys; nothing is sent."""
+# Current Claude model ids, which differ in what they accept (temperature, forced tools).
+CLAUDE_MODELS = [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-1",
+    "claude-haiku-5-5",
+    "claude-haiku-4-5",
+]
+
+
+def production(model_id: str) -> tuple[Any, dict[str, Any]]:
+    """The chat model behind the production runnable for `model_id`, and the keyword arguments
+    the runnable calls it with. Built offline with placeholder keys; nothing is sent."""
     config = settings(AI_MODELS=model_id, ANTHROPIC_API_KEY="test-key", **KEYS)
     (spec,) = config.models
     runnable = chat_model_factory(config)(spec, answer_schema(load_categories(SEED)))
-    model = runnable.first.bound
-    assert model.temperature == 0
+    extra: dict[str, Any] = {}
+    if isinstance(runnable, RunnableBinding):  # a binding around the whole structured runnable
+        extra, runnable = dict(runnable.kwargs), runnable.bound
+    binding = runnable.first
+    # LangChain strips its own ls_* tracing arguments before it builds the request.
+    kwargs = {k: v for k, v in {**binding.kwargs, **extra}.items() if not k.startswith("ls_")}
+    return binding.bound, kwargs
+
+
+def request_messages() -> list[BaseMessage]:
+    line = ClassificationInput(line_id="L1", description="Placi PCB 4 straturi")
+    return messages(system_prompt(load_categories(SEED)), [("1", line)])
+
+
+@pytest.mark.parametrize(
+    ("model_id", "timeout_field", "timeout", "temperature"),
+    [
+        ("anthropic:claude-haiku-4-5", "default_request_timeout", 4.0, None),
+        (CLOUD_A, "request_timeout", 4.0, 0),
+        (CLOUD_B, "timeout", 4.0, 0),
+        (LOCAL, None, 6.0, 0),
+    ],
+)
+def test_the_production_factory_sets_temperature_retries_and_timeout(
+    model_id: str, timeout_field: str | None, timeout: float, temperature: float | None
+) -> None:
+    model, _ = production(model_id)
+    assert model.temperature == temperature
     if timeout_field is None:
         assert model.client_kwargs == {"timeout": timeout}
         assert model.reasoning is False
@@ -539,3 +569,45 @@ def test_the_production_factory_sets_temperature_retries_and_timeout(
     else:
         assert getattr(model, timeout_field) == timeout
         assert model.max_retries == 0
+
+
+@pytest.mark.parametrize("claude", CLAUDE_MODELS)
+def test_every_claude_model_gets_structured_output_without_temperature_or_a_forced_tool(
+    claude: str,
+) -> None:
+    """The request each Claude model would be sent, built offline. A temperature or a forced
+    tool that the model rejects raises or warns here, before anything is sent."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        model, kwargs = production(f"anthropic:{claude}")
+        payload = model._get_request_payload(request_messages(), **kwargs)
+    assert payload.get("temperature") is None
+    assert "tools" not in payload and "tool_choice" not in payload
+    output_format = payload["output_config"]["format"]
+    assert output_format["type"] == "json_schema"
+    category = output_format["schema"]["properties"]["answers"]["items"]["properties"]["categoryId"]
+    assert set(category["enum"]) == ALLOW_LIST
+
+
+def test_the_openai_request_is_a_strict_json_schema_at_temperature_0() -> None:
+    model, kwargs = production(CLOUD_A)
+    payload = model._get_request_payload(request_messages(), **kwargs)
+    assert payload["temperature"] == 0
+    assert payload["response_format"]["type"] == "json_schema"
+    assert payload["response_format"]["json_schema"]["strict"] is True
+
+
+def test_the_google_request_asks_for_json_in_the_schema_at_temperature_0() -> None:
+    model, kwargs = production(CLOUD_B)
+    config = model._prepare_request(request_messages(), **kwargs)["config"]
+    assert config.temperature == 0
+    assert config.response_mime_type == "application/json"
+    assert config.response_json_schema["properties"]["answers"]["type"] == "array"
+
+
+def test_the_ollama_request_turns_thinking_off_and_passes_the_schema() -> None:
+    model, kwargs = production(LOCAL)
+    params = model._chat_params(request_messages(), **kwargs)
+    assert params["think"] is False
+    assert params["format"]["properties"]["answers"]["type"] == "array"
+    assert params["options"]["temperature"] == 0

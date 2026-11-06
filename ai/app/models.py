@@ -1,9 +1,10 @@
 """The chat models behind /classify, one factory per provider, built lazily: a client exists
 only once the chain first calls that model, and never when no model is configured.
 
-Every model runs at temperature 0, with no retries and a request timeout equal to its cap,
-so a call the chain has given up on ends soon after. The provider packages are imported
-inside the factories, so a service with no models never loads them."""
+Every model runs with no retries and a request timeout equal to its cap, so a call the chain
+has given up on ends soon after, and at temperature 0 except Anthropic's (see its factory).
+The provider packages are imported inside the factories, so a service with no models never
+loads them."""
 
 from __future__ import annotations
 
@@ -26,15 +27,17 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
         if spec.provider == "anthropic":
             from langchain_anthropic import ChatAnthropic
 
+            # No temperature: claude-sonnet-5-5 and claude-fable-5 reject any but the default.
+            # Structured output (output_config.format) rather than tool use, because
+            # claude-opus-5-5, claude-sonnet-5-5 and claude-fable-5-1 cannot be forced to call
+            # a tool and may answer in text instead.
             model = ChatAnthropic(
                 model=spec.model,
                 api_key=settings.api_key("anthropic"),
-                temperature=0,
                 max_retries=0,
                 default_request_timeout=spec.timeout_s,
             )
-            # Tool use, with the tool forced.
-            return model.with_structured_output(schema)
+            return model.with_structured_output(schema, method="json_schema")
         if spec.provider == "openai":
             from langchain_openai import ChatOpenAI
 
