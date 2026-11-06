@@ -130,3 +130,31 @@ public sealed record VerifyAnswer(string Token, TransportMode? TransportMode, En
 
 /// <summary>What the phone page shows after a submit: the node's new status and any plausibility warnings.</summary>
 public sealed record VerifyOutcome(Guid NodeId, NodeStatus Status, IReadOnlyList<PlausibilityWarning> Warnings);
+
+/// <summary>
+/// The supplier page (F12): every delivery on the buyer's graph from the supplier the link was made for, with nothing
+/// personal and no carbon figure. Items still waiting for an answer come before confirmed ones.
+/// </summary>
+public sealed record PortalView(string SupplierLabel, string BuyerName, DateTimeOffset ExpiresAt, IReadOnlyList<PortalItem> Items);
+
+/// <summary>
+/// One delivery on the supplier page, with what the phone page would ask for it. <see cref="DefaultMode"/> and
+/// <see cref="DefaultEnergy"/> are the answers to pre-select: an answer the node already has, else the lane's default mode
+/// and the power source the supplier gave most recently, else grid. <see cref="AnsweredMode"/> and
+/// <see cref="AnsweredEnergy"/> are what the supplier has confirmed so far (null when not answered).
+/// <see cref="ItemDescription"/> is invoice text: render it as text.
+/// </summary>
+public sealed record PortalItem(
+    Guid NodeId,
+    NodeStatus Status,
+    string InvoiceNumber,
+    DateOnly IssueDate,
+    string ItemDescription,
+    string Origin,
+    string Dest,
+    IReadOnlyList<TransportMode> Modes,
+    TransportMode DefaultMode,
+    IReadOnlyList<EnergySource> EnergySources,
+    EnergySource DefaultEnergy,
+    TransportMode? AnsweredMode,
+    EnergySource? AnsweredEnergy);
