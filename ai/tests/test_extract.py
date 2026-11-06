@@ -164,6 +164,8 @@ def test_amounts_and_dates_are_found_in_either_convention() -> None:
     assert "9.840,00" in number_forms("9840")
     assert found_number("9840.00", "total 9.840,00 eur")
     assert found_number("1200", "1.200 pcs")
+    assert found_number("1.200", "1.200 pcs")
+    assert found_number("12.000,00", "total: 12.000,00 eur")
     assert not found_number("984", "total 9.840,00 eur")
     assert found_date("2026-10-22", "date: 22.10.2026")
     assert not found_date("2026-10-23", "date: 22.10.2026")

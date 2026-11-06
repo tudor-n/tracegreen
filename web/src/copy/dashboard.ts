@@ -219,7 +219,9 @@ export const connectionCopy = {
 export const toolbarCopy = {
   import: 'Import invoice',
   importing: 'Importing…',
-  fileInput: 'UBL invoice (XML file)',
+  fileInput: 'Invoice: UBL XML, or a PDF to check before importing',
+  /** After a PDF upload: the review form opens. */
+  pdfReady: 'Check the fields read from the PDF.',
   demo: 'Load demo invoice',
   demoLoading: 'Loading…',
   reset: 'Reset demo',
