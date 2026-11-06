@@ -162,6 +162,7 @@ def test_health_reports_the_provider_chain_and_the_cache_size() -> None:
         "provider": "cache,stub",
         "cacheEntries": entries,
         "modelConfigured": False,
+        "models": [],
     }
 
 
