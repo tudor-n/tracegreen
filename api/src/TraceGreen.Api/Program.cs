@@ -61,6 +61,7 @@ builder.Services.AddSingleton<ClassificationService>();
 // Scoped: they hold the typed AI HttpClient, which the client factory hands out per resolution.
 builder.Services.AddScoped<IngestService>();
 builder.Services.AddScoped<DemoService>();
+builder.Services.AddScoped<SuggestionService>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -126,6 +127,7 @@ app.MapTerms();
 app.MapAudit();
 app.MapScenarios();
 app.MapClassification();
+app.MapSuggestions();
 app.MapDev();
 
 app.Run();

@@ -292,6 +292,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which of the node's curated alternatives the AI picks, with a short reason each; no figures */
+        get: operations["SuggestAlternatives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -709,6 +726,14 @@ export interface components {
             energySource?: null | components["schemas"]["EnergySource"];
             /** Format: double */
             massT?: null | number;
+        };
+        SuggestionView: {
+            alternativeId: string;
+            rationale: null | string;
+        };
+        SuggestionsView: {
+            suggestions: components["schemas"]["SuggestionView"][];
+            provider: string;
         };
         SupplierTerms: {
             version: string;
@@ -1470,6 +1495,37 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SuggestAlternatives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionsView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -26,6 +26,32 @@ public class HttpAiClientTests
         new(new HttpClient(handler) { BaseAddress = new Uri("http://ai:8000") }, new AiOptions(new Uri("http://ai:8000"), TimeSpan.FromSeconds(10)));
 
     [Fact]
+    public async Task SuggestPostsTheNodeAndCandidatesWithoutFiguresAndReadsTheProvider()
+    {
+        var handler = new CapturingHandler(HttpStatusCode.OK,
+            """{"suggestions":[{"alternativeId":"N2-alt","rationale":"Same boards, made in Romania.","label":"Banat Circuits SRL"}],"provider":"openai:model-a"}""");
+
+        var outcome = await Client(handler).SuggestAsync(
+            new SuggestNodeInput("Printed circuit boards", "4-layer FR4 boards", "TW", "Taoyuan, TW", "sea", "VERIFIED"),
+            [new SuggestCandidateInput("N2-alt", "Banat Circuits SRL", "RO", "Timisoara, RO", "road")],
+            CancellationToken.None);
+
+        Assert.Equal("/suggest", handler.Request!.RequestUri!.AbsolutePath);
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        var node = body.RootElement.GetProperty("node");
+        Assert.Equal("Printed circuit boards", node.GetProperty("categoryLabel").GetString());
+        Assert.Equal("sea", node.GetProperty("mode").GetString());
+        Assert.Equal(
+            ["categoryLabel", "lineDescription", "country", "origin", "mode", "status"],
+            node.EnumerateObject().Select(p => p.Name));
+        var candidate = body.RootElement.GetProperty("candidates")[0];
+        Assert.Equal(["alternativeId", "label", "country", "origin", "mode"], candidate.EnumerateObject().Select(p => p.Name));
+
+        Assert.Equal("openai:model-a", outcome.Provider);
+        Assert.Equal("N2-alt", Assert.Single(outcome.Suggestions).AlternativeId);
+    }
+
+    [Fact]
     public async Task ClassifyPostsTheContractAndParsesTheAnswer()
     {
         var handler = new CapturingHandler(HttpStatusCode.OK,
