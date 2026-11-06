@@ -75,22 +75,12 @@ public sealed class PortalService(
         {
             return Result<PortalView, PortalError>.Fail(opened.Error);
         }
-        var supplier = opened.Value;
-        var buyer = await repo.GetBuyerAsync(supplier.Ctx, ct);
-        var deliveries = await DeliveriesAsync(supplier, ct);
-        var lastEnergy = await LastEnergyAsync(supplier.Ctx, deliveries, ct);
-
-        var items = deliveries
-            .Select(d => Item(d, lastEnergy))
-            .OrderBy(i => i.Status == NodeStatus.Verified)
-            .ThenByDescending(i => i.IssueDate)
-            .ThenBy(i => i.InvoiceNumber, StringComparer.Ordinal)
-            .ToList();
-        return Result<PortalView, PortalError>.Ok(new PortalView(supplier.Anchor.Label, buyer.Name, supplier.ExpiresAt, items));
+        return Result<PortalView, PortalError>.Ok(await BuildViewAsync(opened.Value, ct));
     }
 
+    /// <summary>Answers one delivery, then returns the list as it now is: new order, and the answer's power source pre-selected elsewhere.</summary>
     /// <param name="clientAddress">Passed on to <see cref="VerifyService.SubmitAsync"/>, which stores only its hash.</param>
-    public async Task<Result<VerifyOutcome, PortalError>> AnswerAsync(
+    public async Task<Result<PortalAnswerResult, PortalError>> AnswerAsync(
         string? token, Guid nodeId, TransportMode? mode, EnergySource? energy, string? clientAddress, CancellationToken ct)
     {
         var opened = await OpenAsync(token, ct);
@@ -128,7 +118,9 @@ public sealed class PortalService(
             return Fail(new PortalError(PortalErrorCode.NodeNotFound, minted.Error.Message));
         }
         var submitted = await verify.SubmitAsync(new VerifyAnswer(minted.Value.Token, mode, energy, null), clientAddress, ct);
-        return submitted.IsOk ? Result<VerifyOutcome, PortalError>.Ok(submitted.Value) : Fail(From(submitted.Error));
+        return submitted.IsOk
+            ? Result<PortalAnswerResult, PortalError>.Ok(new PortalAnswerResult(submitted.Value, await BuildViewAsync(supplier, ct)))
+            : Fail(From(submitted.Error));
     }
 
     /// <summary>
@@ -173,6 +165,20 @@ public sealed class PortalService(
                 new PortalError(PortalErrorCode.SupplierGone, "The delivery this link was made for is no longer on the graph."));
         }
         return Result<Supplier, PortalError>.Ok(new Supplier(ctx, anchor, SupplierKey(anchor, invoice), verified.Value.ExpiresAt));
+    }
+
+    private async Task<PortalView> BuildViewAsync(Supplier supplier, CancellationToken ct)
+    {
+        var buyer = await repo.GetBuyerAsync(supplier.Ctx, ct);
+        var deliveries = await DeliveriesAsync(supplier, ct);
+        var lastEnergy = await LastEnergyAsync(supplier.Ctx, deliveries, ct);
+        var items = deliveries
+            .Select(d => Item(d, lastEnergy))
+            .OrderBy(i => i.Status == NodeStatus.Verified)
+            .ThenByDescending(i => i.IssueDate)
+            .ThenBy(i => i.InvoiceNumber, StringComparer.Ordinal)
+            .ToList();
+        return new PortalView(supplier.Anchor.Label, buyer.Name, supplier.ExpiresAt, items);
     }
 
     private async Task<List<Delivery>> DeliveriesAsync(Supplier supplier, CancellationToken ct)
@@ -245,5 +251,5 @@ public sealed class PortalService(
         },
         error.Message);
 
-    private static Result<VerifyOutcome, PortalError> Fail(PortalError error) => Result<VerifyOutcome, PortalError>.Fail(error);
+    private static Result<PortalAnswerResult, PortalError> Fail(PortalError error) => Result<PortalAnswerResult, PortalError>.Fail(error);
 }

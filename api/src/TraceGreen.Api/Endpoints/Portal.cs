@@ -16,11 +16,18 @@ public sealed record PortalAnswerRequest(string? T, Guid NodeId, TransportMode? 
 /// appears in a response body, an audit payload or a log line. Statuses: malformed or bad signature → 401
 /// <c>InvalidToken</c>; expired → 410 <c>LinkExpired</c>; the link's delivery gone → 410 <c>InvoiceChanged</c>; a delivery
 /// that is not this supplier's → 404 <c>NodeNotFound</c>; already confirmed → 409 <c>AlreadyConfirmed</c>; over
-/// <c>RATE_LIMIT_PER_MIN</c> per client address → 429 <c>RateLimited</c>, counted apart from the verify routes.
+/// <see cref="RateLimitFactor"/> × <c>RATE_LIMIT_PER_MIN</c> per client address → 429 <c>RateLimited</c>, counted apart
+/// from the verify routes.
 /// </summary>
 public static class PortalEndpoints
 {
     public const string RateLimitPolicy = "portal";
+
+    /// <summary>
+    /// The page holds a whole list: one call to open it and one per confirmed delivery, where the phone page needs two
+    /// calls for its one link. A supplier going through a dozen deliveries in a minute stays inside the allowance.
+    /// </summary>
+    public const int RateLimitFactor = 3;
 
     public static IEndpointRouteBuilder MapPortal(this IEndpointRouteBuilder app)
     {
@@ -56,8 +63,8 @@ public static class PortalEndpoints
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("SubmitPortalAnswer")
             .WithTags("Portal")
-            .WithSummary("Confirm one delivery from the supplier page: both answered → VERIFIED, one skipped → PARTIAL; warnings never block")
-            .Produces<VerifyOutcome>()
+            .WithSummary("Confirm one delivery from the supplier page: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is")
+            .Produces<PortalAnswerResult>()
             .ProducesApiProblem(
                 StatusCodes.Status401Unauthorized,
                 StatusCodes.Status404NotFound,

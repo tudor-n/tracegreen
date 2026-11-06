@@ -182,7 +182,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Confirm one delivery from the supplier page: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
+        /** Confirm one delivery from the supplier page: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is */
         post: operations["SubmitPortalAnswer"];
         delete?: never;
         options?: never;
@@ -548,6 +548,10 @@ export interface components {
             nodeId: string;
             transportMode?: null | components["schemas"]["TransportMode"];
             energySource?: null | components["schemas"]["EnergySource"];
+        };
+        PortalAnswerResult: {
+            outcome: components["schemas"]["VerifyOutcome"];
+            view: components["schemas"]["PortalView"];
         };
         PortalItem: {
             /** Format: uuid */
@@ -1136,7 +1140,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VerifyOutcome"];
+                    "application/json": components["schemas"]["PortalAnswerResult"];
                 };
             };
             /** @description Unauthorized */

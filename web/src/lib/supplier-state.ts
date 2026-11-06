@@ -2,11 +2,11 @@ import type {
   EnergySource,
   PlausibilityWarning,
   PortalAnswerRequest,
+  PortalAnswerResult,
   PortalItem,
   PortalView,
   ProblemCode,
   TransportMode,
-  VerifyOutcome,
 } from '@/api/client'
 import { type Answers, canSubmit, offeredEnergy, offeredModes, preselect } from './verify-state'
 
@@ -14,6 +14,7 @@ import { type Answers, canSubmit, offeredEnergy, offeredModes, preselect } from 
 // answers pre-selected for it, and what happens after a send. The page performs the requests the state asks for (the
 // list while loading or stale, the open delivery's answers while sending) and renders the rest, so every rule here is
 // unit-tested without a browser. The questions, their order and their rules are those of /verify (./verify-state.ts).
+// An answer comes back with the list as it now is, so confirming a delivery is one request.
 
 /**
  * What a failed request means. `invalid`, `expired` and `gone` end the link; `changed` means the one delivery moved on
@@ -32,7 +33,7 @@ export type SupplierReply<T> = { ok: true; data: T } | { ok: false; failure: Sup
 /** The two requests the page makes. */
 export interface SupplierApi {
   view(token: string): Promise<SupplierReply<PortalView>>
-  answer(request: PortalAnswerRequest): Promise<SupplierReply<VerifyOutcome>>
+  answer(request: PortalAnswerRequest): Promise<SupplierReply<PortalAnswerResult>>
 }
 
 /**
@@ -86,7 +87,7 @@ export type SupplierState =
       draft: Draft | null
       /** The "please reconfirm" warnings of answers sent from this page, by node id. */
       warnings: Record<string, PlausibilityWarning[]>
-      /** True after an answer: the list is loaded again for the server's order and pre-selections. */
+      /** True when the supplier asked to reload the list (a delivery changed meanwhile): it is fetched again. */
       stale: boolean
     }
   | { phase: 'failed'; failure: PageFailure; retryable: boolean }
@@ -99,7 +100,7 @@ export type SupplierInput =
   | { kind: 'transport'; value: TransportMode | null }
   | { kind: 'energy'; value: EnergySource | null }
   | { kind: 'send' }
-  | { kind: 'answered'; nodeId: string; outcome: VerifyOutcome }
+  | { kind: 'answered'; nodeId: string; result: PortalAnswerResult }
   | { kind: 'answerFailed'; nodeId: string; failure: SupplierFailure }
   | { kind: 'reload' }
 
@@ -187,18 +188,12 @@ export function supplierReducer(state: SupplierState, input: SupplierInput): Sup
       return { ...state, draft: { ...state.draft, sending: true, failure: null } }
     case 'answered': {
       if (state.phase !== 'ready' || state.draft?.nodeId !== input.nodeId || !state.draft.sending) return state
-      const { answers } = state.draft
-      const items = state.view.items.map((item) =>
-        item.nodeId === input.nodeId
-          ? { ...item, status: input.outcome.status, answeredMode: answers.transport, answeredEnergy: answers.energy }
-          : item,
-      )
+      // The API's list: the new status, the new order, and the answer's power source pre-selected on the others.
       return {
         ...state,
-        view: { ...state.view, items },
+        view: input.result.view,
         draft: null,
-        warnings: { ...state.warnings, [input.nodeId]: input.outcome.warnings },
-        stale: true,
+        warnings: { ...state.warnings, [input.nodeId]: input.result.outcome.warnings },
       }
     }
     case 'answerFailed': {

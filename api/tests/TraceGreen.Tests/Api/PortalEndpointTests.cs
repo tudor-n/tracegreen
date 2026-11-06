@@ -173,7 +173,9 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
         var response = await Answer(token, N3, "road", "renewable");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("VERIFIED", (await Json(response)).GetProperty("status").GetString());
+        var body = await Json(response);
+        Assert.Equal("VERIFIED", body.GetProperty("outcome").GetProperty("status").GetString());
+        Assert.Equal("VERIFIED", ItemOf(body.GetProperty("view"), N3).GetProperty("status").GetString());
         var node = await Repo.GetNodeAsync(Ctx, N3, Ct);
         Assert.Equal(NodeStatus.Verified, node!.Status);
         Assert.Equal(EnergySource.Renewable, node.EnergySource);
@@ -191,7 +193,10 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
         await Reset();
         var second = await ImportSecondOradeaInvoice();
         var token = await Token(N3);
-        Assert.Equal(HttpStatusCode.OK, (await Answer(token, N3, "road", "renewable")).StatusCode);
+        var answered = await Answer(token, N3, "road", "renewable");
+        Assert.Equal(HttpStatusCode.OK, answered.StatusCode);
+        // The answer carries the list as it now is, the same list the page would read next.
+        Assert.Equal((await ViewOk(token)).GetRawText(), (await Json(answered)).GetProperty("view").GetRawText());
 
         var view = await ViewOk(token);
 
@@ -227,7 +232,7 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
 
         var response = await Answer(token, N5, item.GetProperty("defaultMode").GetString(), item.GetProperty("defaultEnergy").GetString());
 
-        Assert.Equal("VERIFIED", (await Json(response)).GetProperty("status").GetString());
+        Assert.Equal("VERIFIED", (await Json(response)).GetProperty("outcome").GetProperty("status").GetString());
     }
 
     [Fact]
@@ -345,10 +350,11 @@ public class PortalRateLimitTests : IClassFixture<RateLimitedWebAppFactory>
     }
 
     [Fact]
-    public async Task TheEleventhCallInAMinuteIs429AndThePhonePageKeepsItsOwnAllowance()
+    public async Task TheThirtyFirstCallInAMinuteIs429AndThePhonePageKeepsItsOwnAllowance()
     {
+        // Three times the phone page's 10 a minute, since the page holds a list.
         const string peer = "192.168.137.30";
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 30; i++)
         {
             Assert.Equal(HttpStatusCode.Unauthorized, (await Send(HttpMethod.Post, "/api/portal/view", peer, new { t = "garbage" })).StatusCode);
         }

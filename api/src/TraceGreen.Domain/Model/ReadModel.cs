@@ -158,3 +158,6 @@ public sealed record PortalItem(
     EnergySource DefaultEnergy,
     TransportMode? AnsweredMode,
     EnergySource? AnsweredEnergy);
+
+/// <summary>What the supplier page gets back for an answer: the outcome, and the list as it now is, so one call is one confirmation.</summary>
+public sealed record PortalAnswerResult(VerifyOutcome Outcome, PortalView View);

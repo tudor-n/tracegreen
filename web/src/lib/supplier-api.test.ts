@@ -71,11 +71,11 @@ describe('view', () => {
 describe('answer', () => {
   const body = { t: 'p1.abc', nodeId: '11111111-1111-4111-8111-000000000003', transportMode: 'road', energySource: null } as const
 
-  it('posts the answers and returns the outcome', async () => {
-    const outcome = { nodeId: body.nodeId, status: 'PARTIAL', warnings: [] }
-    const { supplier, sent } = apiWith(() => json(200, outcome))
+  it('posts the answers and returns the outcome with the list as it now is', async () => {
+    const result = { outcome: { nodeId: body.nodeId, status: 'PARTIAL', warnings: [] }, view }
+    const { supplier, sent } = apiWith(() => json(200, result))
 
-    expect(await supplier.answer(body)).toEqual({ ok: true, data: outcome })
+    expect(await supplier.answer(body)).toEqual({ ok: true, data: result })
     expect(new URL(sent[0].url).pathname).toBe('/api/portal/answer')
     expect(await sent[0].json()).toEqual(body)
   })

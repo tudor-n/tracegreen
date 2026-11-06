@@ -88,15 +88,15 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = (context, ct) => new ValueTask(
         Problems.Result(ProblemCode.RateLimited, "Too many attempts from this address; wait a minute.").ExecuteAsync(context.HttpContext));
     // Read per request, so tests can override AppConfig the way they do for DEMO_TOOLS.
-    // The supplier page counts apart from the verify routes, so a supplier going through a list never uses up the
-    // phone page's attempts from the same address, nor the other way round.
-    foreach (var policy in new[] { VerifyEndpoints.RateLimitPolicy, PortalEndpoints.RateLimitPolicy })
+    // The supplier page (F12) counts apart from the verify routes, so a supplier going through a list never uses up the
+    // phone page's attempts from the same address, nor the other way round; its allowance is a multiple, as it holds a list.
+    foreach (var (policy, factor) in new[] { (VerifyEndpoints.RateLimitPolicy, 1), (PortalEndpoints.RateLimitPolicy, PortalEndpoints.RateLimitFactor) })
     {
         options.AddPolicy(policy, http => RateLimitPartition.GetFixedWindowLimiter(
             http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = http.RequestServices.GetRequiredService<AppConfig>().RateLimitPerMin,
+                PermitLimit = http.RequestServices.GetRequiredService<AppConfig>().RateLimitPerMin * factor,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));

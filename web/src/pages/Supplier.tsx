@@ -28,7 +28,7 @@ export default function Supplier() {
     document.documentElement.lang = lang
   }, [lang])
 
-  // The list: on first load, on a retry, and again after an answer. A reply that arrives after the page moved on is dropped.
+  // The list: on first load, on a retry, and on "reload the list". A reply that arrives after the page moved on is dropped.
   const wantsList = state.phase === 'loading' || (state.phase === 'ready' && state.stale)
   useEffect(() => {
     if (!wantsList || token === null) return
@@ -52,7 +52,7 @@ export default function Supplier() {
       if (!current) return
       dispatch(
         reply.ok
-          ? { kind: 'answered', nodeId, outcome: reply.data }
+          ? { kind: 'answered', nodeId, result: reply.data }
           : { kind: 'answerFailed', nodeId, failure: reply.failure },
       )
     })

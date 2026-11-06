@@ -188,42 +188,35 @@ describe('answers', () => {
 
 describe('after a send', () => {
   const sending = () => run(ready(), { kind: 'open', nodeId: N3 }, { kind: 'energy', value: 'renewable' }, { kind: 'send' })
+  const confirmedList = view([
+    item({ nodeId: SECOND, invoiceNumber: 'OH-2026-ADV1', defaultEnergy: 'renewable' }),
+    item({ status: 'VERIFIED', answeredMode: 'road', answeredEnergy: 'renewable' }),
+  ])
 
-  it("shows the API's status and the answers on the card, keeps the warnings, and asks for a fresh list", () => {
+  it("shows the API's list as it now is and keeps the answer's warnings", () => {
     const warnings = [{ code: 'AIR_HEAVY' as const, detail: 'Air above 2 t.' }]
     const state = readyState(
-      supplierReducer(sending(), { kind: 'answered', nodeId: N3, outcome: { nodeId: N3, status: 'VERIFIED', warnings } }),
+      supplierReducer(sending(), {
+        kind: 'answered',
+        nodeId: N3,
+        result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings }, view: confirmedList },
+      }),
     )
     expect(state.draft).toBeNull()
-    expect(state.stale).toBe(true)
+    expect(state.stale).toBe(false)
+    expect(state.view).toBe(confirmedList)
     expect(state.warnings[N3]).toEqual(warnings)
-    expect(state.view.items[0]).toMatchObject({ status: 'VERIFIED', answeredMode: 'road', answeredEnergy: 'renewable' })
     expect(confirmedCount(state.view)).toEqual({ confirmed: 1, total: 2 })
   })
 
-  it("replaces the list with the fresh one, keeping a delivery opened meanwhile", () => {
+  it('opens the next delivery with what the API now pre-selects', () => {
     const answered = supplierReducer(sending(), {
       kind: 'answered',
       nodeId: N3,
-      outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] },
+      result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] }, view: confirmedList },
     })
-    const reopened = supplierReducer(answered, { kind: 'open', nodeId: SECOND })
-    const fresh = view([item({ nodeId: SECOND, defaultEnergy: 'renewable' }), item({ status: 'VERIFIED' })])
-    const state = readyState(supplierReducer(reopened, { kind: 'loaded', view: fresh }))
-    expect(state.view).toBe(fresh)
-    expect(state.stale).toBe(false)
-    expect(state.draft?.nodeId).toBe(SECOND)
-  })
-
-  it('keeps the list on screen when the refresh fails', () => {
-    const answered = supplierReducer(sending(), {
-      kind: 'answered',
-      nodeId: N3,
-      outcome: { nodeId: N3, status: 'PARTIAL', warnings: [] },
-    })
-    const state = readyState(supplierReducer(answered, { kind: 'loadFailed', failure: 'offline' }))
-    expect(state.stale).toBe(false)
-    expect(state.view.items[0].status).toBe('PARTIAL')
+    const state = readyState(supplierReducer(answered, { kind: 'open', nodeId: SECOND }))
+    expect(state.draft?.answers).toEqual({ transport: 'road', energy: 'renewable' })
   })
 
   it('ignores a list nobody asked for', () => {
@@ -245,17 +238,38 @@ describe('after a send', () => {
     })
   })
 
-  it('reload closes the delivery and fetches the list again', () => {
+  it('reload closes the delivery, fetches the list again and takes the fresh one', () => {
     const failed = supplierReducer(sending(), { kind: 'answerFailed', nodeId: N3, failure: 'changed' })
-    const state = readyState(supplierReducer(failed, { kind: 'reload' }))
-    expect(state.draft).toBeNull()
-    expect(state.stale).toBe(true)
+    const reloading = readyState(supplierReducer(failed, { kind: 'reload' }))
+    expect(reloading.draft).toBeNull()
+    expect(reloading.stale).toBe(true)
+    const state = readyState(supplierReducer(reloading, { kind: 'loaded', view: confirmedList }))
+    expect(state.view).toBe(confirmedList)
+    expect(state.stale).toBe(false)
+  })
+
+  it('keeps the list on screen when a reload fails', () => {
+    const reloading = supplierReducer(ready(), { kind: 'reload' })
+    const state = readyState(supplierReducer(reloading, { kind: 'loadFailed', failure: 'offline' }))
+    expect(state.stale).toBe(false)
+    expect(state.view.items).toHaveLength(2)
+  })
+
+  it('a fresh list keeps a delivery opened meanwhile, unless it is now confirmed', () => {
+    const reloading = run(ready(), { kind: 'reload' }, { kind: 'open', nodeId: SECOND })
+    expect(readyState(supplierReducer(reloading, { kind: 'loaded', view: confirmedList })).draft?.nodeId).toBe(SECOND)
+    const openN3 = run(ready(), { kind: 'reload' }, { kind: 'open', nodeId: N3 })
+    expect(readyState(supplierReducer(openN3, { kind: 'loaded', view: confirmedList })).draft).toBeNull()
   })
 
   it("ignores another node's late reply", () => {
     const state = sending()
     expect(
-      supplierReducer(state, { kind: 'answered', nodeId: SECOND, outcome: { nodeId: SECOND, status: 'VERIFIED', warnings: [] } }),
+      supplierReducer(state, {
+        kind: 'answered',
+        nodeId: SECOND,
+        result: { outcome: { nodeId: SECOND, status: 'VERIFIED', warnings: [] }, view: confirmedList },
+      }),
     ).toBe(state)
   })
 })
