@@ -82,6 +82,21 @@ Reset to the demo start state at any time with the "Reset demo" button (or `POST
 
 Copy `.env.example` to `.env` for the variables each service reads.
 
+## AI models (F6)
+
+With nothing set, the AI service answers from `seed/ai-cache.json` and the stub, which covers every line on the demo path. To classify new lines, such as those of `seed/invoices/R1-bistrita.xml` and `R3-tarnaveni.xml`, with live models:
+
+1. **Pick the models.** In the root `.env` (git-ignored; start from `.env.example`), set `AI_MODELS` to an ordered, comma-separated list of `<provider>:<model>`, for example `AI_MODELS=openai:<model>,google_genai:<model>,ollama:qwen3.5:4b`. The providers are `anthropic`, `openai`, `google_genai` and `ollama`. The text before the first `:` is the provider and the rest is the model name, so Ollama tags with colons work. An older `.env` with `AI_MODEL` and `ANTHROPIC_API_KEY` still works and counts as `anthropic:<AI_MODEL>`.
+2. **Add the keys** of the cloud providers you listed (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`) to the same `.env`. A model whose key is missing is skipped. A git worktree does not get the `.env`; copy it in by hand.
+3. **Set up the local model.** Install Ollama on the host, then run `ollama pull qwen3.5:4b` (or `qwen3.5:9b` on a laptop with a GPU of about 8 GB). Ollama listens on port 11434, and the container reaches it as `http://host.docker.internal:11434` (`OLLAMA_BASE_URL`; `compose.yml` maps the name to the host gateway). Check it from the container: `docker compose exec ai curl -s http://host.docker.internal:11434/api/tags` must list the pulled model. When the AI service runs on the host instead, set `OLLAMA_BASE_URL=http://localhost:11434`.
+   - **On Linux** Ollama listens on `127.0.0.1` by default, which a container cannot reach. Bind it to the Docker bridge address that `host-gateway` stands for (`ip -4 addr show docker0`, usually `172.17.0.1`): `sudo systemctl edit ollama`, add `Environment="OLLAMA_HOST=172.17.0.1:11434"` under `[Service]`, then `sudo systemctl restart ollama`. Avoid `0.0.0.0`, which would open the model server to every phone on the hotspot. This has not been tried on the demo laptop yet; the check above says whether it works.
+4. **Restart.** F6 adds Python packages (`CLAUDE.md`, "Invariants"). After pulling them, run `docker compose up --build --renew-anon-volumes`; otherwise the anonymous `/app/.venv` volume keeps the old packages. After changing only `.env`, run `docker compose up -d ai`, which recreates the service with the new values (`docker compose restart` keeps the old environment).
+5. **Read `/health.models`.** The `ai` service publishes no port, so ask it from inside: `docker compose exec ai curl -s http://localhost:8000/health`. Each entry of `models` reads like `{ "id": "openai:<model>", "ready": true, "reason": null }`. A model that is not ready gives the reason, such as `"OPENAI_API_KEY not set"`, and `modelConfigured` is true when any model is ready. The API's `/api/health` shows only the AI service's provider string.
+6. **Mind the budget.** One `/classify` call gets 8 s in all (`AI_TIMEOUT_S`): at most 4 s per cloud model (`AI_MODEL_TIMEOUT_S`) and 6 s for Ollama (`OLLAMA_TIMEOUT_S`), and the stub answers whatever is left. Tune these in `.env` only, and keep `AI_TIMEOUT_S` under the API's 10 s (`AI_TIMEOUT_MS`).
+7. **Score the models.** With `AI_DEV_ROUTES=1`, `POST /classify?model=<id>` asks one model and skips the cache. `node scripts/ai-eval.mjs --url <ai service>` (default `http://localhost:8000`) scores every ready model on `ai/eval/ro-lines.json`, and `--write` saves the table to `docs/ai-eval.md`. Because the `ai` container publishes no port, run the service on the host for this ("Running services on the host instead"). Leave `AI_DEV_ROUTES` at 0 for the demo.
+
+The demo image does not pass these variables yet: `compose.demo.yml` replaces the `ai` service's environment and still sets only `AI_MODEL`, `ANTHROPIC_API_KEY` and `AI_TIMEOUT_S` ("Not changed: `compose.demo.yml`" in `NEXT.md`).
+
 ## Linux
 
 Everything above works on Linux; these are the Linux-specific steps, run by hand (the repo has no `.sh` scripts). Commands are for Ubuntu; other distributions differ only in the package manager.

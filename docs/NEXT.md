@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-06 (the AI classifier F6: the HS rules, the Romanian invoices R1–R3, the model variables in Compose and the docs, Terminal C of `docs/plan/ai-f6.md`); before that, 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
 
 ## What exists
 
@@ -11,11 +11,11 @@ Monorepo with three services behind one browser origin, brought up by `docker co
 | `api/` .NET 10 host | Config from env (fails fast), OpenAPI at `/openapi/v1.json`, `GET /api/health` (mode, db, seed nodes, `ai`, `baseUrl`), `GET /api/graph`, `POST /api/dev/reset`, `POST /api/ingest/{ubl,demo}`, `GET /api/events` (Server-Sent Events with `id:`/`Last-Event-ID` replay, `resync`, `ping`), `POST /api/request-link`, `GET /api/verify/context`, `POST /api/verify` (rate limited), `POST /api/audit/verify`, `POST /api/simulate`, `POST /api/scenarios`, `POST /api/dev/simulate-answer`, startup flags `--migrate --seed --reset --exit` | integration tests via `TestWebAppFactory` (memory mode) |
 | `api/` Domain (pure) | Model records; carbon math (`Carbon/`: factor table with provenance, spend and activity estimates, KPIs, MAC + badge, simulator); UBL 2.1 parser (namespace-agnostic, DTD rejected, 2 MB cap); canonical JSON + hashes; HMAC link tokens (`v1.` layout, hash-bound, constant-time); hash-chained audit log; `IRepository`, `IEventBus`, `IAiClient` ports; `LineClassification` (invoice code → cache → AI with timeout → stub); `DemoState` builder | unit tests, hand-computed expectations |
 | `api/` Infrastructure | `MemoryRepository` (lock-atomic); `EfRepository` on Postgres (advisory lock per workspace, unique nonce, unique `(workspace_id, prev_hash)`, TRUNCATE-based reset); migrations `Init` + `Rls` (row-level security + append-only trigger on `audit_log`); `InMemoryEventBus` (ring buffer 500); `HttpAiClient` / `StubAiClient` | repository contract runs against memory always and against Postgres when `DATABASE_URL` is set |
-| `ai/` FastAPI | The C7 contract and stub: `POST /classify` (cache, then stub; categories outside `seed/categories.json` become `UNCLASSIFIED`), `POST /suggest` (empty), `POST /extract-pdf` (501), `GET /health` (`provider: cache,stub`, cache size, `modelConfigured`); camelCase schemas matching `HttpAiClient`; `anthropic` installed but no client is built | 14 pytest tests (cache hit, stub fallback, allow-list, cache-key parity with C#, adversarial line, no Anthropic client, routes); ruff clean |
+| `ai/` FastAPI | The C7 contract with the F6 chain: `POST /classify` answers one batch through the cache, then the models in `AI_MODELS` in order (LangChain chat models for Anthropic, OpenAI, Google GenAI and Ollama), then the stub, within 8 s; categories outside `seed/categories.json` become `UNCLASSIFIED`, and so do answers below 0.6 confidence; model answers are kept in a runtime cache; `POST /classify?model=<id>` only with `AI_DEV_ROUTES=1`; `POST /suggest` (empty), `POST /extract-pdf` (501), `GET /health` (provider, cache size, `modelConfigured`, and `models` with `ready` and `reason`); camelCase schemas matching `HttpAiClient` | the 14 C7 pytest tests (cache hit, stub fallback, allow-list, cache-key parity with C#, adversarial line, no client without a model, routes) plus `tests/test_models.py` (fake models, no network or keys); ruff clean |
 | `web/` Vite SPA | Dashboard at `/`: Zustand graph store (`hydrate`, `applyEvent`, `select`) with memoised React Flow selectors and dagre layout (B1); supplier nodes (status tone, hotspot ring, "i" factor tooltip, "AI-mapped" label), the KPI bar from API values and the toolbar (Import, Load demo invoice, Reset demo) (B2), kept live by `useGraphEvents` (A3). The node drawer with the QR card, the audit panel and the connection badge (B4). The simulator in the drawer (B5): mode buttons with the lane's missing legs disabled, the node's `alternatives` as swap buttons, the API's result with deltas (tonnes, euros, days; cost, lead time and the MAC labelled illustrative) and the MAC badge, a ghost node left of the supplier, and "Apply" (`POST /api/scenarios`); the base node never changes (see "Simulator panel (B5)" below). The supplier page `/verify/:nodeId` (C5): RO by default and EN through `?lang=`, the link's context, two pre-selected answer groups with skip (→ PARTIAL), and every result state (thanks with the non-blocking reconfirm banner, already used, expired, invoice changed, not valid, too many attempts, no connection with retry); its rules live in the pure `web/src/lib/verify-state.ts` and its requests in `verify-api.ts` (a request hanging past 10 s counts as no connection). In development, React's StrictMode sends the context request twice on load, so each page load counts twice against the verify rate limit; the production build sends it once. Tailwind v4, shadcn (button, card, badge, sheet, select, tooltip, separator), Vite proxy `/api` → API with `X-Forwarded-Host`, oxlint with `react/no-danger` as error | vitest (store, selectors, formatting, sync, toolbar and simulator requests, scenario display, verify page states and requests), typecheck, lint, build; the Playwright smoke `web/e2e/demo-path.spec.ts` against Compose (B6) |
 | CI | `.github/workflows/ci.yml` on every pull request and on pushes to `main`: **api** (`dotnet build` with warnings as errors, then `dotnet test` with a Postgres 17 service, so the contract tests run against `tracegreen_test`), **ai** (`uv sync --locked`, pytest, `ruff check`, `ruff format --check`), **web** (`pnpm typecheck`, `lint`, `test`, `build`), **types drift** (API in memory mode, `pnpm gen:api`, `git diff --exit-code web/src/api/schema.d.ts`). Every action is pinned to a release commit. **e2e** (the demo image built and started, `pnpm e2e` against it on Postgres, then again with the API recreated in memory mode; container logs printed on failure) | all five jobs green on GitHub; the e2e job first on its own pull request (#33, 2 min 27 s for both modes) |
-| `seed/` | Fixed-UUID demo data: 5 UBL invoices + adversarial file, factors (placeholders flagged `PLACEHOLDER`), lanes (illustrative), alternatives, categories (= AI allow-list), classification map, ai-cache, demo-state | validated by `SeedLoader` tests |
-| Compose | `db`, `ai` (reload), `api` (`dotnet run`, migrates + seeds on boot), `web` (Vite); `compose.demo.yml` with one-shot `migrate`, runtime images and nginx | brought up and checked by hand |
+| `seed/` | Fixed-UUID demo data: 5 UBL invoices + adversarial file, and the Romanian invoices R1–R3 for the AI and HS-rule paths (not in the demo state), factors (placeholders flagged `PLACEHOLDER`), lanes (illustrative), alternatives, categories (= AI allow-list), classification map (CPV and HS prefixes), ai-cache, demo-state | validated by `SeedLoader` tests |
+| Compose | `db`, `ai` (reload; the model variables and keys come from the root `.env`, and `host.docker.internal` reaches Ollama on the host), `api` (`dotnet run`, migrates + seeds on boot), `web` (Vite); `compose.demo.yml` with one-shot `migrate`, runtime images and nginx | brought up and checked by hand |
 
 Test counts at hand-off: 125 .NET tests (109 before Task 8 plus the event bus, AI client, classification and SSE tests), 1 Python test, web typecheck/lint/build.
 
@@ -36,6 +36,8 @@ Test counts after B5: 266 .NET tests, 252 in memory mode (run with `dotnet test`
 Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven steps).
 
 Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 22 script tests (`node --test scripts/lib/*.test.mjs`, 10 of them for demo-check).
+
+Test counts after the F6 seed data (Terminal C): 266 .NET tests, 252 in memory mode, all passing (run with `dotnet test` inside the `tracegreen-api` dev image on the worktree); `AllSeedInvoicesParse` now reads R1–R3 as well.
 
 ## Wire contract (slice 1)
 
@@ -102,6 +104,59 @@ Checked on 2026-11-05 against Compose: passes in Postgres mode and in memory mod
 - `scripts/demo-check.mjs` (Node, no dependencies; logic in `scripts/lib/demo-check.mjs`, tested): the URL (`PUBLIC_BASE_URL` from `.env.demo`, or the argument when it is left empty, RUNBOOK step 2) is set, not loopback, answers `/api/health`, is where the API builds QR links (with `PUBLIC_BASE_URL` set, `baseUrl.source` must be `configured`, which catches a stack not restarted after editing `.env.demo`), and `/api/events` sends its `hello` event. Checked on 2026-11-05: all five pass against the dev stack started with `PUBLIC_BASE_URL=http://<lan-ip>:3000`, and with it empty and the LAN URL as the argument (the check then says to open the dashboard at that address); health and the event stream pass through nginx on the demo image.
 - `scripts/firewall.ps1`: one inbound rule for TCP 3000 from the local subnet, idempotent, `-Remove` to delete it. It parses and its help loads; it has not been run elevated on a machine yet.
 - CSP: the header in `web/nginx.conf` is unchanged. The smoke passes against `compose.demo.yml` with no CSP violation on the dashboard or the phone page, and the header reaches the pages, the `/verify` route and the assets. The Linux firewall commands were already in `RUNBOOK.md`; ruling R6's fallback phone and the checks are now there too.
+
+## AI classifier data and config (F6, 2026-11-06)
+
+Terminal C's part of the F6 plan (`docs/plan/ai-f6.md`). The chain itself (Terminal A) and the scoring set and script (Terminal B) come in their own pull requests. The decisions are in `DECISIONS.md`, "AI classifier chain (F6)".
+
+**HS rules.** Nine rows with `"listId": "HS"` in `seed/classification-map.json`, covering the six real categories. Each code was checked on 2026-11-06 against the World Customs Organization's HS Nomenclature 2022 edition (index page `https://www.wcoomd.org/en/topics/nomenclature/instrument-and-tools/hs-nomenclature-2022-edition/hs-nomenclature-2022-edition.aspx`; chapter files `https://www.wcoomd.org/-/media/wco/public/global/pdf/topics/nomenclature/instruments-and-tools/hs-nomenclature-2022/2022/` + `0739_2022e.pdf` for chapter 39, `1048_2022e.pdf` for 48, `1579_2022e.pdf` for 79 and `1685_2022e.pdf` for 85). The text below is quoted from those files:
+
+| Prefix | HS 2022 text | Category |
+|---|---|---|
+| `7907` | 79.07, 7907.00 "Other articles of zinc." | `zinc_diecast` |
+| `8534` | 85.34, 8534.00 "Printed circuits." | `pcb` |
+| `854430` | 8544.30 "Ignition wiring sets and other wiring sets of a kind used in vehicles, aircraft or ships" | `wire_harness` |
+| `854442` | 8544.42 "Fitted with connectors", under "Other electric conductors, for a voltage not exceeding 1,000 V" | `wire_harness` |
+| `481910` | 4819.10 "Cartons, boxes and cases, of corrugated paper or paperboard" | `packaging_paper` |
+| `481920` | 4819.20 "Folding cartons, boxes and cases, of non-corrugated paper or paperboard" | `packaging_paper` |
+| `853669` | 8536.69 "Other", under "Lamp-holders, plugs and sockets" (8536.61 is the lamp-holders) | `connectors` |
+| `853670` | 8536.70 "Connectors for optical fibres, optical fibre bundles or cables" | `connectors` |
+| `392690` | 3926.90 "Other", under 39.26 "Other articles of plastics and articles of other materials of headings 39.01 to 39.14" | `plastics` |
+
+**Romanian invoices.** Three new files in `seed/invoices/`, not added to `demo-state.json` or `ai-cache.json`:
+
+| File | Supplier (fictional) | CUI | Lines | Path |
+|---|---|---|---|---|
+| `R1-bistrita.xml` | Zincora Turnătorie SRL, Bistrița | RO99999968 | 2, Romanian with diacritics, no classification code (zinc die-cast sensor housings, zamak covers) | AI: no code and no cache entry |
+| `R2-brasov.xml` | Tâmpa Circuite SRL, Brașov | RO99999950 | 3, each with an HS code (`853400`, `853669`, `481910`) | HS rule: `pcb` from the invoice, no AI call |
+| `R3-tarnaveni.xml` | Târnăveni Fascicule SRL, Târnăveni | RO99999941 | 4, abbreviated and without diacritics, four categories, one line in pieces (`H87`) | AI |
+
+All three are in EUR, with the RON VAT total (BR-RO-030, BR-53) at the BNR rate of the issue date: 2026-10-19 5.3272, 2026-10-20 5.3285, 2026-10-21 5.3297 (`https://curs.bnr.ro/files/xml/years/nbrfxrates2026.xml`). The CUIs have a valid check digit, computed with the same weights that reproduce the existing seed CUIs, and are not registered at ANAF: `POST https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva` returned all three under `notFound` on 2026-11-06. Only the CUIs were looked up; the supplier names were made up for the seed. Amounts and quantities are invented, as on the other seed invoices; no factor, lane or mass changed.
+
+`node scripts/validate-seed-anaf.mjs` on 2026-11-06:
+
+```
+OK    N1-shenzhen.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N2-taiwan.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N3-oradea.xml
+OK    N4-sibiu.xml
+OK    N5-hamburg.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    R1-bistrita.xml
+OK    R2-brasov.xml
+OK    R3-tarnaveni.xml
+OK    adversarial.xml
+
+9/9 passed (3 with the expected seller-identification error)
+```
+
+Imported through `POST /api/ingest/ubl` into a throwaway API in memory mode with no AI service (2026-11-06): R2 became `pcb` from its invoice code (source `invoice`, confidence 1). R1 and R3 fell through to the stub (`UNCLASSIFIED`); these are the lines the model chain will answer. All three took the lane `RO-SB-SB`.
+
+**Config.** `compose.yml` passes every variable of the plan's agreements to the `ai` service, with the agreed defaults: `AI_MODELS`, `AI_MODEL`, the three cloud keys, `OLLAMA_BASE_URL`, `AI_TIMEOUT_S` 8, `AI_MODEL_TIMEOUT_S` 4, `OLLAMA_TIMEOUT_S` 6 and `AI_DEV_ROUTES` 0. It also maps `host.docker.internal` to the host gateway, so the name resolves on Linux as well. `.env.example` documents each of them.
+
+**Not changed: `compose.demo.yml`.** Its `ai` service replaces the environment (`environment: !override`) with `AI_MODEL`, `ANTHROPIC_API_KEY` and `AI_TIMEOUT_S` "10" only. Until it gets the same lines and `extra_hosts`, the demo image passes neither `AI_MODELS`, the other keys nor the Ollama address, and the service's budget there equals the API's 10 s timeout.
 
 ## Seed XML validation (2026-10-23)
 
@@ -187,7 +242,7 @@ Current order, from the 2026-10-22 review's slice order (vertical slices toward 
 1. **Slice 4 check (M2, A8 with B and C):** the API-level part passed on 2026-11-05 in both modes ("M2 pre-check" above). Left: the timed two-device run-through over the hotspot (T16), where the phone flips the node green in under 2 s. Measure import → node and submit → flip, and log failures in `docs/run-log.md` (people write it).
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** done; `pnpm e2e` passes against Compose and the demo image, and CI runs it on the demo image in both data modes (A9).
-4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout).
+4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Then Phase 2: time the local model on R1–R3, write the real scores to `docs/ai-eval.md`, and add the AI demo steps to `RUNBOOK.md`. Phase 3 merges A, then C, then B, and runs the full check.
 5. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
 
 The task list below is the original plan, kept for its specifications; where it and the order above disagree on order, the order above wins.
