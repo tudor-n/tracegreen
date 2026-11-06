@@ -5,50 +5,99 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Status tokens (F2): amber = estimated, hatched = partial, green = verified, red ring = hotspot. */
+/*
+ * The v2 design ("TraceGreen Redesign" canvas, Version 2): a calm grey ground, white grouped surfaces, the platform
+ * system font, capsule controls. Two colours carry the meaning: amber = estimated or still being traced, green =
+ * confirmed by a supplier. Red is for the hotspot only. Everything else is neutral, so the two status colours stay loud.
+ */
 :root {
-  --status-estimated: #d97706;
-  --status-partial-a: #d97706;
-  --status-partial-b: #16a34a;
-  --status-verified: #16a34a;
-  --hotspot: #dc2626;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Brand (Logo 5) */
+  --ink: #1d1d1f;
+  --brand-trace: #d06e10;
+  --brand-proof: #12814f;
+
+  /* Status */
+  --status-estimated: #f08a1c;
+  --status-estimated-edge: #f5a34f;
+  --status-estimated-ink: #8a4708;
+  --status-estimated-tint: #fdeedd;
+  --status-partial-a: #f08a1c;
+  --status-partial-b: #12814f;
+  --status-verified: #12814f;
+  --status-verified-ink: #0b6b42;
+  --status-verified-tint: #e3f3ea;
+  --hotspot: #d93a2e;
+  --hotspot-ink: #a3271d;
+  --hotspot-tint: #fde8e6;
+
+  /* Neutrals */
+  --ink-2: #424245;
+  --grouped: #f5f5f7;
+  --fill: #efeff1;
+  --fill-strong: #e3e3e8;
+  --sidebar-ground: #ececef;
+  --hairline: rgb(0 0 0 / 0.1);
+
+  /* Depth: one hairline plus one soft, offset shadow. */
+  --shadow-card: 0 0 0 0.5px rgb(0 0 0 / 0.08), 0 10px 26px -20px rgb(0 0 0 / 0.3);
+  --shadow-raised: 0 0 0 0.5px rgb(0 0 0 / 0.14), 0 8px 18px -10px rgb(0 0 0 / 0.28);
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-logo: 'Geist Variable', sans-serif;
+
+  /* shadcn tokens, mapped onto the palette above. */
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: #ffffff;
+  --card-foreground: #1d1d1f;
+  --popover: #ffffff;
+  --popover-foreground: #1d1d1f;
+  --primary: #12814f;
+  --primary-foreground: #ffffff;
+  --secondary: #efeff1;
+  --secondary-foreground: #1d1d1f;
+  --muted: #efeff1;
+  --muted-foreground: #6e6e73;
+  --accent: #efeff1;
+  --accent-foreground: #1d1d1f;
+  --destructive: #d93a2e;
+  --border: rgb(0 0 0 / 0.1);
+  --input: rgb(0 0 0 / 0.12);
+  --ring: rgb(18 129 79 / 0.45);
+  --chart-1: #12814f;
+  --chart-2: #f08a1c;
+  --chart-3: #6e6e73;
+  --chart-4: #424245;
+  --chart-5: #1d1d1f;
+  --radius: 0.875rem;
+  --sidebar: #ececef;
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #12814f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dcdce1;
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: rgb(0 0 0 / 0.1);
+  --sidebar-ring: rgb(18 129 79 / 0.45);
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-heading: var(--font-display);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --color-ink-2: var(--ink-2);
+  --color-grouped: var(--grouped);
+  --color-fill: var(--fill);
+  --color-fill-strong: var(--fill-strong);
+  --color-estimated: var(--status-estimated);
+  --color-estimated-ink: var(--status-estimated-ink);
+  --color-estimated-tint: var(--status-estimated-tint);
+  --color-verified: var(--status-verified);
+  --color-verified-ink: var(--status-verified-ink);
+  --color-verified-tint: var(--status-verified-tint);
+  --color-hotspot: var(--hotspot);
+  --color-hotspot-ink: var(--hotspot-ink);
+  --color-hotspot-tint: var(--hotspot-tint);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -83,149 +132,202 @@
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --radius-xl: calc(var(--radius) * 1.15);
+  --radius-2xl: calc(var(--radius) * 1.3);
+  --radius-3xl: calc(var(--radius) * 1.6);
+  --radius-4xl: calc(var(--radius) * 2);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
+  }
+  html {
+    @apply font-sans;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
   }
   body {
     @apply bg-background text-foreground;
   }
-  html {
-    @apply font-sans;
+  ::selection {
+    background: #cdeedb;
+    color: #0b2a1c;
   }
-}
-
-/*
- * Supplier nodes (F2): the tone follows data-status, the red ring data-hotspot (an overlay, never a status).
- * Tints mix in oklab: in oklch the white card's hue of 0 would pull every tint towards pink.
- */
-
-/*
- * The flip (F3): when a node turns VERIFIED, SupplierNode sets data-flip for FLIP_MS (700 ms). The box turns edge-on,
- * changes from amber to green while edge-on, and turns back. --tone is registered as a colour so the keyframes can
- * hold the amber of the old status through the first half. With reduced motion there is no flip; the colour changes.
- */
-@property --tone {
-  syntax: '<color>';
-  inherits: false;
-  initial-value: #d97706;
-}
-
-@keyframes node-flip {
-  0% {
-    --tone: var(--status-estimated);
-    transform: perspective(600px) rotateY(0deg);
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
   }
-  50% {
-    --tone: var(--status-estimated);
-    transform: perspective(600px) rotateY(90deg);
-  }
-  50.01% {
-    --tone: var(--status-verified);
-    transform: perspective(600px) rotateY(90deg);
-  }
-  100% {
-    --tone: var(--status-verified);
-    transform: perspective(600px) rotateY(0deg);
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  .supplier-node {
-    --tone: var(--status-estimated);
-    border: 2px solid var(--tone);
-    background-color: color-mix(in oklab, var(--tone) 14%, var(--card));
-    box-shadow: var(--hotspot-ring, 0 0 #0000), 0 1px 2px rgb(0 0 0 / 0.08);
+  /* A status dot: amber, green, or amber and green stripes for PARTIAL, so it reads without colour vision. */
+  .status-dot {
+    background-color: var(--status-estimated);
+    transition: background-color 600ms var(--ease);
   }
-  .supplier-node[data-status='PARTIAL'] {
-    --tone: var(--status-partial-a);
-    background-image: repeating-linear-gradient(
-      135deg,
-      color-mix(in oklab, var(--status-partial-a) 22%, var(--card)) 0 8px,
-      color-mix(in oklab, var(--status-partial-b) 22%, var(--card)) 8px 16px
+  .status-dot[data-status='VERIFIED'] {
+    background-color: var(--status-verified);
+  }
+  .status-dot[data-status='PARTIAL'] {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--status-partial-a) 0 2.5px,
+      var(--status-partial-b) 2.5px 5px
     );
   }
-  .supplier-node[data-status='VERIFIED'] {
-    --tone: var(--status-verified);
-  }
-  .supplier-node[data-hotspot='true'] {
-    --hotspot-ring: 0 0 0 3px var(--background), 0 0 0 6px var(--hotspot);
-  }
-  .supplier-node[data-selected='true'] {
-    outline: 2px solid var(--foreground);
-    outline-offset: 3px;
-  }
-  .supplier-node[data-selected='true'][data-hotspot='true'] {
-    outline-offset: 9px;
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    .supplier-node[data-flip='true'] {
-      animation: node-flip 700ms ease-in-out;
-    }
+
+  /* A supplier row in the tree. When a supplier confirms, a green tint sweeps across the row once (F3). */
+  .supplier-row[data-flash='true']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--status-verified-tint) 40%, transparent);
+    animation: row-sweep 1.4s var(--ease) both;
   }
 
-  /* A simulated change (B5): dashed, so it never reads as a supplier on the graph, and its edge dashed too. */
-  .ghost-node {
-    border: 2px dashed var(--muted-foreground);
-    background-color: color-mix(in oklab, var(--card) 85%, transparent);
+  /* The supply line from a row to the buyer: width is tonnes, colour is status. */
+  .supply-line {
+    fill: none;
+    stroke-linecap: round;
+    stroke: var(--status-estimated-edge);
+    transition:
+      stroke 900ms var(--ease),
+      stroke-width 900ms var(--ease),
+      opacity 500ms var(--ease);
   }
-  .react-flow__edge.ghost-edge .react-flow__edge-path {
-    stroke-dasharray: 5 4;
+  .supply-line[data-status='VERIFIED'] {
+    stroke: var(--status-verified);
+  }
+  .supply-line-partial {
+    fill: none;
+    stroke: var(--status-verified);
+    stroke-dasharray: 5 7;
+  }
+  .supply-line-ghost {
+    fill: none;
+    stroke: var(--muted-foreground);
     stroke-width: 1.5;
+    stroke-dasharray: 2 6;
+    stroke-linecap: round;
   }
 
-  /* MAC badge tones: green when the change saves carbon at or below the carbon price, amber above it. */
+  /* The MAC badge of a simulated change: neutral, so green keeps meaning "supplier-confirmed". */
   .scenario-badge {
-    --badge-tone: var(--muted-foreground);
     color: var(--foreground);
-    border: 1px solid var(--badge-tone);
-    background-color: color-mix(in oklab, var(--badge-tone) 16%, var(--card));
+    background-color: var(--fill);
   }
-  .scenario-badge[data-badge='win-win'],
-  .scenario-badge[data-badge='below-ets'] {
-    --badge-tone: var(--status-verified);
+
+  .pulse-dot {
+    animation: pulse-dot 1.4s ease-in-out infinite;
   }
-  .scenario-badge[data-badge='premium'] {
-    --badge-tone: var(--status-estimated);
+
+  /*
+   * Logo 5 wordmark (design handoff, "Logo 5 · construction"). The line centre sits 0.42em below the baseline, 0.075em
+   * thick with round caps. Trace dots: dash 0.07em, gap 0.2em, from 0.04em in. Amber from 0.17em into the G to the r→e
+   * boundary, green from there to the n, joined by a 45° cut. Glow belongs to the product UI, never the logo.
+   */
+  .wordmark {
+    display: inline-flex;
+    font: 600 1em/1 var(--font-logo);
+    letter-spacing: -0.035em;
+    font-kerning: normal;
+    white-space: nowrap;
+    color: var(--ink);
+    font-variant-numeric: normal;
+  }
+  .wm-trace,
+  .wm-seg {
+    position: relative;
+    display: inline-block;
+    padding-bottom: 0.34em;
+  }
+  .wm-green {
+    position: relative;
+    display: inline-flex;
+  }
+  .wm-dots {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 0.14em;
+    overflow: visible;
+  }
+  .wm-dots line {
+    stroke: var(--brand-trace);
+    stroke-width: 0.075em;
+    stroke-linecap: round;
+    stroke-dasharray: 0.07em 0.2em;
+  }
+  .wm-gr {
+    color: var(--brand-trace);
+  }
+  .wm-een {
+    color: var(--brand-proof);
+  }
+  .wm-bar {
+    position: absolute;
+    bottom: 0.0325em;
+    height: 0.075em;
+    border-radius: 99px;
+    transform-origin: left center;
+  }
+  .wm-gr .wm-bar {
+    left: 0.17em;
+    right: -0.0375em;
+    background: var(--brand-trace);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 0.075em) 100%, 0 100%);
+  }
+  .wm-een .wm-bar {
+    left: -0.0075em;
+    right: 0;
+    background: var(--brand-proof);
+    clip-path: polygon(0.075em 0, 100% 0, 100% 100%, 0 100%);
+  }
+  /* Loader: the tracing beat on loop; the line under "Green" waits as grey dots. */
+  .wordmark[data-variant='loader'] .wm-dots line {
+    animation: wm-march 700ms linear infinite;
+  }
+  .wordmark[data-variant='loader'] .wm-bar {
+    display: none;
+  }
+  .wordmark[data-variant='loader'] .wm-pending line {
+    stroke: #d1d1d6;
+  }
+}
+
+@keyframes row-sweep {
+  from {
+    transform: translateX(-60%);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(60%);
+    opacity: 0;
+  }
+}
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes wm-march {
+  to {
+    stroke-dashoffset: -0.27em;
   }
 }
