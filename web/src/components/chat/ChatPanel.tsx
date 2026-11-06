@@ -1,16 +1,18 @@
 import { XIcon } from 'lucide-react'
 import { type FormEvent, useEffect, useReducer, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import type { ChatAnswer, ChatFactView } from '@/api/client'
+import type { ChatAnswer, ChatFactView, ChatModels } from '@/api/client'
+import { ChatModelPicker } from '@/components/chat/ChatModelPicker'
 import { ExplainedTag, PageMessage } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { chatCopy, type TemplateId } from '@/copy/chat'
 import { AI_WRITTEN, FROM_YOUR_DATA } from '@/copy/labels'
 import { factLabel, factLink, factValue } from '@/lib/chat-display'
+import { AUTO, answeredBy, modelToSend } from '@/lib/chat-models'
 import { chatReducer, historyOf, initialChat, isPending, type Turn } from '@/lib/chat-state'
 import { templateAnswer } from '@/lib/chat-templates'
-import { askChat } from '@/lib/dashboard-actions'
+import { askChat, fetchChatModels } from '@/lib/dashboard-actions'
 import { cn } from '@/lib/utils'
 import { useGraphStore } from '@/store'
 
@@ -34,6 +36,20 @@ export function ChatPanel() {
   const nextId = useRef(1)
   const end = useRef<HTMLDivElement>(null)
   const pending = isPending(state)
+  const [models, setModels] = useState<ChatModels | null>(null)
+  const [picked, setPicked] = useState(AUTO)
+  const sent = modelToSend(picked, models)
+
+  // The model list is read each time the chat opens, so a model set up meanwhile shows; the last list stays while it
+  // loads. A list that cannot be read leaves Automatic alone.
+  useEffect(() => {
+    if (!open) return
+    const controller = new AbortController()
+    void fetchChatModels(controller.signal).then((result) => {
+      if (!controller.signal.aborted) setModels(result.ok ? result.data : { available: false, models: [] })
+    })
+    return () => controller.abort()
+  }, [open])
 
   // Escape closes the chat before anything else hears it (the side panel under it would close too).
   useEffect(() => {
@@ -59,7 +75,7 @@ export function ChatPanel() {
     const id = nextId.current++
     const history = historyOf(state)
     dispatch({ type: 'asked', id, question, asked: 'ai' })
-    const answer = await askChat(question, history)
+    const answer = await askChat(question, history, sent)
     dispatch(answer.ok ? { type: 'answered', id, answer: answer.data } : { type: 'failed', id, message: answer.message })
   }
 
@@ -113,12 +129,13 @@ export function ChatPanel() {
       <div role="log" aria-live="polite" className="flex flex-1 flex-col gap-4">
         {state.turns.length === 0 && <Suggestions heading={chatCopy.tryThese} onPick={askTemplate} disabled={pending} />}
         {state.turns.map((turn) => (
-          <TurnView key={turn.id} turn={turn} onLink={onLink} onPick={askTemplate} pending={pending} />
+          <TurnView key={turn.id} turn={turn} onLink={onLink} onPick={askTemplate} pending={pending} models={models} />
         ))}
         <div ref={end} />
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-1.5">
+        <ChatModelPicker list={models} sent={sent} onChange={setPicked} />
         <label htmlFor="chat-question" className="sr-only">
           {chatCopy.inputLabel}
         </label>
@@ -148,18 +165,22 @@ function TurnView({
   onLink,
   onPick,
   pending,
+  models,
 }: {
   turn: Turn
   onLink: (fact: ChatFactView) => void
   onPick: (template: TemplateId) => void
   pending: boolean
+  models: ChatModels | null
 }) {
   const { state } = turn
   return (
     <div data-testid={`chat-turn-${turn.id}`} data-phase={state.phase} className="flex flex-col gap-2">
       <p className="max-w-[85%] self-end rounded-2xl bg-fill px-3.5 py-2 text-sm break-words">{turn.question}</p>
       {state.phase === 'pending' && <PageMessage busy>{chatCopy.sending}</PageMessage>}
-      {state.phase === 'answered' && <AnswerView answer={state.answer} fromData={state.fromData} onLink={onLink} />}
+      {state.phase === 'answered' && (
+        <AnswerView answer={state.answer} fromData={state.fromData} onLink={onLink} by={answeredBy(state.answer.provider, models)} />
+      )}
       {state.phase === 'notAnswered' && (
         <Suggestions heading={chatCopy.notAnswered} sub={chatCopy.tryThese} onPick={onPick} disabled={pending} />
       )}
@@ -173,13 +194,24 @@ function TurnView({
   )
 }
 
-/** One answer: whose sentence it is, the sentence with its value chips, and what each value is. */
-function AnswerView({ answer, fromData, onLink }: { answer: ChatAnswer; fromData: boolean; onLink: (fact: ChatFactView) => void }) {
+/** One answer: whose sentence it is (and which model wrote it), the sentence with its value chips, and what each value is. */
+function AnswerView({
+  answer,
+  fromData,
+  onLink,
+  by,
+}: {
+  answer: ChatAnswer
+  fromData: boolean
+  onLink: (fact: ChatFactView) => void
+  by: string | null
+}) {
   const byId = new Map(answer.facts.map((f) => [f.id, f]))
   return (
-    <div data-testid="chat-answer" className="flex flex-col gap-2.5 rounded-2xl bg-grouped p-3.5">
-      <div>
+    <div data-testid="chat-answer" data-provider={answer.provider} className="flex flex-col gap-2.5 rounded-2xl bg-grouped p-3.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <ExplainedTag help={fromData ? chatCopy.fromDataHelp : chatCopy.aiWrittenHelp}>{fromData ? FROM_YOUR_DATA : AI_WRITTEN}</ExplainedTag>
+        {!fromData && by !== null && <span className="text-[11px] text-muted-foreground">{chatCopy.models.writtenBy(by)}</span>}
       </div>
       <p className="text-sm leading-relaxed break-words">
         {answer.segments.map((segment, i) => {

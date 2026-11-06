@@ -1,6 +1,7 @@
 import {
   api,
   type ChatAnswer,
+  type ChatModels,
   type DraftInvoice,
   type IngestResult,
   type PdfDraftView,
@@ -185,10 +186,22 @@ export function fetchSuggestions(nodeId: string, signal?: AbortSignal): Promise<
 /**
  * POST /api/chat (F13): the question and the last three typed questions. The answer's sentence is the AI's, every value
  * in it the API filled in from the data after checking the sentence; a question the data does not answer comes back
- * notAnswered, never as a guess.
+ * notAnswered, never as a guess. `model` is one of GET /api/chat/models' ids, which then answers alone; null leaves the
+ * server to try its models in order.
  */
-export function askChat(question: string, history: readonly string[], signal?: AbortSignal): Promise<Answer<ChatAnswer>> {
-  return fetchBody(() => api.POST('/api/chat', { body: { question, history: [...history] }, signal }))
+export function askChat(
+  question: string,
+  history: readonly string[],
+  model: string | null = null,
+  signal?: AbortSignal,
+): Promise<Answer<ChatAnswer>> {
+  const body = { question, history: [...history], ...(model === null ? {} : { model }) }
+  return fetchBody(() => api.POST('/api/chat', { body, signal }))
+}
+
+/** GET /api/chat/models (F13): the models the chat can be asked with, in the order Automatic tries them. */
+export function fetchChatModels(signal?: AbortSignal): Promise<Answer<ChatModels>> {
+  return fetchBody(() => api.GET('/api/chat/models', { signal }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

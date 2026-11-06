@@ -6,6 +6,7 @@ import {
   confirmPdf,
   extractPdf,
   failureMessage,
+  fetchChatModels,
   fetchSuggestions,
   requestLink,
   requestPortalLink,
@@ -233,6 +234,42 @@ describe('askChat', () => {
     } as never)
     const result = await askChat('Q', [])
     expect(result.ok).toBe(false)
+  })
+
+  it('sends the chosen model with the question', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: {}, response: new Response(null, { status: 200 }) } as never)
+    await askChat('Q', [], 'ollama:qwen2.5:14b')
+    expect(post).toHaveBeenCalledWith('/api/chat', { body: { question: 'Q', history: [], model: 'ollama:qwen2.5:14b' }, signal: undefined })
+  })
+
+  it('shows a model the server does not offer as its headline', async () => {
+    vi.spyOn(api, 'POST').mockResolvedValue({
+      error: problem(422, 'ModelNotReady', 'That model is not set up on the server yet; pick another one or Automatic.'),
+      response: new Response(null, { status: 422 }),
+    } as never)
+    expect(await askChat('Q', [], 'anthropic:claude-x')).toEqual({
+      ok: false,
+      message: 'That model is not set up yet. That model is not set up on the server yet; pick another one or Automatic.',
+    })
+  })
+})
+
+describe('fetchChatModels', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns the server list', async () => {
+    const list = { available: true, models: [{ id: 'ollama:m', provider: 'ollama', model: 'm', ready: true, reason: null }] }
+    const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: list, response: new Response(null, { status: 200 }) } as never)
+    const signal = new AbortController().signal
+    expect(await fetchChatModels(signal)).toEqual({ ok: true, data: list })
+    expect(get).toHaveBeenCalledWith('/api/chat/models', { signal })
+  })
+
+  it('fails on a network error, so the panel can offer Automatic alone', async () => {
+    vi.spyOn(api, 'GET').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect((await fetchChatModels()).ok).toBe(false)
   })
 })
 

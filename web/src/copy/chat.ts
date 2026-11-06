@@ -74,6 +74,27 @@ export const chatCopy = {
     when: 'Date',
   } as Readonly<Partial<Record<string, string>>>,
   unknownField: 'Value',
+  /** The model picker: which AI writes the sentence. Whichever it is, every value is still filled in from the data. */
+  models: {
+    label: 'Model',
+    auto: 'Automatic',
+    loading: 'Looking for models…',
+    autoHelp: 'Automatic asks each ready model in turn until one answers.',
+    aloneHelp: 'Only this model is asked; if it cannot answer, the question is not answered.',
+    none: 'No AI model is set up on this server (AI_CHAT_MODELS or AI_MODELS). The suggested questions still work.',
+    noneReady: 'No model has its key on this server yet. The suggested questions still work.',
+    serviceDown: "The AI service isn't answering. The suggested questions still work.",
+    /** A listed model that cannot answer yet, with the server's reason (e.g. its key is not set). */
+    notReady: (name: string, reason: string | null) => `${name} (not set up${reason === null ? '' : `: ${reason}`})`,
+    writtenBy: (name: string) => `by ${name}`,
+    /** The provider part of a model id, as a reader knows it; an unknown one shows as it is. */
+    providers: {
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      google_genai: 'Google',
+      ollama: 'Ollama (local)',
+    } as Readonly<Partial<Record<string, string>>>,
+  },
 } as const
 
 export type TemplateId = keyof typeof chatCopy.questions
