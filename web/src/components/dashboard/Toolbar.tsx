@@ -1,9 +1,12 @@
 import { RotateCcwIcon, UploadIcon } from 'lucide-react'
 import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import type { PdfDraftView } from '@/api/client'
+import { PdfReview } from '@/components/import/PdfReview'
 import { Button } from '@/components/ui/button'
 import { toolbarCopy } from '@/copy/dashboard'
 import type { Connection } from '@/hooks/useGraphEvents'
-import { type ActionOutcome, fetchDemoTools, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
+import { type ActionOutcome, extractPdf, fetchDemoTools, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
+import { isPdf } from '@/lib/pdf-form'
 import { cn } from '@/lib/utils'
 
 // Import, Load demo invoice and Reset demo, stacked at the foot of the sidebar. The outcome is shown as text; the
@@ -16,6 +19,7 @@ export function Toolbar({ connection }: { connection: Connection }) {
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null)
   const demoTools = useDemoTools(connection)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [review, setReview] = useState<PdfDraftView | null>(null)
 
   const run = async (action: Action, request: () => Promise<ActionOutcome>) => {
     setBusy(action)
@@ -27,7 +31,18 @@ export function Toolbar({ connection }: { connection: Connection }) {
   const onFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = '' // so picking the same file again fires another change
-    if (file) void run('import', () => importInvoice(file))
+    if (!file) return
+    // A PDF is read into a draft for a person to check (F9); an XML is imported as it is.
+    if (isPdf(file)) {
+      void run('import', async () => {
+        const answer = await extractPdf(file)
+        if (!answer.ok) return answer
+        setReview(answer.data)
+        return { ok: true, message: toolbarCopy.pdfReady }
+      })
+    } else {
+      void run('import', () => importInvoice(file))
+    }
   }
 
   return (
@@ -35,7 +50,7 @@ export function Toolbar({ connection }: { connection: Connection }) {
       <input
         ref={fileInput}
         type="file"
-        accept=".xml,application/xml,text/xml"
+        accept=".xml,application/xml,text/xml,.pdf,application/pdf"
         aria-label={toolbarCopy.fileInput}
         tabIndex={-1}
         className="sr-only"
@@ -76,6 +91,19 @@ export function Toolbar({ connection }: { connection: Connection }) {
       >
         {outcome?.message}
       </p>
+      {review !== null && (
+        <PdfReview
+          draft={review}
+          onClose={() => {
+            setReview(null)
+            setOutcome(null)
+          }}
+          onImported={(label) => {
+            setReview(null)
+            setOutcome({ ok: true, message: toolbarCopy.imported(label) })
+          }}
+        />
+      )}
     </div>
   )
 }

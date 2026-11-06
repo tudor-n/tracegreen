@@ -16,6 +16,7 @@ public class InvoiceRow
     public string InvoiceHash { get; set; } = "";
     public string ExtractedJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; }
+    public string DocumentKind { get; set; } = "ubl";
 }
 
 public class NodeRow

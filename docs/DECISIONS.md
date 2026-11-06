@@ -168,6 +168,32 @@ The dashboard side (ticket 2, on `b/f6-review-dashboard`):
 - **"Category set by buyer" is its own line under ruling 3's provenance line, not part of it** — ruling 3 fixes the provenance wording, and `drawer-provenance` keeps its text — cost if wrong: copy.
 - **The new strings are English only, in `copy/labels.ts` (the flag and the buyer note) and `copy/dashboard.ts` (`reviewCopy`)** — the dashboard has no Romanian mode (only the supplier-facing pages switch), and the ticket gives the wording to Dev C — cost if wrong: a Romanian set once the dashboard switches language.
 
+## The AI's reason (F6 follow-up, 2026-11-06)
+
+- **The reason is shown only when the AI chose the category, and filtered by the copy rules before it is stored (`BannedTerms`, the C# copy of `scripts/lib/banned-terms.mjs`, kept equal by a test that reads the script)** — a model's words reach the reader; a reason that breaks the copy rules is dropped, not reworded — cost if wrong: none.
+
+## AI-suggested alternatives (F11, 2026-11-06)
+
+- **The AI picks; it never proposes.** Candidates are the node's curated alternatives (`seed/alternatives.json`, the ones the simulator already offers); the model sees short ids of our own, any other id is dropped on both sides, and the label shown is the seed's. The simulator computes every figure — cost if wrong: none, the data rules forbid an invented supplier anyway.
+- **A reason only restates the data.** It is dropped when it holds a digit or a claim word (lower, closer, cheaper, carbon, distance, …), in `ai/app/suggest.py` and again in `SuggestionService` — a small model wrote false claims ("Timisoara is close to Taoyuan", "road is lower carbon than sea") that nothing checks, and the UI must not show them. The pick stays without a reason — cost if wrong: fewer reasons on screen.
+- **Asked on demand, not on import.** The What if tab asks once when it opens, under the classification timeout; a failure shows the list as before — cost if wrong: none.
+
+## The data chat (F13, 2026-11-06)
+
+- **"The model writes, the app checks"** (the user's choice over fixed sentences). The model writes one or two sentences but cites every value and name as a `{{factId}}` placeholder; the API fills in the values from its data and refuses any answer that types a number or a name, cites an unknown fact, or makes a status, largest, smallest or more-than claim the facts contradict. It keeps "the AI never produces a carbon number": no figure the reader sees passes through a model — cost if wrong: a stricter mode with fixed sentences only.
+- **Comparisons are facts, not the model's arithmetic.** Suppliers are numbered by emissions (S1 is the largest), and the totals, counts by status, the supplier-confirmed share and the lists of suppliers by status are facts of their own — a small model wrote "still estimated" about a supplier-confirmed node until the status claims were checked and the lists added — cost if wrong: more facts.
+- **The suggested questions are answered in the SPA from the store, without the AI**, labelled "From your data": instant, exact, and still there when no model is — cost if wrong: none.
+- **The panel sits where the side panel sits and covers it**; closing it brings the side panel back as it was, and picking a supplier from an answer closes it. The conversation lives while the app is open and is never stored — cost if wrong: none.
+- **Separate budgets for the longer calls** (`AI_CHAT_TIMEOUT_MS` 20 s in the API, `AI_CHAT_TIMEOUT_S` 15 s and `AI_LONG_MODEL_TIMEOUT_S` 12 s per model in the service, on their own HTTP client), so the 10 s classification path stays as it is — cost if wrong: env values.
+
+## PDF invoice import (F9, 2026-11-06)
+
+- **Two steps, with the draft held on the server.** The model's draft waits in memory (`PdfDraftStore`: random id, 30 minutes, at most 32), so the person's edits are compared with what the model really answered, not with what a client says it answered. A restart drops the drafts (410 `DraftExpired`), like the in-process event bus already does — cost if wrong: a table for drafts.
+- **The PDF's SHA-256 is the raw hash** (`invoices.raw_xml_hash`, now any document's), so the same PDF is refused twice like the same XML. `Invoice.DocumentKind` says which kind of document it was, and `ExtractedInvoice` is untouched, so no invoice hash changes — cost if wrong: a rename of the column.
+- **Text layer only, read in the AI service with pypdf** (pure Python, pinned at 6.21.2), and a model of `AI_MODELS` copies the fields. No OCR, no PDF library in the API or the browser — cost if wrong: scans stay refused.
+- **Amounts are strings on the wire and read by one rule on both sides.** With both marks, the last is the decimal mark. One kind groups thousands when it repeats or has exactly three digits after it ("1.200", "9,840"), as Romanian and English invoices print them; otherwise it is the decimal mark — cost if wrong: a quantity like 1.250 kg is read as 1250; the form shows the value the person confirms.
+- **"Not in the PDF" is a hint, not a check.** The person decides; a field they change is no longer marked — cost if wrong: none.
+
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.

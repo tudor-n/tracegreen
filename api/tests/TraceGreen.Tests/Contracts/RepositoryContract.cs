@@ -119,6 +119,19 @@ public abstract class RepositoryContract
         Assert.Equal("Zinc die-cast casing, sensor alloy", (await repo.GetNodeAsync(Ctx, node.Id, CancellationToken.None))!.ClassificationRationale);
     }
 
+    [Fact]
+    public async Task TheDocumentKindRoundTripsAndDefaultsToUbl()
+    {
+        var repo = await MakeAsync();
+        var (invoice, node) = NewImport("raw-pdf" + Ids.NewId().ToString("N"));
+
+        await repo.InsertInvoiceWithNodeAsync(Ctx, invoice with { DocumentKind = "pdf" }, node, Audit("invoice.imported"), CancellationToken.None);
+
+        Assert.Equal("pdf", (await repo.GetInvoiceAsync(Ctx, invoice.Id, CancellationToken.None))!.DocumentKind);
+        var seeded = (await repo.ListNodesAsync(Ctx, CancellationToken.None)).First(n => n.Id == N2);
+        Assert.Equal("ubl", (await repo.GetInvoiceAsync(Ctx, seeded.InvoiceId, CancellationToken.None))!.DocumentKind);
+    }
+
     private static (Invoice Invoice, SupplierNode Node) NewImport(string rawHash)
     {
         var invoiceId = Ids.NewId();

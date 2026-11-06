@@ -32,6 +32,8 @@ services:
       DATA_MODE: ${DATA_MODE:-}
       AI_BASE_URL: http://ai:8000
       AI_TIMEOUT_MS: "10000"
+      AI_CHAT_TIMEOUT_MS: ${AI_CHAT_TIMEOUT_MS:-20000}
+      AI_EXTRACT_TIMEOUT_MS: ${AI_EXTRACT_TIMEOUT_MS:-25000}
       SEED_DIR: /seed
     volumes: !override
       - ./seed:/seed:ro
@@ -61,6 +63,10 @@ services:
       AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
       AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
       OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      AI_CHAT_TIMEOUT_S: ${AI_CHAT_TIMEOUT_S:-15}
+      AI_EXTRACT_TIMEOUT_S: ${AI_EXTRACT_TIMEOUT_S:-20}
+      AI_LONG_MODEL_TIMEOUT_S: ${AI_LONG_MODEL_TIMEOUT_S:-12}
+      AI_CHAT_MODELS: ${AI_CHAT_MODELS:-}
       AI_DEV_ROUTES: "0"
 
   web:

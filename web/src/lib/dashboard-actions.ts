@@ -1,11 +1,16 @@
 import {
   api,
+  type ChatAnswer,
+  type DraftInvoice,
+  type IngestResult,
+  type PdfDraftView,
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
   type Scenario,
   type ScenarioChange,
   type ScenarioResult,
+  type SuggestionsView,
 } from '@/api/client'
 import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
@@ -90,6 +95,29 @@ export function importInvoice(file: File): Promise<ActionOutcome> {
   )
 }
 
+/**
+ * POST /api/ingest/pdf/extract (F9): an AI copies the PDF's fields into a draft for a person to check. Nothing is
+ * imported until the draft is confirmed.
+ */
+export function extractPdf(file: File): Promise<Answer<PdfDraftView>> {
+  return fetchBody(() =>
+    api.POST('/api/ingest/pdf/extract', {
+      // openapi-fetch sends no body unless one is given; the serializer below sends the File itself.
+      body: file as never,
+      bodySerializer: () => {
+        const form = new FormData()
+        form.append('file', file)
+        return form
+      },
+    }),
+  )
+}
+
+/** POST /api/ingest/pdf/confirm: import the fields as the person checked them; the node arrives through node.created. */
+export function confirmPdf(draftId: string, invoice: DraftInvoice): Promise<Answer<IngestResult>> {
+  return fetchBody(() => api.POST('/api/ingest/pdf/confirm', { body: { draftId, invoice } }))
+}
+
 /** POST /api/ingest/demo: seed N1 with its fixed ids. */
 export function loadDemoInvoice(): Promise<ActionOutcome> {
   return send(
@@ -143,6 +171,24 @@ export function simulateChange(nodeId: string, change: ScenarioChange): Promise<
  */
 export function saveScenario(nodeId: string, change: ScenarioChange): Promise<Answer<Scenario>> {
   return fetchBody(() => api.POST('/api/scenarios', { body: { nodeId, ...change } }))
+}
+
+/**
+ * GET /api/nodes/{id}/suggestions (F11): which of the node's curated alternatives the AI picks, each with a short reason.
+ * Never a figure and never a new supplier. Asked when the What if tab opens and aborted when it closes; a failure only
+ * means no suggestion, so it never blocks the simulator.
+ */
+export function fetchSuggestions(nodeId: string, signal?: AbortSignal): Promise<Answer<SuggestionsView>> {
+  return fetchBody(() => api.GET('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal }))
+}
+
+/**
+ * POST /api/chat (F13): the question and the last three typed questions. The answer's sentence is the AI's, every value
+ * in it the API filled in from the data after checking the sentence; a question the data does not answer comes back
+ * notAnswered, never as a guess.
+ */
+export function askChat(question: string, history: readonly string[], signal?: AbortSignal): Promise<Answer<ChatAnswer>> {
+  return fetchBody(() => api.POST('/api/chat', { body: { question, history: [...history] }, signal }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

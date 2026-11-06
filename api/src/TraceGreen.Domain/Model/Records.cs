@@ -44,7 +44,8 @@ public sealed record Invoice(
     string RawXmlHash,
     string InvoiceHash,
     ExtractedInvoice Extracted,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string DocumentKind = "ubl");
 
 public sealed record SupplierNode(
     Guid Id,

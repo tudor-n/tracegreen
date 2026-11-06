@@ -38,9 +38,23 @@ public class AppConfigTests
         Assert.Equal(604800, c.LinkTtlSeconds);
         Assert.Equal(90.01m, c.EtsPriceEurPerT);
         Assert.Equal(10000, c.AiTimeoutMs);
+        Assert.Equal(20000, c.AiChatTimeoutMs);
+        Assert.Equal(25000, c.AiExtractTimeoutMs);
         Assert.Equal(10, c.RateLimitPerMin);
         Assert.False(c.DemoTools);
         Assert.Equal("http://localhost:8000", c.AiBaseUrl);
+    }
+
+    [Fact]
+    public void TheLongerAiBudgetsComeFromTheEnvironment()
+    {
+        var env = Env();
+        env["AI_CHAT_TIMEOUT_MS"] = "18000";
+        env["AI_EXTRACT_TIMEOUT_MS"] = "30000";
+
+        var c = AppConfig.FromEnvironment(env);
+
+        Assert.Equal((18000, 30000), (c.AiChatTimeoutMs, c.AiExtractTimeoutMs));
     }
 
     [Fact]

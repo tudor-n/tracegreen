@@ -26,6 +26,8 @@ export default function Suppliers() {
   const kpis = useGraphStore((s) => s.kpis)
   const selected = useGraphStore(selectSelectedNode)
   const open = useGraphStore((s) => s.openPanels.drawer) && selected !== null
+  // The chat covers the side panel; the panel stays mounted underneath, so closing the chat shows it as it was.
+  const chatOpen = useGraphStore((s) => s.openPanels.chat)
   const preview = useGraphStore((s) => s.scenarioPreview)
   const select = useGraphStore((s) => s.select)
   const nodes = useMemo(() => byEmissions(nodeMap), [nodeMap])
@@ -78,7 +80,11 @@ export default function Suppliers() {
           {body}
         </div>
       </main>
-      {open && <SupplierPanel node={selected} hotspot={hotspots.has(selected.id)} />}
+      {open && (
+        <div className={chatOpen ? 'hidden' : 'contents'}>
+          <SupplierPanel node={selected} hotspot={hotspots.has(selected.id)} />
+        </div>
+      )}
     </div>
   )
 }

@@ -21,6 +21,10 @@ DEFAULT_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
 # The API's default timeout for this service (AI_TIMEOUT_MS 10000). AI_TIMEOUT_S must stay
 # under it, or the API may give up first; a scoring run sets it higher on purpose.
 API_TIMEOUT_S = 10.0
+# The API's defaults for the longer tasks (AI_CHAT_TIMEOUT_MS 20000, AI_EXTRACT_TIMEOUT_MS
+# 25000); AI_CHAT_TIMEOUT_S and AI_EXTRACT_TIMEOUT_S stay under them for the same reason.
+API_CHAT_TIMEOUT_S = 20.0
+API_EXTRACT_TIMEOUT_S = 25.0
 
 
 @dataclass(frozen=True)
@@ -46,10 +50,23 @@ class Settings:
     ai_timeout_s: float
     ollama_base_url: str
     dev_routes: bool
+    # The longer tasks (chat F13, PDF extraction F9): their total budget, and the cap for each
+    # model attempt, which replaces the model's own cap for those tasks.
+    chat_timeout_s: float = 15.0
+    extract_timeout_s: float = 20.0
+    long_model_timeout_s: float = 12.0
+    # AI_CHAT_MODELS: the models the chat may use, when it should not use all of AI_MODELS (the
+    # chat sends supplier names and figures, which /classify never does). None: AI_MODELS.
+    chat_models: tuple[ModelSpec, ...] | None = None
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
     google_api_key: str | None = field(default=None, repr=False)
+
+    @property
+    def chat_specs(self) -> tuple[ModelSpec, ...]:
+        """The models the chat uses: AI_CHAT_MODELS when set, else AI_MODELS."""
+        return self.chat_models if self.chat_models is not None else self.models
 
     @property
     def model_configured(self) -> bool:
@@ -76,6 +93,17 @@ class Settings:
                 ollama_timeout_s=_seconds(source, "OLLAMA_TIMEOUT_S", 6),
             ),
             ai_timeout_s=_seconds(source, "AI_TIMEOUT_S", 8),
+            chat_timeout_s=_seconds(source, "AI_CHAT_TIMEOUT_S", 15),
+            extract_timeout_s=_seconds(source, "AI_EXTRACT_TIMEOUT_S", 20),
+            long_model_timeout_s=_seconds(source, "AI_LONG_MODEL_TIMEOUT_S", 12),
+            chat_models=parse_models(
+                _text(source, "AI_CHAT_MODELS") or "",
+                legacy_model=None,
+                keys=keys,
+                cloud_timeout_s=_seconds(source, "AI_MODEL_TIMEOUT_S", 4),
+                ollama_timeout_s=_seconds(source, "OLLAMA_TIMEOUT_S", 6),
+            )
+            or None,
             ollama_base_url=_text(source, "OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
