@@ -17,7 +17,7 @@ function watchCsp(context: BrowserContext, into: string[]): void {
   })
 }
 
-test('demo path: import, verify on the phone, live flip, simulator, audit chain, CSP', async ({ page, browser }) => {
+test('demo path: import, verify on the phone, live flip, terms, simulator, audit chain, CSP', async ({ page, browser }) => {
   const n1 = page.getByTestId(`node-${N1}`)
   const cspViolations: string[] = []
   watchCsp(page.context(), cspViolations)
@@ -45,11 +45,15 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain,
     const supplier = await phone.newPage()
     const verifyPage = supplier.getByTestId('verify-page')
 
-    await test.step('3. the phone opens the link and answers Air + Grid', async () => {
+    await test.step('3. the phone opens the link, answers Air + Grid, ticks the supplier terms and submits', async () => {
       await supplier.goto(link)
       await expect(verifyPage).toHaveAttribute('data-phase', 'ready')
       await supplier.getByTestId('verify-transport-air').click()
       await supplier.getByTestId('verify-energy-grid').click()
+      // The terms start unticked, and nothing can be sent until the supplier ticks them.
+      await expect(supplier.getByTestId('verify-terms')).not.toBeChecked()
+      await expect(supplier.getByTestId('verify-submit')).toBeDisabled()
+      await supplier.getByTestId('verify-terms').check()
       await supplier.getByTestId('verify-submit').click()
     })
 
@@ -63,11 +67,18 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain,
       await again.goto(link)
       await expect(again.getByTestId('verify-page')).toHaveAttribute('data-result', 'alreadyUsed')
     })
+
+    await test.step('6. the printable supplier terms open at their own address, without a token', async () => {
+      const terms = await phone.newPage()
+      await terms.goto('/terms/supplier?lang=en')
+      await expect(terms.getByTestId('terms-page')).toHaveAttribute('data-phase', 'ready')
+      await expect(terms.getByTestId('terms-page')).toHaveAttribute('data-version', /^\d{4}-\d{2}-\d{2}$/)
+    })
   } finally {
     await phone.close()
   }
 
-  await test.step('6. simulator: Sea is win-win, N1-alt is premium or below-ETS; Apply leaves N1 as it is', async () => {
+  await test.step('7. simulator: Sea is win-win, N1-alt is premium or below-ETS; Apply leaves N1 as it is', async () => {
     const result = page.getByTestId('sim-result')
     const ghost = page.getByTestId(`ghost-${N1}`)
     await page.getByTestId('drawer-simulate').click()
@@ -86,14 +97,14 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain,
     await expect(n1).toHaveAttribute('data-status', 'VERIFIED')
   })
 
-  await test.step('7. the audit panel shows the chain as valid', async () => {
+  await test.step('8. the audit panel shows the chain as valid', async () => {
     await page.getByTestId('toolbar-audit').click()
     await expect(page.getByTestId('audit-panel')).toBeVisible()
     await page.getByTestId('audit-verify').click()
     await expect(page.getByTestId('audit-chain')).toHaveAttribute('data-valid', 'true')
   })
 
-  await test.step('8. no Content Security Policy violation on the dashboard or the phone', () => {
+  await test.step('9. no Content Security Policy violation on the dashboard or the phone', () => {
     expect(cspViolations).toEqual([])
   })
 })
