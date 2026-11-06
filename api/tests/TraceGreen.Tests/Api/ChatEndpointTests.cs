@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using TraceGreen.Domain.Ai;
+using TraceGreen.Domain.Chat;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 
@@ -116,6 +117,60 @@ public class ChatEndpointTests(ChatWebAppFactory factory) : IClassFixture<ChatWe
 
         Assert.Equal("notAnswered", body.GetProperty("status").GetString());
         Assert.Empty(body.GetProperty("segments").EnumerateArray());
+        Assert.Empty(body.GetProperty("facts").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task ARefusedAnswerIsAskedForOnceMoreFromTheSameModelWithTheRule()
+    {
+        factory.Ai.Sent.Clear();
+        factory.Ai.Answer = input => Task.FromResult(input.Retry is null
+            ? new ChatOutcome(true, "The largest emitter is {{S2.name}}.", ["S2.name"], "ollama:local:3b")
+            : new ChatOutcome(true, "The largest emitter is {{S1.name}}.", ["S1.name"], "ollama:local:3b"));
+
+        var body = await Answer("Who emits the most?");
+
+        Assert.Equal("answered", body.GetProperty("status").GetString());
+        Assert.Equal(2, factory.Ai.Sent.Count);
+        var retry = factory.Ai.Sent[1];
+        Assert.Equal("ollama:local:3b", retry.Model);
+        Assert.Equal("The largest emitter is {{S2.name}}.", retry.Retry!.Text);
+        Assert.Equal(AnswerCheck.RetryHint("a largest claim the data does not hold"), retry.Retry.Problem);
+    }
+
+    [Fact]
+    public async Task AnAnswerRefusedTwiceIsNotAnswered()
+    {
+        factory.Ai.Sent.Clear();
+        Model("The total is 19.4 t.");
+
+        var body = await Answer("What is the total?");
+
+        Assert.Equal("notAnswered", body.GetProperty("status").GetString());
+        Assert.Equal(2, factory.Ai.Sent.Count);
+    }
+
+    [Fact]
+    public async Task ALongAnswerRefusedTwiceIsShownWithoutItsFalseSentence()
+    {
+        Model("The largest emitter is {{S1.name}}. Compare its transport in What if. The next largest is {{S3.name}}.", "S1.name", "S3.name");
+
+        var body = await Answer("How can I reduce my emissions?");
+
+        Assert.Equal("answered", body.GetProperty("status").GetString());
+        Assert.Equal(["S1.name"], body.GetProperty("facts").EnumerateArray().Select(f => f.GetProperty("id").GetString()));
+    }
+
+    [Fact]
+    public async Task AGeneralAnswerComesBackAsTextWithNoFacts()
+    {
+        const string text = "I can tell you who emits the most and what a change of transport would do.";
+        Model(text);
+
+        var body = await Answer("I need help");
+
+        Assert.Equal("answered", body.GetProperty("status").GetString());
+        Assert.Equal(text, Assert.Single(body.GetProperty("segments").EnumerateArray()).GetProperty("text").GetString());
         Assert.Empty(body.GetProperty("facts").EnumerateArray());
     }
 

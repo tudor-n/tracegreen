@@ -99,12 +99,21 @@ class ChatFact(Wire):
     value: str
 
 
+class ChatRetry(Wire):
+    """The API refused the model's earlier answer to this question (Domain/Chat/AnswerCheck.cs):
+    that answer as the model wrote it, and the rule it broke, to ask once more."""
+
+    text: str
+    problem: str
+
+
 class ChatRequest(Wire):
     question: str
     history: list[str] = []
     facts: list[ChatFact] = []
     # One of GET /chat/models' ids: that model alone answers. None: the chat's models in order.
     model: str | None = None
+    retry: ChatRetry | None = None
 
 
 class ChatModel(Wire):

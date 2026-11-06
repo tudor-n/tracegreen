@@ -6,10 +6,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import Runnable, RunnableLambda
 
+from app.chat import check_answer
 from app.config import ModelSpec, Settings
 from app.main import create_app
 
@@ -49,6 +51,8 @@ class ChatFakes:
             self.prompts.append(messages)
             self.specs.append(spec)
             value = self.answers[spec.id]
+            if isinstance(value, list):  # one answer per call, the last one kept
+                value = value.pop(0) if len(value) > 1 else value[0]
             if isinstance(value, Exception):
                 raise value
             return value
@@ -68,8 +72,9 @@ def ask(fakes: ChatFakes, question: str = "Who emits the most?", **extra: Any) -
     return response.json()
 
 
-def answer(text: str, *ids: str, answerable: bool = True) -> dict[str, Any]:
-    return {"answerable": answerable, "text": text, "factIds": list(ids)}
+def answer(text: str, *ids: str, kind: str | None = None) -> dict[str, Any]:
+    kind = kind or ("data" if "{{" in text else "general")
+    return {"kind": kind, "text": text, "factIds": list(ids)}
 
 
 def test_an_answer_that_cites_facts_comes_back_with_its_ids() -> None:
@@ -105,19 +110,23 @@ def test_an_unknown_fact_hands_over_and_no_valid_answer_is_not_answered() -> Non
     fakes = ChatFakes(
         {
             "openai:model-a": answer("{{S9.name}} is the largest."),
-            "ollama:local:3b": answer("No fact at all."),
+            "ollama:local:3b": answer("It emits 4.7 t."),
         }
     )
 
     assert ask(fakes) == {"answerable": False, "text": "", "factIds": [], "provider": "none"}
 
 
-def test_a_model_that_says_the_facts_do_not_answer_is_believed() -> None:
-    fakes = ChatFakes({"openai:model-a": answer("", answerable=False)})
+def test_a_general_answer_may_cite_no_fact() -> None:
+    text = (
+        "I can tell you who emits the most, which suppliers are still estimated and what a "
+        "change of transport would do. Scope 3 covers the emissions of what you buy."
+    )
+    fakes = ChatFakes({"openai:model-a": answer(text)})
 
-    body = ask(fakes, "What will the ETS price be next year?")
+    body = ask(fakes, "I need help")
 
-    assert body == {"answerable": False, "text": "", "factIds": [], "provider": "openai:model-a"}
+    assert body == {"answerable": True, "text": text, "factIds": [], "provider": "openai:model-a"}
 
 
 def test_the_unit_is_not_a_number() -> None:
@@ -225,7 +234,8 @@ def test_a_named_model_answers_alone_and_does_not_hand_over() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"answerable": False, "text": "", "factIds": [], "provider": "none"}
-    assert [s.id for s in fakes.specs] == ["ollama:local:3b"]
+    # Asked, then told why once; never handed over.
+    assert [s.id for s in fakes.specs] == ["ollama:local:3b", "ollama:local:3b"]
 
 
 def test_a_named_model_that_passes_is_the_provider() -> None:
@@ -285,13 +295,30 @@ def test_a_picked_local_model_answers_alone_with_the_chat_caps() -> None:
     assert (spec.timeout_s, spec.max_tokens) == (12, 400)
 
 
-def test_automatic_with_only_local_models_asks_none_and_a_model_the_server_lacks_is_422() -> None:
+def test_with_no_model_of_its_own_ready_automatic_asks_the_first_local_model() -> None:
+    fakes = ChatFakes({"ollama:qwen2.5:14b": answer("{{S1.name}} emits {{S1.carbon}}.")})
+    env = {"AI_MODELS": "", "AI_CHAT_MODELS": "anthropic:claude-x"}
+    test_client = client(fakes, local=("qwen2.5:14b", "llama3.2:3b"), **env)
+
+    assert post(test_client, None).json()["provider"] == "ollama:qwen2.5:14b"
+    listed = test_client.get("/chat/models").json()["models"]
+    assert [(m["id"], m["ready"], m["automatic"]) for m in listed] == [
+        ("anthropic:claude-x", False, True),
+        ("ollama:qwen2.5:14b", True, True),
+        ("ollama:llama3.2:3b", True, False),
+    ]
+
+
+def test_a_model_the_server_lacks_is_422_and_asks_nobody() -> None:
     fakes = ChatFakes({})
     test_client = client(fakes, local=("qwen2.5:14b",), AI_MODELS="")
 
-    assert post(test_client, None).json()["provider"] == "stub"
     assert post(test_client, "ollama:llama9:70b").json()["detail"]["code"] == "unknown_model"
     assert fakes.prompts == []
+
+
+def test_without_any_model_automatic_is_the_stub() -> None:
+    assert post(client(ChatFakes({}), AI_MODELS=""), None).json()["provider"] == "stub"
 
 
 def test_every_chat_model_gets_the_answer_cap() -> None:
@@ -318,4 +345,91 @@ def test_a_prompt_too_long_for_the_ollama_context_skips_the_local_model() -> Non
     body = test_client.post("/chat", json={"question": "Who?", "facts": many}).json()
 
     assert body["provider"] == "none"
-    assert [s.id for s in fakes.specs] == ["openai:model-a"]
+    assert [s.id for s in fakes.specs] == ["openai:model-a", "openai:model-a"]
+
+
+def test_an_answer_that_breaks_a_rule_goes_back_once_with_the_rule() -> None:
+    fakes = ChatFakes(
+        {
+            "openai:model-a": [
+                answer("{{S1.name}} emits 4.7 t."),
+                answer("{{S1.name}} emits {{S1.carbon}}."),
+            ]
+        }
+    )
+
+    body = ask(fakes)
+
+    assert (body["provider"], body["text"]) == (
+        "openai:model-a",
+        "{{S1.name}} emits {{S1.carbon}}.",
+    )
+    retry = fakes.prompts[1]
+    assert "emits 4.7 t." in str(retry[-2].content)
+    assert "it types '4.7'" in str(retry[-1].content)
+    assert "{{id}}" in str(retry[-1].content)
+
+
+@pytest.mark.parametrize(
+    ("text", "problem"),
+    [
+        ("Taiwan PCB Ltd. emits the most.", "it types a name from the data"),
+        ("Ask Cluj Metal SRL for a quote.", "it names a company"),
+        ("Most of your emissions are still estimated.", "without citing the fact"),
+        ("{{S1.name}} is the largest.", None),
+        ("{{S1.name}} is the largest. FactIds: {{S1.name}}.", "format into its text"),
+        ("{{S9.name}} is the largest.", "S9.name, which is not one of the facts"),
+        ("It is about {{S1.name}} {S1.carbon}}.", "not written as {{id}}"),
+        ("The total is large.", None),
+        ("Estimated means the figure comes from the invoice spend.", None),
+        ("Most of it is estimated.", "without citing the fact"),
+        ("Your largest supplier is the board maker.", "without citing the fact"),
+        ("Your suppliers are still estimated.", "without citing the fact"),
+        ("Your largest supplier is {{S1.name}}.", None),
+        ("Most emissions of a factory come from what it buys, its Scope 3.", None),
+    ],
+)
+def test_the_cheap_checks_name_the_rule(text: str, problem: str | None) -> None:
+    facts = {f["id"]: f["value"] for f in FACTS}
+    answer_, broke = check_answer(answer(text), facts)
+
+    if problem is None:
+        assert broke is None and answer_ is not None
+    else:
+        assert answer_ is None and broke is not None and problem in broke.rule
+
+
+def test_a_data_answer_must_cite_a_fact() -> None:
+    _, broke = check_answer({"kind": "data", "text": "It is the PCB maker.", "factIds": []}, {})
+
+    assert broke is not None and broke.rule == "it is about the data but cites no fact"
+
+
+def test_the_hint_names_the_fact_to_cite_but_the_rule_holds_no_data() -> None:
+    facts = {f["id"]: f["value"] for f in FACTS}
+
+    _, broke = check_answer(answer("Taiwan PCB Ltd. emits the most."), facts)
+
+    assert broke is not None
+    assert broke.rule == "it types a name from the data"
+    assert broke.hint == "it types the name 'Taiwan PCB Ltd.'; write {{S1.name}} in its place"
+
+
+def test_an_answer_the_api_refused_is_asked_again_with_the_rule() -> None:
+    fakes = ChatFakes({"openai:model-a": answer("{{S1.name}} is the largest.")})
+    test_client = client(fakes)
+
+    body = test_client.post(
+        "/chat",
+        json={
+            "question": "Who emits the most?",
+            "facts": FACTS,
+            "model": "openai:model-a",
+            "retry": {"text": "{{S1.name}} is still estimated.", "problem": "a status claim"},
+        },
+    ).json()
+
+    assert body["provider"] == "openai:model-a"
+    (prompt,) = fakes.prompts
+    assert str(prompt[-2].content) == "{{S1.name}} is still estimated."
+    assert "a status claim" in str(prompt[-1].content)

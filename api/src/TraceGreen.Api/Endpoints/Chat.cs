@@ -31,7 +31,7 @@ public static class ChatEndpoints
                     {
                         if (result.LogNote is { } note)
                         {
-                            log.LogInformation("Chat not answered: {Note}", note);
+                            log.LogInformation("Chat answer checks: {Note}", note);
                         }
                         return Results.Ok(result.Answer);
                     },

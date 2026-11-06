@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Chat;
+using TraceGreen.Domain.Copy;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Seed;
 using TraceGreen.Domain.Services;
@@ -94,7 +95,12 @@ public class ChatFactsTests
     [InlineData("Your largest supplier is Taiwan PCB, {{S1.carbon}}.", "a name written out")]
     [InlineData("Try Cluj Precision SRL instead of {{S1.name}}.", "a company name written out")]
     [InlineData("Try Brasov Castings GmbH, cheaper than {{S1.name}}.", "a company name written out")]
-    [InlineData("Most of it is estimated.", "no fact cited")]
+    [InlineData("Most of it is estimated.", "a claim about the data without a fact")]
+    [InlineData("Your largest supplier is the board maker.", "a claim about the data without a fact")]
+    [InlineData("Your suppliers are still estimated. Ask {{S2.name}} first.", "a claim about the data without a fact")]
+    [InlineData("ISO 14064 covers this.", "a number written out")]
+    [InlineData("The largest is {{S1.name}}. FactIds: {{S1.name}}.", "the answer's format in its text")]
+    [InlineData("Kind: general. Hello.", "the answer's format in its text")]
     [InlineData("", "empty answer")]
     [InlineData("{{S1.name}} is {S1.status}}.", "malformed placeholder")]
     public void AnswersThatBreakARuleAreRefused(string text, string problem)
@@ -129,6 +135,19 @@ public class ChatFactsTests
         Assert.True(AnswerCheck.Check("{{total.carbon}} of CO2 equivalent, written CO₂e or tCO2e.", Pack).Ok);
     }
 
+    [Theory]
+    [InlineData("I can tell you who emits the most, which suppliers are still estimated and what a change of transport would do.")]
+    [InlineData("Estimated means the figure comes from the invoice spend; supplier-confirmed means the supplier answered.")]
+    [InlineData("Most emissions of a factory come from what it buys, its Scope 3. Start with the largest emitters.")]
+    public void AGeneralAnswerMayCiteNoFact(string text)
+    {
+        var result = AnswerCheck.Check(text, Pack);
+
+        Assert.True(result.Ok, result.Problem);
+        Assert.Empty(result.FactIds);
+        Assert.Equal(text, Assert.Single(result.Segments).Text);
+    }
+
     [Fact]
     public void ThePackListsTheNamesAnAnswerMayOnlyCite()
     {
@@ -154,6 +173,15 @@ public class ChatFactsTests
     [InlineData("{{S3.name}} emits less than {{S1.name}}.")]
     [InlineData("Still estimated: {{list.estimated}}.")]
     [InlineData("{{S1.name}} is confirmed. {{S2.name}} is estimated.")]
+    [InlineData("The second largest emitter is {{S2.name}}, with {{S2.carbon}}.")]
+    [InlineData("The third-largest is {{S3.name}}.")]
+    [InlineData("The largest emitter still estimated is {{S2.name}}; ask it to confirm.")]
+    [InlineData("The second largest estimated emitter is {{S3.name}}.")]
+    [InlineData("{{S1.name}} emits the most. The next largest is {{S2.name}}.")]
+    [InlineData("The largest estimated is {{S2.name}}; the next largest estimated is {{S3.name}}.")]
+    [InlineData("The second smallest is {{S3.name}}.")]
+    [InlineData("The largest emitters are {{S1.name}} and {{S2.name}}.")]
+    [InlineData("The largest estimated suppliers are {{S2.name}} and {{S3.name}}.")]
     public void ClaimsTheDataHoldsPass(string text) =>
         Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
 
@@ -165,8 +193,51 @@ public class ChatFactsTests
     [InlineData("The smallest emitter is {{S1.name}}.", "a smallest claim the data does not hold")]
     [InlineData("{{S3.name}} emits more than {{S1.name}}.", "a comparison the data does not hold")]
     [InlineData("{{S1.name}} emits less than {{S3.name}}.", "a comparison the data does not hold")]
+    [InlineData("The second largest emitter is {{S3.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The largest estimated emitter is {{S3.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The fifth largest is {{S4.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The smallest estimated emitter is {{S2.name}}.", "a smallest claim the data does not hold")]
+    [InlineData("The largest emitters are {{S1.name}} and {{S3.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The largest is {{S1.name}}. The next largest is {{S3.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The next largest is {{S3.name}}.", "a largest claim the data does not hold")]
+    [InlineData("The largest is {{S1.name}}. The next largest is {{S3.name}}, which is estimated.", "a largest claim the data does not hold")]
     public void ClaimsTheDataDoesNotHoldAreRefused(string text, string problem) =>
         Assert.Equal(problem, AnswerCheck.Check(text, Pack).Problem);
+
+    [Fact]
+    public void ALongAnswerIsShownWithoutItsOneFalseSentence()
+    {
+        var trimmed = AnswerCheck.Trim(
+            "The largest emitter is {{S1.name}}. Ask for the rest with Request data. The next largest is {{S3.name}}.", Pack);
+
+        Assert.NotNull(trimmed);
+        Assert.Equal(["S1.name"], trimmed.FactIds);
+        Assert.Equal(". Ask for the rest with Request data.", trimmed.Segments[^1].Text);
+    }
+
+    [Theory]
+    [InlineData("The largest emitter is {{S2.name}}. The next is {{S1.name}}.")]
+    [InlineData("The largest emitter is {{S2.name}}. Ask it to confirm. Then compare modes in What if.")]
+    [InlineData("The total is 19.4 t. It is 20 t next year. And 21 t after.")]
+    [InlineData("The largest emitters are {{S1.name}} and {{S3.name}}. Confirm their deliveries first. Start with {{S1.name}}.")]
+    public void AnAnswerIsNotTrimmedWhenTooShortWhenNothingCitedIsLeftOrWhenOneSentenceIsNotEnough(string text) =>
+        Assert.Null(AnswerCheck.Trim(text, Pack));
+
+    [Fact]
+    public void EveryRuleHasARetryHintThatHoldsNoData()
+    {
+        string[] rules =
+        [
+            "a number written out", "the answer's format in its text", "a name written out", "a company name written out", "a banned term",
+            "a status claim the data does not hold", "a largest claim the data does not hold",
+            "a smallest claim the data does not hold", "a comparison the data does not hold",
+            "a claim about the data without a fact",
+        ];
+
+        Assert.All(rules, rule => Assert.NotEqual(rule, AnswerCheck.RetryHint(rule)));
+        Assert.All(rules, rule => Assert.False(BannedTerms.Any(AnswerCheck.RetryHint(rule))));
+        Assert.Equal("unknown fact S9.name", AnswerCheck.RetryHint("unknown fact S9.name"));
+    }
 
     [Fact]
     public void TheStatusListsAreTheApisOwn()

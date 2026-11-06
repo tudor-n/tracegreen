@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using TraceGreen.Domain.Ai;
 using TraceGreen.Domain.Chat;
 using TraceGreen.Domain.Model;
@@ -52,6 +53,9 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
     public const int MaxHistory = 3;
     public const int MaxModelIdChars = 120;
 
+    /// <summary>Below this much of the chat's time left, an answer the check refused is not asked for again.</summary>
+    public static readonly TimeSpan MinRetryTime = TimeSpan.FromSeconds(3);
+
     /// <summary>The model list is a quick read; past this the chat box offers "Automatic" only.</summary>
     public static readonly TimeSpan ModelsTimeout = TimeSpan.FromSeconds(3);
 
@@ -103,12 +107,11 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
         var pack = FactPack.Build(snapshot, scenarios);
         var input = new ChatInput(asked, earlier, pack.Facts.Select(f => new ChatFactInput(f.Id, f.About, f.PromptText)).ToList(), chosen);
 
+        var started = Stopwatch.GetTimestamp();
         ChatOutcome outcome;
         try
         {
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            cts.CancelAfter(options.AiChatTimeout);
-            outcome = await ai.ChatAsync(input, cts.Token).WaitAsync(options.AiChatTimeout, ct);
+            outcome = await AskAi(input, options.AiChatTimeout, ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -128,17 +131,62 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
             return Ok(outcome.Provider == "stub" ? ChatStatus.Unavailable : ChatStatus.NotAnswered, outcome.Provider, null);
         }
         var checkedAnswer = AnswerCheck.Check(outcome.Text, pack);
+        string? note = null;
         if (!checkedAnswer.Ok)
         {
-            // The rule, never the text: the text may hold invoice names and is the model's, not the buyer's.
-            return Ok(ChatStatus.NotAnswered, outcome.Provider, $"answer from {outcome.Provider} refused: {checkedAnswer.Problem}");
+            // The same model is asked once more, told the rule its answer broke, while the chat has time left; failing
+            // that, a long answer is shown without its one false sentence (AnswerCheck.Trim). The log gets the rules,
+            // never the text: it may hold invoice names and is the model's, not the buyer's.
+            note = $"answer from {outcome.Provider} refused: {checkedAnswer.Problem}";
+            var left = options.AiChatTimeout - Stopwatch.GetElapsedTime(started);
+            ChatOutcome? again = null;
+            if (left >= MinRetryTime)
+            {
+                var retry = new ChatRetry(outcome.Text, AnswerCheck.RetryHint(checkedAnswer.Problem!));
+                try
+                {
+                    again = await AskAi(input with { Model = outcome.Provider, Retry = retry }, left, ct);
+                }
+                catch (Exception ex) when (!ct.IsCancellationRequested)
+                {
+                    note += $"; asked again, no answer ({ex.GetType().Name})";
+                }
+            }
+            var second = again is { Answerable: true, ModelProblem: null } ? AnswerCheck.Check(again.Text, pack) : null;
+            if (second is { Ok: true })
+            {
+                (outcome, checkedAnswer, note) = (again!, second, null);
+            }
+            else
+            {
+                if (again is not null)
+                {
+                    note += $"; asked again: {second?.Problem ?? "no answer"}";
+                }
+                // The retried answer trimmed if that passes, else the first one trimmed.
+                var (trimmed, from) = second is not null && AnswerCheck.Trim(again!.Text, pack) is { } shorter
+                    ? (shorter, again)
+                    : (AnswerCheck.Trim(outcome.Text, pack), outcome);
+                if (trimmed is null)
+                {
+                    return Ok(ChatStatus.NotAnswered, outcome.Provider, note);
+                }
+                (outcome, checkedAnswer, note) = (from, trimmed, $"{note}; shown without the sentence that broke the rule");
+            }
         }
 
         var facts = checkedAnswer.FactIds
             .Select(id => pack.Find(id)!)
             .Select(f => new ChatFactView(f.Id, f.Field, f.Kind, f.Value, f.Subject, f.NodeId, f.AuditId))
             .ToList();
-        return Result<ChatResult, ChatError>.Ok(new ChatResult(new ChatAnswer(ChatStatus.Answered, checkedAnswer.Segments, facts, outcome.Provider), null));
+        return Result<ChatResult, ChatError>.Ok(new ChatResult(new ChatAnswer(ChatStatus.Answered, checkedAnswer.Segments, facts, outcome.Provider), note));
+    }
+
+    private async Task<ChatOutcome> AskAi(ChatInput input, TimeSpan budget, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(budget);
+        return await ai.ChatAsync(input, cts.Token).WaitAsync(budget, ct);
     }
 
     private static Result<ChatResult, ChatError> Ok(ChatStatus status, string provider, string? note) =>

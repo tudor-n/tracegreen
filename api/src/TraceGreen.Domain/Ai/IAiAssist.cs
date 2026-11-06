@@ -11,9 +11,13 @@ public sealed record ChatFactInput(string Id, string About, string Value);
 /// <summary>
 /// The buyer's question, up to three earlier questions (never earlier answers) and the facts it may cite.
 /// <see cref="Model"/> is one of <see cref="IAiAssist.ChatModelsAsync"/>'s ids, which then answers alone; null asks the
-/// chat's models in order.
+/// chat's models in order. <see cref="Retry"/> is set when the API refused that model's answer and asks once more.
 /// </summary>
-public sealed record ChatInput(string Question, IReadOnlyList<string> History, IReadOnlyList<ChatFactInput> Facts, string? Model = null);
+public sealed record ChatInput(
+    string Question, IReadOnlyList<string> History, IReadOnlyList<ChatFactInput> Facts, string? Model = null, ChatRetry? Retry = null);
+
+/// <summary>The model's answer the API's check refused, and what to do instead (<c>AnswerCheck.RetryHint</c>).</summary>
+public sealed record ChatRetry(string Text, string Problem);
 
 /// <summary>Why the AI service would not use the model a question named: it has no such model, or not its key.</summary>
 public enum ChatModelProblem { Unknown, NotReady }
