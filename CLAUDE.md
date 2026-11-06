@@ -62,7 +62,7 @@ For anything a person outside the team can read: UI strings, seed data, README, 
 ## Data rules
 
 - Never put a number into `seed/factors.json`, a lane, a mass or `ETS_PRICE_EUR_PER_T` that a person did not take from a named source. A row's `source` keeps its PLACEHOLDER text until a person replaces the row with one that names the table, year and row label (`docs/factor-sources.md`). A PLACEHOLDER source stays visible on screen.
-- Never hand-tune demo numbers to make a badge appear. If real factors change a badge, report it in `docs/NEXT.md` and change what the demo script says (D5).
+- Never hand-tune demo numbers to make a badge appear. If real factors change a badge, report it in `docs/NEXT.md` and change what the demo script says (`docs/RUNBOOK.md`, "Demo steps (F1–F4)"; D5).
 - No cloud deployment, tunnel or new dependency until the simulator slice is done; the demo runs on the laptop's hotspot (ruling R6).
 
 ## Working style
