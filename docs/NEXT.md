@@ -156,7 +156,26 @@ Imported through `POST /api/ingest/ubl` into a throwaway API in memory mode with
 
 **Config.** `compose.yml` passes every variable of the plan's agreements to the `ai` service, with the agreed defaults: `AI_MODELS`, `AI_MODEL`, the three cloud keys, `OLLAMA_BASE_URL`, `AI_TIMEOUT_S` 8, `AI_MODEL_TIMEOUT_S` 4, `OLLAMA_TIMEOUT_S` 6 and `AI_DEV_ROUTES` 0. It also maps `host.docker.internal` to the host gateway, so the name resolves on Linux as well. `.env.example` documents each of them.
 
-**Not changed: `compose.demo.yml`.** Its `ai` service replaces the environment (`environment: !override`) with `AI_MODEL`, `ANTHROPIC_API_KEY` and `AI_TIMEOUT_S` "10" only. Until it gets the same lines and `extra_hosts`, the demo image passes neither `AI_MODELS`, the other keys nor the Ollama address, and the service's budget there equals the API's 10 s timeout.
+**The demo image.** `compose.demo.yml` replaces the `ai` service's environment (`environment: !override`), so it gets the same variables, read from the root `.env`, with `AI_DEV_ROUTES` fixed at 0. Before, it passed only `AI_MODEL`, `ANTHROPIC_API_KEY` and `AI_TIMEOUT_S` "10", a budget equal to the API's own timeout. `extra_hosts` comes from `compose.yml`.
+
+**Checked against Terminal A's branch (`f6/ai-core` at `70d8b5b`, 2026-11-06).** A throwaway container ran that branch's `ai/` with this branch's `seed/`:
+
+| Check | Result |
+|---|---|
+| `/health` with `AI_MODELS=openai:<placeholder>,ollama:qwen3.5:4b` and no key | `provider` `cache,ollama:qwen3.5:4b,stub`; the OpenAI model `ready: false`, `reason` "OPENAI_API_KEY not set"; the Ollama model `ready: true` and `modelConfigured: true`, although that model was not pulled. An Ollama model is ready by configuration, not by a reachable server. |
+| `/classify` with no model reachable | 200 in 0.18 s: the cached line from the cache, the other from the stub ("AI unavailable") |
+| Dev route with `AI_DEV_ROUTES=1` | 400 "Model not ready: openai:<placeholder> (OPENAI_API_KEY not set)"; 400 "Unknown model: nope:x" |
+| The container reaching Ollama on the Windows host | `http://host.docker.internal:11434/api/tags` answers with Ollama's default settings |
+| The local model, `ollama:ministral-3:3b` (the only model on the dev machine; Qwen 3.5 is still to be timed) | Warm: one line in 1.2–1.4 s, R1's two and R3's first and last lines in 3.4 s (R1 both `zinc_diecast`, 0.95 and 0.90; the connector line `connectors`, 0.90; the harness line `UNCLASSIFIED`, 0.60). Cold, after unloading the model: 4.7 s for one line. The first two calls after the service started gave no answer within 8 s and fell to the stub. The same prompt and schema sent straight to Ollama, and through the service's own model factory without a deadline, answered in 1–2 s, so the misses were start-up and model load, not the prompt. Hence the warm-up step in `RUNBOOK.md`. |
+
+**Phase 2 for C, the AI demo steps,** are in `RUNBOOK.md`, "AI demo steps (F6)". Two of the plan's steps say less on screen than the plan expected:
+
+- **Step 1:** the node shows the category and "AI-mapped · <confidence>", but not the model's reason; `NodeView` carries no rationale. The script shows the reason with a `curl` to the AI service.
+- **Step 3:** `adversarial.xml` is answered from `seed/ai-cache.json` by the API, so no live model sees its injected line on stage. The live models' handling of injection is in the scoring table (`docs/ai-eval.md`, Terminal B's Phase 2).
+
+Neither step has been rehearsed with live cloud models yet.
+
+## Seed XML validation (2026-10-23)
 
 ## Seed XML validation (2026-10-23)
 
@@ -242,7 +261,7 @@ Current order, from the 2026-10-22 review's slice order (vertical slices toward 
 1. **Slice 4 check (M2, A8 with B and C):** the API-level part passed on 2026-11-05 in both modes ("M2 pre-check" above). Left: the timed two-device run-through over the hotspot (T16), where the phone flips the node green in under 2 s. Measure import → node and submit → flip, and log failures in `docs/run-log.md` (people write it).
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** done; `pnpm e2e` passes against Compose and the demo image, and CI runs it on the demo image in both data modes (A9).
-4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Then Phase 2: time the local model on R1–R3, write the real scores to `docs/ai-eval.md`, and add the AI demo steps to `RUNBOOK.md`. Phase 3 merges A, then C, then B, and runs the full check.
+4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Phase 2: the AI demo steps are in `RUNBOOK.md` (C, done); left are timing Qwen 3.5 on R1–R3 through the dev route (A) and the real scores in `docs/ai-eval.md` with the keys (B). Phase 3 merges A, then C, then B, runs the full check and rehearses the AI demo steps on the demo laptop.
 5. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
 
 The task list below is the original plan, kept for its specifications; where it and the order above disagree on order, the order above wins.

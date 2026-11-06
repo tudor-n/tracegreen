@@ -83,10 +83,10 @@ flowchart LR
   M3 -- "lines left" --> S["stub<br/>UNCLASSIFIED"]
 ```
 
-- `config.py` reads `AI_MODELS` (`<provider>:<model>`, in order) into model specs, each with a ready flag and a reason (a missing key, for example). The older `AI_MODEL` with `ANTHROPIC_API_KEY` counts as `anthropic:<AI_MODEL>`.
+- `config.py` reads `AI_MODELS` (`<provider>:<model>`, in order) into model specs, each with a ready flag and a reason (a missing key, for example). While `AI_MODELS` is empty, the older `AI_MODEL` counts as `anthropic:<AI_MODEL>`.
 - `models.py` builds each LangChain chat model lazily: temperature 0, no retries, its own timeout. No client exists while no model is configured.
 - `prompts.py` lists the allowed category ids and labels from `seed/categories.json` and puts the invoice lines in an `<invoice_lines>` block that the prompt declares to be data.
-- `providers.py` runs the chain. It sends the lines left over to the next ready model in one structured-output call, checks the answer (`SECURITY.md`, "The AI boundary"), and turns any answer below 0.6 confidence into `UNCLASSIFIED`. Each model call runs in a worker thread with a hard deadline. Model answers are kept in a runtime cache under the same key as `seed/ai-cache.json`.
+- `providers.py` runs the chain. It sends the lines left over to the next ready model in one structured-output call, checks the answer (`SECURITY.md`, "The AI boundary"), and turns any answer below 0.6 confidence into `UNCLASSIFIED`. Each model call runs in a worker thread with a hard deadline. Model answers are kept in a runtime cache under the same key as `seed/ai-cache.json`, until the service restarts.
 - `main.py` adds `models` to `/health` and, only with `AI_DEV_ROUTES=1`, `POST /classify?model=<id>`, which asks that one model and skips the cache (scoring, `docs/ai-eval.md`).
 
 ## The read model
