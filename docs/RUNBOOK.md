@@ -49,11 +49,11 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 
 | Where | Hooks |
 |---|---|
-| Toolbar | `toolbar-reset`, `toolbar-demo`, `toolbar-audit`; `import-file` (the supplier page spec) |
-| Graph | `node-<id>` with `data-status`; `ghost-<id>` with `data-badge`; `ghost-<id>-saved` |
-| Node drawer | `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate`; `drawer-portal`, `portal-url` (the supplier page spec) |
-| Simulator | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
-| Audit panel | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
+| Sidebar (every screen) | `toolbar-reset`, `toolbar-demo`; `toolbar-audit` is the Audit log link; `import-file` (the supplier page spec) |
+| Supplier tree (`/suppliers`) | `node-<id>` with `data-status` on each row; `ghost-<id>` with `data-badge` on the What if row; `ghost-<id>-saved` |
+| Side panel | `node-drawer`, `drawer-request`, `qr-url`; `drawer-simulate` is the What if tab; `drawer-portal`, `portal-url` (the supplier page spec) |
+| Simulator (What if tab) | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
+| Audit log screen (`/audit`) | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
 | Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-terms-link` (its link to `/terms/supplier`), `verify-submit` |
 | Terms page | `terms-page` with `data-phase` and `data-version` |
 | Supplier page list (F12) | `supplier-page` with `data-phase` and `data-result`; `delivery-<nodeId>` with `data-status`; `delivery-<nodeId>-open`, `delivery-<nodeId>-transport-<mode>` and `delivery-<nodeId>-energy-<source>` with `aria-pressed`, `delivery-<nodeId>-confirm`; `supplier-terms` (the page's one terms checkbox, shown while a delivery is open for answers) and `supplier-terms-link` |

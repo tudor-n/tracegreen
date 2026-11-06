@@ -27,7 +27,8 @@ test('supplier page: one link lists every delivery from the supplier, each confi
   let link = ''
 
   await test.step('1. reset, then import a second invoice from N3’s seller', async () => {
-    await page.goto('/')
+    // The supplier rows live on the Suppliers screen; the sidebar with the import is on every screen.
+    await page.goto('/suppliers')
     await page.getByTestId('toolbar-reset').click()
     // The seed start state is N2-N5 (no N1, no second Oradea invoice); waiting for it proves the reset has landed.
     await expect(nodes).toHaveCount(4)
@@ -99,7 +100,7 @@ test('supplier page: one link lists every delivery from the supplier, each confi
     await phone.close()
   }
 
-  await test.step('7. the audit panel shows the chain as valid', async () => {
+  await test.step('7. the audit log screen shows the chain as valid', async () => {
     await page.getByTestId('toolbar-audit').click()
     await expect(page.getByTestId('audit-panel')).toBeVisible()
     await page.getByTestId('audit-verify').click()

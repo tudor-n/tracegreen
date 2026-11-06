@@ -1,5 +1,6 @@
-import { useEffect, useReducer } from 'react'
+import { type ReactNode, useEffect, useReducer } from 'react'
 import { useSearchParams } from 'react-router'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { AnswerGroup } from '@/components/verify/AnswerGroup'
 import { LanguageHeader } from '@/components/verify/LanguageHeader'
@@ -76,36 +77,33 @@ export default function Verify() {
       data-testid="verify-page"
       data-phase={state.phase}
       data-result={result}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 py-5"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 pt-3"
     >
       <LanguageHeader lang={lang} />
 
       {state.phase === 'loading' && (
-        <p role="status" aria-busy="true" className="py-16 text-center text-lg text-muted-foreground">
+        <p role="status" aria-busy="true" className="flex flex-col items-center gap-4 py-24 text-center text-[17px] text-muted-foreground">
+          <Wordmark size={28} variant="loader" label={null} />
           {copy.loading}
         </p>
       )}
 
       {(state.phase === 'ready' || state.phase === 'submitting') && (
         <>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">{copy.title}</h1>
-            <p className="text-base">{copy.intro(state.context.buyerName)}</p>
+          <div className="flex flex-col gap-2 px-1">
+            <h1 className="font-display text-[28px] leading-tight font-bold tracking-[-0.025em]">{copy.title}</h1>
+            <p className="text-[15px] leading-relaxed text-ink-2">{copy.intro(state.context.buyerName)}</p>
           </div>
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-xl border bg-card p-4 text-base">
-            <dt className="text-muted-foreground">{copy.labels.supplier}</dt>
-            <dd className="font-semibold">{state.context.supplierLabel}</dd>
-            <dt className="text-muted-foreground">{copy.labels.item}</dt>
-            <dd className="break-words">{state.context.itemDescription}</dd>
-            <dt className="text-muted-foreground">{copy.labels.invoice}</dt>
-            <dd>
+          <dl className="rounded-[14px] bg-card px-4 text-[15px] shadow-[0_0_0_0.5px_rgb(0_0_0/0.08)] [&>div+div]:shadow-[inset_0_0.5px_0_var(--hairline)]">
+            <Fact label={copy.labels.supplier}>{state.context.supplierLabel}</Fact>
+            <Fact label={copy.labels.item}>{state.context.itemDescription}</Fact>
+            <Fact label={copy.labels.invoice}>
               {state.context.invoiceNumber} · {formatIssueDate(state.context.issueDate, lang)}
-            </dd>
-            <dt className="text-muted-foreground">{copy.labels.route}</dt>
-            <dd>
+            </Fact>
+            <Fact label={copy.labels.route}>
               {state.context.origin} → {state.context.dest}
-            </dd>
+            </Fact>
           </dl>
 
           <AnswerGroup
@@ -136,21 +134,21 @@ export default function Verify() {
             onChange={(accepted) => dispatch({ kind: 'terms', accepted })}
           />
 
-          <div className="flex flex-col gap-2 pb-4">
+          <div className="sticky bottom-0 -mx-4 mt-auto flex flex-col gap-2 bg-background/85 px-4 pt-3 pb-7 shadow-[0_-0.5px_0_var(--hairline)] backdrop-blur-xl backdrop-saturate-[1.8]">
             {!canSubmit(state.answers) ? (
-              <p role="status" className="text-center text-base text-muted-foreground">
+              <p role="status" className="text-center text-[15px] text-ink-2">
                 {copy.answerOne}
               </p>
             ) : (
               !accepted && (
-                <p role="status" className="text-center text-base text-muted-foreground">
+                <p role="status" className="text-center text-[15px] text-ink-2">
                   {copy.terms.tickToSubmit}
                 </p>
               )
             )}
             <Button
               data-testid="verify-submit"
-              className="h-14 w-full rounded-xl text-lg"
+              className="h-[52px] w-full text-[17px]"
               disabled={state.phase === 'submitting' || !canSend(state.answers, accepted)}
               onClick={() => dispatch({ kind: 'submit' })}
             >
@@ -179,12 +177,21 @@ export default function Verify() {
           body={copy.results[state.failure].body}
         >
           {state.retry !== null && (
-            <Button className="mt-2 h-14 w-full rounded-xl text-lg" onClick={() => dispatch({ kind: 'retry' })}>
+            <Button className="mt-2 h-[52px] w-full text-[17px]" onClick={() => dispatch({ kind: 'retry' })}>
               {copy.retry}
             </Button>
           )}
         </ResultMessage>
       )}
     </main>
+  )
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="text-right leading-snug font-medium break-words">{children}</dd>
+    </div>
   )
 }

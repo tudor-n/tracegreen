@@ -71,7 +71,10 @@ export const drawerCopy = {
   leadTime: 'Lead time',
   requestData: 'Request data',
   requesting: 'Requesting…',
+  /** Once a link is on screen: links are single-use or expire, so the buyer can always ask for a fresh one. */
+  requestAgain: 'New verification link',
   supplierPage: 'Supplier page link',
+  supplierPageAgain: 'New supplier page link',
   supplierPageRequesting: 'Making the link…',
   simulate: 'Simulate',
 } as const
@@ -157,6 +160,7 @@ export const auditPanelCopy = {
   empty: 'No entries yet.',
   hash: 'hash',
   verify: 'Verify chain',
+  notChecked: 'Not checked yet. Verify the chain to recompute every hash.',
   verifying: 'Verifying…',
   checked: (entries: number) => `${entries} ${entries === 1 ? 'entry' : 'entries'} checked`,
   actions: {
@@ -236,3 +240,43 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
 }
+
+/** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */
+export const shellCopy = {
+  sections: 'Sections',
+  overview: 'Overview',
+  suppliers: 'Suppliers',
+} as const
+
+/** The Overview: where the buyer stands, in three cards. Every figure is the API's KPI as it is. */
+export const overviewCopy = {
+  title: 'Overview',
+  /** The API counts one node per invoice line, so the caption counts deliveries, not suppliers. */
+  totalCaption: (count: number, deliveries: string, spend: string) =>
+    `From ${deliveries} ${count === 1 ? 'delivery' : 'deliveries'} · ${spend} spend`,
+  split: 'How the total splits',
+  estimated: 'Estimated',
+  confirmed: 'Supplier-confirmed',
+  splitLabel: (confirmed: string, estimated: string) => `${confirmed} supplier-confirmed, ${estimated} estimated`,
+  nextTitle: (supplier: string) => `Next: ask ${supplier} to confirm`,
+  nextBody: 'It has the largest figure that no supplier has confirmed yet.',
+  nextAction: 'Open supplier',
+  allConfirmed: 'Every supplier has confirmed its figure.',
+  allSuppliers: 'All suppliers',
+} as const
+
+/** The Suppliers screen: the tree of supply lines into the buyer, and the side panel for the selected supplier. */
+export const suppliersCopy = {
+  title: 'Suppliers',
+  subtitle: 'Sorted by emissions, largest at the top. Line width shows tonnes.',
+  selectHint: 'Select a supplier to see its details.',
+  close: 'Close',
+  tabs: { summary: 'Summary', details: 'Details', factors: 'Factors', whatIf: 'What if' },
+  tabsLabel: 'Supplier details',
+  askTitle: 'Ask the supplier to confirm',
+  askBody: 'They answer two questions on their phone. No account, no login.',
+  factorsIntro: (figure: string) => `The rows behind ${figure}`,
+  /** For a confirmed node: the rows behind the spend-based figure it replaced. */
+  factorsBefore: (figure: string) => `Before confirmation: the rows behind ${figure}`,
+  statusKey: 'Status key',
+} as const

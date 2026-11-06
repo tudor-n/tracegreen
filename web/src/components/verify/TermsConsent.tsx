@@ -33,8 +33,8 @@ export function TermsConsent({
   return (
     <label
       className={cn(
-        'flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border-2 p-3 text-base leading-snug has-disabled:cursor-default has-disabled:opacity-60',
-        accepted ? 'border-primary bg-primary/5' : 'border-border',
+        'flex min-h-14 cursor-pointer items-start gap-3.5 rounded-[14px] p-4 text-[15px] leading-relaxed transition-[background-color,box-shadow] duration-300 has-disabled:cursor-default has-disabled:opacity-60',
+        accepted ? 'bg-verified-tint shadow-[0_0_0_1px_rgb(18_129_79/0.35)]' : 'bg-card shadow-[0_0_0_0.5px_rgb(0_0_0/0.08)]',
       )}
     >
       <input
@@ -43,7 +43,7 @@ export function TermsConsent({
         checked={accepted}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-0.5 size-6 shrink-0 accent-primary"
+        className="mt-0.5 size-[22px] shrink-0 accent-primary"
       />
       <span>
         {before}
@@ -53,7 +53,7 @@ export function TermsConsent({
           target="_blank"
           rel="noopener noreferrer"
           data-testid={`${testId}-link`}
-          className="font-semibold text-primary underline underline-offset-4"
+          className="font-semibold text-verified-ink underline decoration-verified/40 underline-offset-4 hover:decoration-verified"
         >
           {link}
           <span className="sr-only"> ({copy.opensInNewTab})</span>

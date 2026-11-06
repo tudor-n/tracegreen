@@ -1,5 +1,6 @@
 import { useEffect, useReducer } from 'react'
 import { useSearchParams } from 'react-router'
+import { Wordmark } from '@/components/brand/Wordmark'
 import { DeliveryCard } from '@/components/supplier/DeliveryCard'
 import { Button } from '@/components/ui/button'
 import { LanguageHeader } from '@/components/verify/LanguageHeader'
@@ -79,24 +80,25 @@ export default function Supplier() {
       data-testid="supplier-page"
       data-phase={state.phase}
       data-result={state.phase === 'failed' ? state.failure : undefined}
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-4 py-5"
+      className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-4 pt-3 pb-8"
     >
       <LanguageHeader lang={lang} />
 
       {state.phase === 'loading' && (
-        <p role="status" aria-busy="true" className="py-16 text-center text-lg text-muted-foreground">
+        <p role="status" aria-busy="true" className="flex flex-col items-center gap-4 py-24 text-center text-[17px] text-muted-foreground">
+          <Wordmark size={28} variant="loader" label={null} />
           {questions.loading}
         </p>
       )}
 
       {state.phase === 'ready' && (
         <>
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-bold">{copy.title(state.view.buyerName)}</h1>
-            <p data-testid="supplier-progress" className="text-base font-semibold">
+          <div className="flex flex-col gap-2 px-1">
+            <h1 className="font-display text-[28px] leading-tight font-bold tracking-[-0.025em]">{copy.title(state.view.buyerName)}</h1>
+            <p data-testid="supplier-progress" className="text-[15px] font-semibold">
               {state.view.supplierLabel} · {progressLine(copy, state.view)}
             </p>
-            <p className="text-base">{copy.intro}</p>
+            <p className="text-[15px] leading-relaxed text-ink-2">{copy.intro}</p>
           </div>
 
           {/* One box for the page, shown while a delivery is still open for answers; each answer carries its SHA-256. */}
@@ -113,11 +115,11 @@ export default function Supplier() {
           )}
 
           {state.view.items.length === 0 ? (
-            <p role="status" className="rounded-xl border bg-card p-6 text-center text-lg text-muted-foreground">
+            <p role="status" className="rounded-[18px] bg-card p-6 text-center text-[17px] text-muted-foreground shadow-card">
               {copy.empty}
             </p>
           ) : (
-            <ul className="flex flex-col gap-3 pb-4">
+            <ul className="flex flex-col gap-3">
               {state.view.items.map((item) => {
                 const draft = state.draft?.nodeId === item.nodeId ? state.draft : null
                 return (
@@ -152,7 +154,7 @@ export default function Supplier() {
           body={copy.results[state.failure].body}
         >
           {state.retryable && (
-            <Button className="mt-2 h-14 w-full rounded-xl text-lg" onClick={() => dispatch({ kind: 'reload' })}>
+            <Button className="mt-2 h-[52px] w-full text-[17px]" onClick={() => dispatch({ kind: 'reload' })}>
               {questions.retry}
             </Button>
           )}

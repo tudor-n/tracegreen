@@ -6,8 +6,8 @@ import type { Connection } from '@/hooks/useGraphEvents'
 import { type ActionOutcome, fetchDemoTools, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
 import { cn } from '@/lib/utils'
 
-// Import, Load demo invoice and Reset demo. The outcome is shown as text; the graph itself updates from the event
-// stream, never from these responses.
+// Import, Load demo invoice and Reset demo, stacked at the foot of the sidebar. The outcome is shown as text; the
+// graph itself updates from the event stream, never from these responses.
 
 type Action = 'import' | 'demo' | 'reset'
 
@@ -31,26 +31,27 @@ export function Toolbar({ connection }: { connection: Connection }) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".xml,application/xml,text/xml"
-          aria-label={toolbarCopy.fileInput}
-          tabIndex={-1}
-          className="sr-only"
-          data-testid="import-file"
-          onChange={onFile}
-        />
-        <Button data-testid="toolbar-import" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
-          <UploadIcon data-icon="inline-start" aria-hidden />
-          {busy === 'import' ? toolbarCopy.importing : toolbarCopy.import}
-        </Button>
+    <div className="flex flex-col gap-1.5">
+      <input
+        ref={fileInput}
+        type="file"
+        accept=".xml,application/xml,text/xml"
+        aria-label={toolbarCopy.fileInput}
+        tabIndex={-1}
+        className="sr-only"
+        data-testid="import-file"
+        onChange={onFile}
+      />
+      <Button data-testid="toolbar-import" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+        <UploadIcon data-icon="inline-start" aria-hidden />
+        {busy === 'import' ? toolbarCopy.importing : toolbarCopy.import}
+      </Button>
+      <div className="flex flex-wrap gap-1.5 md:flex-col">
         <Button
-          variant="outline"
+          variant="ghost"
           data-testid="toolbar-demo"
           disabled={busy !== null}
+          className="md:justify-start"
           onClick={() => void run('demo', loadDemoInvoice)}
         >
           {busy === 'demo' ? toolbarCopy.demoLoading : toolbarCopy.demo}
@@ -60,6 +61,7 @@ export function Toolbar({ connection }: { connection: Connection }) {
             variant="ghost"
             data-testid="toolbar-reset"
             disabled={busy !== null}
+            className="md:justify-start"
             onClick={() => void run('reset', resetDemo)}
           >
             <RotateCcwIcon data-icon="inline-start" aria-hidden />
@@ -70,7 +72,7 @@ export function Toolbar({ connection }: { connection: Connection }) {
       <p
         role="status"
         data-testid="toolbar-message"
-        className={cn('min-h-4 max-w-md text-right text-xs', outcome?.ok === false ? 'text-destructive' : 'text-muted-foreground')}
+        className={cn('min-h-4 px-1 text-xs', outcome?.ok === false ? 'text-destructive' : 'text-muted-foreground')}
       >
         {outcome?.message}
       </p>

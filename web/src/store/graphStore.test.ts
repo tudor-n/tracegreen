@@ -59,7 +59,7 @@ describe('hydrate', () => {
 
     store.getState().hydrate(snapshot(0, [node('a', 10)]))
     expect(store.getState().selectedNodeId).toBeNull()
-    expect(store.getState().openPanels).toEqual({ drawer: false, audit: false, simulator: false })
+    expect(store.getState().openPanels).toEqual({ drawer: false, simulator: false })
   })
 })
 
