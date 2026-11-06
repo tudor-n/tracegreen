@@ -72,6 +72,45 @@ public class HttpAiClientTests
         Assert.Equal(["S1.name"], outcome.FactIds);
     }
 
+    private static HttpAiAssist Assist(CapturingHandler handler) =>
+        new(new HttpClient(handler) { BaseAddress = new Uri("http://ai:8000") });
+
+    [Fact]
+    public async Task ChatSendsTheChosenModel()
+    {
+        var handler = new CapturingHandler(HttpStatusCode.OK, """{"answerable":false,"text":"","factIds":[],"provider":"none"}""");
+
+        await Assist(handler).ChatAsync(new ChatInput("Who leads?", [], [], "ollama:local:3b"), CancellationToken.None);
+
+        using var body = JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("ollama:local:3b", body.RootElement.GetProperty("model").GetString());
+    }
+
+    [Theory]
+    [InlineData("unknown_model", ChatModelProblem.Unknown)]
+    [InlineData("model_not_ready", ChatModelProblem.NotReady)]
+    public async Task ChatReadsARefusedModel(string code, ChatModelProblem problem)
+    {
+        var handler = new CapturingHandler(HttpStatusCode.UnprocessableEntity, $$$"""{"detail":{"code":"{{{code}}}","message":"no"}}""");
+
+        var outcome = await Assist(handler).ChatAsync(new ChatInput("Who leads?", [], [], "x:y"), CancellationToken.None);
+
+        Assert.Equal(problem, outcome.ModelProblem);
+        Assert.False(outcome.Answerable);
+    }
+
+    [Fact]
+    public async Task ChatModelsReadsTheList()
+    {
+        var handler = new CapturingHandler(HttpStatusCode.OK,
+            """{"models":[{"id":"anthropic:claude-x","provider":"anthropic","model":"claude-x","ready":false,"reason":"ANTHROPIC_API_KEY not set"}]}""");
+
+        var models = await Assist(handler).ChatModelsAsync(CancellationToken.None);
+
+        Assert.Equal("/chat/models", handler.Request!.RequestUri!.AbsolutePath);
+        Assert.Equal(new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set"), Assert.Single(models));
+    }
+
     [Fact]
     public async Task ClassifyPostsTheContractAndParsesTheAnswer()
     {

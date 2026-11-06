@@ -8,14 +8,28 @@ namespace TraceGreen.Domain.Ai;
 /// </summary>
 public sealed record ChatFactInput(string Id, string About, string Value);
 
-/// <summary>The buyer's question, up to three earlier questions (never earlier answers) and the facts it may cite.</summary>
-public sealed record ChatInput(string Question, IReadOnlyList<string> History, IReadOnlyList<ChatFactInput> Facts);
+/// <summary>
+/// The buyer's question, up to three earlier questions (never earlier answers) and the facts it may cite.
+/// <see cref="Model"/> is one of <see cref="IAiAssist.ChatModelsAsync"/>'s ids, which then answers alone; null asks the
+/// chat's models in order.
+/// </summary>
+public sealed record ChatInput(string Question, IReadOnlyList<string> History, IReadOnlyList<ChatFactInput> Facts, string? Model = null);
+
+/// <summary>Why the AI service would not use the model a question named: it has no such model, or not its key.</summary>
+public enum ChatModelProblem { Unknown, NotReady }
 
 /// <summary>
 /// The model's answer: a sentence with <c>{{id}}</c> placeholders and the ids it cites, or <see cref="Answerable"/>
 /// false when the facts do not answer the question. <see cref="Provider"/> is the model id, or "stub".
+/// <see cref="ModelProblem"/> is set, and nothing answered, when the named model was refused.
 /// </summary>
-public sealed record ChatOutcome(bool Answerable, string Text, IReadOnlyList<string> FactIds, string Provider);
+public sealed record ChatOutcome(bool Answerable, string Text, IReadOnlyList<string> FactIds, string Provider, ChatModelProblem? ModelProblem = null);
+
+/// <summary>
+/// A model the chat may use (F13; <c>AI_CHAT_MODELS</c>, else <c>AI_MODELS</c>), in the order the chat tries them.
+/// <see cref="Reason"/> says why one is not ready, e.g. its key is not set.
+/// </summary>
+public sealed record ChatModelInfo(string Id, string Provider, string Model, bool Ready, string? Reason);
 
 /// <summary>One invoice line as a model copied it from a PDF (F9); every value a string as printed, empty when not shown.</summary>
 public sealed record DraftLine(string Description, string Quantity, string UnitCode, string Amount, string ClassificationCode, string ClassificationScheme);
@@ -49,6 +63,9 @@ public sealed record ExtractOutcome(DraftInvoice? Invoice, IReadOnlyDictionary<s
 public interface IAiAssist
 {
     Task<ChatOutcome> ChatAsync(ChatInput input, CancellationToken ct);
+
+    /// <summary>The models the chat may use, in order, ready or not; empty when none is configured.</summary>
+    Task<IReadOnlyList<ChatModelInfo>> ChatModelsAsync(CancellationToken ct);
 
     /// <summary>The text layer of a PDF invoice and the fields a model copied from it (F9); never imports anything.</summary>
     Task<ExtractOutcome> ExtractPdfAsync(byte[] pdf, CancellationToken ct);

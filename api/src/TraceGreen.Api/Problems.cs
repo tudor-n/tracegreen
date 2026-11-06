@@ -38,6 +38,8 @@ public enum ProblemCode
     [JsonStringEnumMemberName("ExtractionUnavailable")] ExtractionUnavailable,
     [JsonStringEnumMemberName("DraftExpired")] DraftExpired,
     [JsonStringEnumMemberName("InvalidInvoiceFields")] InvalidInvoiceFields,
+    [JsonStringEnumMemberName("UnknownModel")] UnknownModel,
+    [JsonStringEnumMemberName("ModelNotReady")] ModelNotReady,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -83,6 +85,8 @@ public static class Problems
             ProblemCode.ExtractionUnavailable => (StatusCodes.Status503ServiceUnavailable, "No model could read the invoice"),
             ProblemCode.DraftExpired => (StatusCodes.Status410Gone, "Draft expired"),
             ProblemCode.InvalidInvoiceFields => (StatusCodes.Status422UnprocessableEntity, "Invoice fields not accepted"),
+            ProblemCode.UnknownModel => (StatusCodes.Status422UnprocessableEntity, "Model not offered by the chat"),
+            ProblemCode.ModelNotReady => (StatusCodes.Status422UnprocessableEntity, "Model not set up yet"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);
@@ -113,6 +117,8 @@ public static class Problems
     public static ProblemCode From(ChatErrorCode code) => code switch
     {
         ChatErrorCode.InvalidQuestion => ProblemCode.InvalidQuestion,
+        ChatErrorCode.UnknownModel => ProblemCode.UnknownModel,
+        ChatErrorCode.ModelNotReady => ProblemCode.ModelNotReady,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

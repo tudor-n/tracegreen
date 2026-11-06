@@ -256,6 +256,8 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   ExtractionUnavailable: 'No AI model could read the PDF right now.',
   DraftExpired: 'This check has run out of time.',
   InvalidInvoiceFields: 'A field needs fixing.',
+  UnknownModel: 'The chat does not offer that model.',
+  ModelNotReady: 'That model is not set up yet.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

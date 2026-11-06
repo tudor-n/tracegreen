@@ -33,6 +33,10 @@ public sealed class ScriptedChatAi : IAiAssist
     }
 
     public Task<HealthStatus> HealthAsync(CancellationToken ct) => Task.FromResult(new HealthStatus(true, "scripted"));
+
+    public Func<Task<IReadOnlyList<ChatModelInfo>>> Models { get; set; } = () => Task.FromResult<IReadOnlyList<ChatModelInfo>>([]);
+
+    public Task<IReadOnlyList<ChatModelInfo>> ChatModelsAsync(CancellationToken ct) => Models();
 }
 
 public sealed class ChatWebAppFactory : TestWebAppFactory
@@ -148,4 +152,73 @@ public class ChatEndpointTests(ChatWebAppFactory factory) : IClassFixture<ChatWe
     [Fact]
     public async Task AnOverLongQuestionIs422() =>
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Ask(new string('a', 301))).StatusCode);
+
+    [Fact]
+    public async Task TheModelListIsTheAiServicesInItsOrderWithWhyOneIsNotReady()
+    {
+        factory.Ai.Models = () => Task.FromResult<IReadOnlyList<ChatModelInfo>>(
+        [
+            new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set"),
+            new ChatModelInfo("ollama:local:3b", "ollama", "local:3b", true, null),
+        ]);
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/chat/models", Ct);
+
+        Assert.True(body.GetProperty("available").GetBoolean());
+        var models = body.GetProperty("models").EnumerateArray().ToList();
+        Assert.Equal(["anthropic:claude-x", "ollama:local:3b"], models.Select(m => m.GetProperty("id").GetString()));
+        Assert.False(models[0].GetProperty("ready").GetBoolean());
+        Assert.Equal("ANTHROPIC_API_KEY not set", models[0].GetProperty("reason").GetString());
+        Assert.Equal("local:3b", models[1].GetProperty("model").GetString());
+        Assert.Equal("ollama", models[1].GetProperty("provider").GetString());
+    }
+
+    [Fact]
+    public async Task AnAiServiceThatDoesNotAnswerListsNoModelAndSaysSo()
+    {
+        factory.Ai.Models = () => throw new HttpRequestException("down");
+
+        var body = await _client.GetFromJsonAsync<JsonElement>("/api/chat/models", Ct);
+
+        Assert.False(body.GetProperty("available").GetBoolean());
+        Assert.Empty(body.GetProperty("models").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task TheChosenModelIsSentWithTheQuestionAndNoneMeansInOrder()
+    {
+        factory.Ai.Sent.Clear();
+        Model("{{total.carbon}}.", "total.carbon");
+
+        await _client.PostAsJsonAsync("/api/chat", new { question = "Total?", model = " ollama:local:3b " }, Ct);
+        await _client.PostAsJsonAsync("/api/chat", new { question = "Total?", model = "" }, Ct);
+        await Ask("Total?");
+
+        Assert.Equal(["ollama:local:3b", null, null], factory.Ai.Sent.Select(i => i.Model));
+    }
+
+    [Theory]
+    [InlineData(ChatModelProblem.Unknown, "UnknownModel")]
+    [InlineData(ChatModelProblem.NotReady, "ModelNotReady")]
+    public async Task AModelTheAiServiceRefusesIs422WithItsCode(ChatModelProblem problem, string code)
+    {
+        factory.Ai.Answer = _ => Task.FromResult(new ChatOutcome(false, "", [], "stub", problem));
+
+        var response = await _client.PostAsJsonAsync("/api/chat", new { question = "Total?", model = "openai:model-z" }, Ct);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(code, (await response.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AnOverLongModelIdIs422WithoutAskingTheAi()
+    {
+        factory.Ai.Sent.Clear();
+
+        var response = await _client.PostAsJsonAsync("/api/chat", new { question = "Total?", model = new string('m', 121) }, Ct);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("UnknownModel", (await response.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("code").GetString());
+        Assert.Empty(factory.Ai.Sent);
+    }
 }
