@@ -24,14 +24,15 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain,
   let link = ''
 
   await test.step('1. reset, then load the demo invoice: N1 is ESTIMATED', async () => {
-    await page.goto('/')
+    // The tree of supplier rows lives on the Suppliers screen; the sidebar with the demo tools is on every screen.
+    await page.goto('/suppliers')
     await page.getByTestId('toolbar-reset').click()
     await expect(n1).toHaveCount(0)
     await page.getByTestId('toolbar-demo').click()
     await expect(n1).toHaveAttribute('data-status', 'ESTIMATED')
   })
 
-  await test.step('2. open the drawer and request a link: the printed URL', async () => {
+  await test.step('2. open the side panel and request a link: the printed URL', async () => {
     await n1.click()
     await expect(page.getByTestId('node-drawer')).toBeVisible()
     await page.getByTestId('drawer-request').click()
@@ -86,7 +87,7 @@ test('demo path: import, verify on the phone, live flip, simulator, audit chain,
     await expect(n1).toHaveAttribute('data-status', 'VERIFIED')
   })
 
-  await test.step('7. the audit panel shows the chain as valid', async () => {
+  await test.step('7. the audit log screen shows the chain as valid', async () => {
     await page.getByTestId('toolbar-audit').click()
     await expect(page.getByTestId('audit-panel')).toBeVisible()
     await page.getByTestId('audit-verify').click()
