@@ -57,6 +57,7 @@ builder.Services.AddSingleton<LinkService>();
 builder.Services.AddSingleton<VerifyService>();
 builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<PortalService>();
+builder.Services.AddSingleton<ClassificationService>();
 // Scoped: they hold the typed AI HttpClient, which the client factory hands out per resolution.
 builder.Services.AddScoped<IngestService>();
 builder.Services.AddScoped<DemoService>();

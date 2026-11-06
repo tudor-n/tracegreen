@@ -134,6 +134,33 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         return new RecordVerificationResult(RecordVerificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
     }
 
+    public async Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockWorkspaceAsync(db, ctx.WorkspaceId, ct);
+
+        // Read under the workspace's advisory lock, which every write takes, so the review is computed from the node as it
+        // is at the commit. Returning before the commit disposes the transaction uncommitted.
+        var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == nodeId, ct);
+        if (nodeRow is null)
+        {
+            return new ReviewClassificationResult(ReviewClassificationStatus.NodeNotFound, null, null);
+        }
+        var current = Mapping.ToDomain(nodeRow);
+        if (!string.Equals(current.CategoryId, expectedCategoryId, StringComparison.Ordinal))
+        {
+            return new ReviewClassificationResult(ReviewClassificationStatus.CategoryChanged, current, null);
+        }
+        var write = review(current);
+        Mapping.Apply(nodeRow, write.Patch);
+        var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, write.Audit, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return new ReviewClassificationResult(ReviewClassificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
     public async Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);

@@ -67,6 +67,14 @@ public static class NodeFactory
             LeadDays: leadDays,
             TransportMode: transportMode,
             EnergySource: energySource,
-            CreatedAt: createdAt);
+            CreatedAt: createdAt,
+            Review: InitialReview(classification.Source));
     }
+
+    /// <summary>
+    /// Every AI-mapped category waits for a person, whatever its confidence; an invoice code, the stub and a buyer's own
+    /// choice need no review.
+    /// </summary>
+    public static ClassificationReview InitialReview(ClassificationSource source) =>
+        source is ClassificationSource.Cache or ClassificationSource.Model ? ClassificationReview.Pending : ClassificationReview.NotNeeded;
 }

@@ -40,6 +40,8 @@ public class NodeRow
     public string? TransportMode { get; set; }
     public string? EnergySource { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string Review { get; set; } = "";
+    public DateTimeOffset? ReviewedAt { get; set; }
 }
 
 public class VerificationRow

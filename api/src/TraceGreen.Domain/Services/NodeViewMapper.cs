@@ -49,9 +49,8 @@ public sealed class NodeViewMapper
             Confidence: node.AiConfidence,
             AiMapped: aiMapped,
             LineDescription: line.Description,
-            // Contract stage: derived until the review is stored on the node.
-            Review: aiMapped ? ClassificationReview.Pending : ClassificationReview.NotNeeded,
-            ReviewedAt: null);
+            Review: node.Review,
+            ReviewedAt: node.ReviewedAt);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).
         var laneView = new LaneView(

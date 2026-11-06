@@ -48,7 +48,20 @@ internal static class Mapping
         ClassificationSource = Name(n.ClassificationSource), MassT = n.MassT, LaneId = n.LaneId, Status = Name(n.Status),
         SpendKg = n.SpendKg, ActivityKg = n.ActivityKg, SpendEur = n.SpendEur, CostEur = n.CostEur, LeadDays = n.LeadDays,
         TransportMode = Name(n.TransportMode), EnergySource = Name(n.EnergySource), CreatedAt = Utc(n.CreatedAt),
+        Review = Name(n.Review), ReviewedAt = n.ReviewedAt is { } reviewedAt ? Utc(reviewedAt) : null,
     };
+
+    public static void Apply(NodeRow row, ClassificationPatch patch)
+    {
+        row.CategoryId = patch.CategoryId;
+        row.SectorId = patch.SectorId;
+        row.ClassificationSource = Name(patch.Source);
+        row.AiConfidence = patch.Confidence;
+        row.Review = Name(patch.Review);
+        row.ReviewedAt = Utc(patch.ReviewedAt);
+        row.SpendKg = patch.SpendKg;
+        row.ActivityKg = patch.ActivityKg;
+    }
 
     public static void Apply(NodeRow row, NodePatch patch)
     {
@@ -65,7 +78,8 @@ internal static class Mapping
         r.Id, r.WorkspaceId, r.InvoiceId, r.Label, r.Country, r.CategoryId, r.SectorId, r.AiConfidence,
         Parse<ClassificationSource>(r.ClassificationSource), r.MassT, r.LaneId, Parse<NodeStatus>(r.Status),
         r.SpendKg, r.ActivityKg, r.SpendEur, r.CostEur, r.LeadDays,
-        ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt);
+        ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt,
+        Parse<ClassificationReview>(r.Review), r.ReviewedAt);
 
     public static VerificationRow ToRow(Verification v) => new()
     {

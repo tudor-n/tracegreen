@@ -121,6 +121,39 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
+    public Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var ws = Get(ctx.WorkspaceId);
+            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.NodeNotFound, null, null));
+            }
+            if (!string.Equals(node.CategoryId, expectedCategoryId, StringComparison.Ordinal))
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.CategoryChanged, node, null));
+            }
+            var write = review(node);
+            var patch = write.Patch;
+            var patched = node with
+            {
+                CategoryId = patch.CategoryId,
+                SectorId = patch.SectorId,
+                ClassificationSource = patch.Source,
+                AiConfidence = patch.Confidence,
+                Review = patch.Review,
+                ReviewedAt = patch.ReviewedAt,
+                SpendKg = patch.SpendKg,
+                ActivityKg = patch.ActivityKg,
+            };
+            ws.Nodes[node.Id] = patched;
+            var entry = ws.Append(write.Audit);
+            return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.Ok, patched, entry));
+        }
+    }
+
     public Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
     {
         lock (_gate)

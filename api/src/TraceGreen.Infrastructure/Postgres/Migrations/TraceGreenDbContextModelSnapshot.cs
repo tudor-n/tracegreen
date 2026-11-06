@@ -370,6 +370,15 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("mass_t");
 
+                    b.Property<string>("Review")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("review");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
                     b.Property<string>("SectorId")
                         .IsRequired()
                         .HasColumnType("text")
