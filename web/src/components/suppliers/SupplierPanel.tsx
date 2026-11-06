@@ -1,6 +1,6 @@
 import { ListChecksIcon, SmartphoneIcon, XIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { NodeView, RequestLinkResponse } from '@/api/client'
+import type { CarbonFigure, NodeView, RequestLinkResponse } from '@/api/client'
 import { LinkCard } from '@/components/dashboard/LinkCard'
 import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
 import { Chip, type ChipTone, Group, GroupRow } from '@/components/shell/Page'
@@ -24,10 +24,11 @@ import {
 
 // The side panel for the selected supplier (v2 design). Four tabs give each kind of information its own place:
 // Summary (the figure, its provenance and the one action), Details (invoice and lane), Factors (the rows behind the
-// figure) and What if (the simulator, B5). Every number comes from the API as it is. The verification link belongs to
-// the node it was asked for: the panel body is keyed by node, so another node starts without one, and the token never
-// leaves this component's state. Escape or the close button closes the panel; a reset that removes the node closes it
-// too (hydrateState). Frozen test hooks (RUNBOOK): `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate`;
+// figure) and What if (the simulator, B5). Every number comes from the API as it is. The links belong to the node they
+// were asked for: the panel body is keyed by node (never by tab), so another node starts without them, switching tabs
+// keeps them and any request still on its way, and the tokens never leave this component's state. Escape or the close
+// button closes the panel, unless the Escape already closed something inside it (a tooltip); a reset that removes the
+// node closes it too (hydrateState). Frozen test hooks (RUNBOOK): `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate`;
 // `drawer-portal` and `portal-url` for the supplier page link (F12), which lists every delivery from this supplier.
 
 type Tab = 'summary' | 'details' | 'factors' | 'whatIf'
@@ -50,7 +51,7 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') select(null)
+      if (event.key === 'Escape' && !event.defaultPrevented) select(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -97,6 +98,17 @@ function PanelBody({ node }: { node: NodeView }) {
   const [tab, setTab] = useState<Exclude<Tab, 'whatIf'>>('summary')
   const shown: Tab = simulating ? 'whatIf' : tab
   const [links, setLinks] = useState<Links>({ verify: null, portal: null })
+  const [requesting, setRequesting] = useState<LinkKind | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const onRequest = async (kind: LinkKind) => {
+    setRequesting(kind)
+    setError(null)
+    const answer = kind === 'verify' ? await requestLink(node.id) : await requestPortalLink(node.id)
+    if (answer.ok) setLinks((l) => ({ ...l, [kind]: answer.data }))
+    else setError(answer.message)
+    setRequesting(null)
+  }
 
   const pick = (next: Tab) => {
     // The What if tab is the simulator: leaving it takes the ghost row off the tree.
@@ -120,7 +132,6 @@ function PanelBody({ node }: { node: NodeView }) {
             type="button"
             role="tab"
             aria-selected={shown === t.id}
-            aria-pressed={t.id === 'whatIf' ? simulating : undefined}
             data-testid={t.testId}
             onClick={() => pick(t.id)}
             className={cn(
@@ -133,7 +144,9 @@ function PanelBody({ node }: { node: NodeView }) {
         ))}
       </div>
       <div role="tabpanel" className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300" key={shown}>
-        {shown === 'summary' && <Summary node={node} links={links} onLink={(kind, link) => setLinks((l) => ({ ...l, [kind]: link }))} />}
+        {shown === 'summary' && (
+          <Summary node={node} links={links} requesting={requesting} error={error} onRequest={(kind) => void onRequest(kind)} />
+        )}
         {shown === 'details' && <Details node={node} />}
         {shown === 'factors' && <Factors node={node} />}
         {shown === 'whatIf' && <SimulatorPanel node={node} />}
@@ -149,24 +162,16 @@ type Links = Record<LinkKind, RequestLinkResponse | null>
 interface SummaryProps {
   node: NodeView
   links: Links
-  onLink: (kind: LinkKind, link: RequestLinkResponse) => void
+  /** Which link is on its way; both buttons wait while one is. */
+  requesting: LinkKind | null
+  error: string | null
+  onRequest: (kind: LinkKind) => void
 }
 
-function Summary({ node, links, onLink }: SummaryProps) {
+function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
   const figure = shownFigure(node)
   const provenance = provenanceLine(node)
   const answered = node.transportMode !== null || node.energySource !== null
-  const [requesting, setRequesting] = useState<LinkKind | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const onRequest = async (kind: LinkKind) => {
-    setRequesting(kind)
-    setError(null)
-    const answer = kind === 'verify' ? await requestLink(node.id) : await requestPortalLink(node.id)
-    if (answer.ok) onLink(kind, answer.data)
-    else setError(answer.message)
-    setRequesting(null)
-  }
 
   return (
     <>
@@ -206,35 +211,34 @@ function Summary({ node, links, onLink }: SummaryProps) {
 
       {links.verify !== null && <LinkCard link={links.verify} />}
       {links.portal !== null && <LinkCard link={links.portal} kind="portal" />}
-      {(links.verify === null || links.portal === null) && (
-        <div className="flex flex-col gap-3 rounded-2xl bg-grouped p-[18px]">
-          <h3 className="text-[15px] font-semibold">{suppliersCopy.askTitle}</h3>
-          <p className="text-[13px] leading-relaxed text-ink-2">{suppliersCopy.askBody}</p>
-          {links.verify === null && (
-            <Button size="lg" disabled={requesting !== null} data-testid="drawer-request" onClick={() => void onRequest('verify')}>
-              <SmartphoneIcon data-icon="inline-start" aria-hidden />
-              {requesting === 'verify' ? drawerCopy.requesting : drawerCopy.requestData}
-            </Button>
-          )}
-          {links.portal === null && (
-            <Button
-              variant="outline"
-              size="lg"
-              disabled={requesting !== null}
-              data-testid="drawer-portal"
-              onClick={() => void onRequest('portal')}
-            >
-              <ListChecksIcon data-icon="inline-start" aria-hidden />
-              {requesting === 'portal' ? drawerCopy.supplierPageRequesting : drawerCopy.supplierPage}
-            </Button>
-          )}
-          {error !== null && (
-            <p role="alert" data-testid="drawer-request-error" className="text-xs text-destructive">
-              {error}
-            </p>
-          )}
-        </div>
-      )}
+      {/* Both buttons stay: a link is single-use or expires, so the buyer can always ask for a fresh one here. */}
+      <div className="flex flex-col gap-3 rounded-2xl bg-grouped p-[18px]">
+        <h3 className="text-[15px] font-semibold">{suppliersCopy.askTitle}</h3>
+        <p className="text-[13px] leading-relaxed text-ink-2">{suppliersCopy.askBody}</p>
+        <Button
+          size="lg"
+          variant={links.verify === null ? 'default' : 'outline'}
+          disabled={requesting !== null}
+          data-testid="drawer-request"
+          onClick={() => onRequest('verify')}
+        >
+          <SmartphoneIcon data-icon="inline-start" aria-hidden />
+          {requesting === 'verify' ? drawerCopy.requesting : links.verify === null ? drawerCopy.requestData : drawerCopy.requestAgain}
+        </Button>
+        <Button variant="outline" size="lg" disabled={requesting !== null} data-testid="drawer-portal" onClick={() => onRequest('portal')}>
+          <ListChecksIcon data-icon="inline-start" aria-hidden />
+          {requesting === 'portal'
+            ? drawerCopy.supplierPageRequesting
+            : links.portal === null
+              ? drawerCopy.supplierPage
+              : drawerCopy.supplierPageAgain}
+        </Button>
+        {error !== null && (
+          <p role="alert" data-testid="drawer-request-error" className="text-xs text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
     </>
   )
 }
@@ -254,7 +258,7 @@ function Details({ node }: { node: NodeView }) {
           {node.classification.lineDescription}
         </p>
       </Group>
-      <Group title={drawerCopy.lane}>
+      <Group title={drawerCopy.lane} tag={ILLUSTRATIVE}>
         <GroupRow label={drawerCopy.route}>
           {node.lane.origin} → {node.lane.dest}
         </GroupRow>
@@ -271,10 +275,25 @@ function Details({ node }: { node: NodeView }) {
   )
 }
 
+/**
+ * The rows behind the figure on screen and, once a supplier confirmed, the rows behind the spend-based estimate it
+ * replaced, so every figure the panel shows (Summary shows both) names its source, year and row label.
+ */
 function Factors({ node }: { node: NodeView }) {
-  const { factors } = shownFigure(node)
+  const figure = shownFigure(node)
   return (
-    <Group title={suppliersCopy.factorsIntro(formatTonnesCo2e(node.carbonKg))}>
+    <>
+      <FactorGroup title={suppliersCopy.factorsIntro(formatTonnesCo2e(node.carbonKg))} factors={figure.factors} />
+      {figure !== node.spend && (
+        <FactorGroup title={suppliersCopy.factorsBefore(formatTonnesCo2e(node.spend.kg))} factors={node.spend.factors} />
+      )}
+    </>
+  )
+}
+
+function FactorGroup({ title, factors }: { title: string; factors: CarbonFigure['factors'] }) {
+  return (
+    <Group title={title}>
       {factors.length === 0 ? (
         <p className="py-3 text-sm text-muted-foreground">{nodeCopy.noFactors}</p>
       ) : (

@@ -3,7 +3,8 @@ import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
 // The building blocks every v2 screen shares: the large title, the white grouped surface, a grouped list with
-// hairlines between rows, and the one-line loading, empty and error messages.
+// hairlines between rows (the one label/value row of the app), the capsule chip and the quiet tag, and the one-line
+// loading, empty and error messages.
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
   return (
@@ -22,11 +23,16 @@ export function Surface({ className, ...props }: ComponentProps<'section'>) {
   return <section className={cn('rounded-[18px] bg-card p-6 shadow-card', className)} {...props} />
 }
 
-/** A grey inset group inside a surface or panel, its rows divided by hairlines. */
-export function Group({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
+/** A grey inset group inside a surface or panel, its rows divided by hairlines; `tag` labels the whole group. */
+export function Group({ title, tag, children, className }: { title?: string; tag?: string; children: ReactNode; className?: string }) {
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      {title !== undefined && <h3 className="pl-0.5 text-[13px] font-medium text-muted-foreground">{title}</h3>}
+      {title !== undefined && (
+        <h3 className="flex items-center gap-1.5 pl-0.5 text-[13px] font-medium text-muted-foreground">
+          {title}
+          {tag !== undefined && <Tag>{tag}</Tag>}
+        </h3>
+      )}
       <div className="rounded-[14px] bg-grouped px-4 [&>*+*]:shadow-[inset_0_0.5px_0_var(--hairline)]">{children}</div>
     </div>
   )
@@ -77,4 +83,18 @@ const chipTone: Record<ChipTone, string> = {
   estimated: 'bg-estimated-tint text-estimated-ink',
   verified: 'bg-verified-tint text-verified-ink',
   hotspot: 'bg-hotspot-tint text-hotspot-ink',
+}
+
+/** A quiet tag beside a label, such as "illustrative"; `warning` for one that asks for attention. */
+export function Tag({ tone, children }: { tone?: 'warning'; children: ReactNode }) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 rounded-md px-1.5 py-px text-[11px] font-medium',
+        tone === 'warning' ? 'bg-estimated-tint font-semibold text-estimated-ink' : 'bg-fill text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
+  )
 }

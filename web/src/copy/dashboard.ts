@@ -71,7 +71,10 @@ export const drawerCopy = {
   leadTime: 'Lead time',
   requestData: 'Request data',
   requesting: 'Requesting…',
+  /** Once a link is on screen: links are single-use or expire, so the buyer can always ask for a fresh one. */
+  requestAgain: 'New verification link',
   supplierPage: 'Supplier page link',
+  supplierPageAgain: 'New supplier page link',
   supplierPageRequesting: 'Making the link…',
   simulate: 'Simulate',
 } as const
@@ -248,7 +251,9 @@ export const shellCopy = {
 /** The Overview: where the buyer stands, in three cards. Every figure is the API's KPI as it is. */
 export const overviewCopy = {
   title: 'Overview',
-  totalCaption: (suppliers: string, spend: string) => `From ${suppliers} suppliers · ${spend} spend`,
+  /** The API counts one node per invoice line, so the caption counts deliveries, not suppliers. */
+  totalCaption: (count: number, deliveries: string, spend: string) =>
+    `From ${deliveries} ${count === 1 ? 'delivery' : 'deliveries'} · ${spend} spend`,
   split: 'How the total splits',
   estimated: 'Estimated',
   confirmed: 'Supplier-confirmed',
@@ -271,5 +276,7 @@ export const suppliersCopy = {
   askTitle: 'Ask the supplier to confirm',
   askBody: 'They answer two questions on their phone. No account, no login.',
   factorsIntro: (figure: string) => `The rows behind ${figure}`,
+  /** For a confirmed node: the rows behind the spend-based figure it replaced. */
+  factorsBefore: (figure: string) => `Before confirmation: the rows behind ${figure}`,
   statusKey: 'Status key',
 } as const

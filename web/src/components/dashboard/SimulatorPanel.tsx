@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AlternativeView, NodeView, ScenarioChange, ScenarioResult } from '@/api/client'
-import { Tag } from '@/components/dashboard/DrawerParts'
+import { Tag } from '@/components/shell/Page'
 import { FactorInfo } from '@/components/graph/FactorInfo'
 import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
 import { Button } from '@/components/ui/button'
