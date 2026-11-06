@@ -3,24 +3,30 @@ import { NavLink } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
 import { Toolbar } from '@/components/dashboard/Toolbar'
-import { auditPanelCopy, shellCopy } from '@/copy/dashboard'
+import { auditPanelCopy, dashboardTitle, shellCopy } from '@/copy/dashboard'
 import type { Connection } from '@/hooks/useGraphEvents'
 import { cn } from '@/lib/utils'
-import { useGraphStore } from '@/store'
+import { type GraphState, useGraphStore } from '@/store'
 
 // The v2 sidebar: the wordmark, one link per screen, and the invoice actions at the bottom. The connection badge
 // appears beside the wordmark only while live updates are down.
 // On a narrow screen it sits above the content as a band. `toolbar-audit` is a frozen test hook (RUNBOOK).
 
+/**
+ * How many suppliers the graph holds. The graph has one node per delivery and no supplier id, so a supplier with two
+ * invoices is counted once by its name.
+ */
+const selectSupplierCount = (s: GraphState) => new Set(Object.values(s.nodes).map((n) => n.label)).size
+
 export function Sidebar({ connection }: { connection: Connection }) {
-  const supplierCount = useGraphStore((s) => Object.keys(s.nodes).length)
+  const supplierCount = useGraphStore(selectSupplierCount)
   return (
     <nav
       aria-label={shellCopy.sections}
       className="flex flex-col gap-5 bg-sidebar px-3.5 py-5 shadow-[inset_0_-0.5px_0_var(--hairline)] md:sticky md:top-0 md:h-dvh md:w-56 md:shrink-0 md:shadow-[inset_-0.5px_0_0_var(--hairline)]"
     >
       <div className="flex items-center justify-between gap-3 px-2.5 pt-1">
-        <NavLink to="/" aria-label="TraceGreen" className="rounded-md">
+        <NavLink to="/" aria-label={dashboardTitle} className="rounded-md">
           <Wordmark size={20} label={null} />
         </NavLink>
         <ConnectionBadge connection={connection} />
@@ -60,9 +66,16 @@ function Item({ to, icon: Icon, label, count, end, testId }: ItemProps) {
           )
         }
       >
-        <Icon className="size-[17px]" strokeWidth={1.7} aria-hidden />
-        <span className="flex-1">{label}</span>
-        {count !== undefined && count > 0 && <span className="text-xs font-normal text-muted-foreground">{count}</span>}
+        {({ isActive }) => (
+          <>
+            <Icon className="size-[17px]" strokeWidth={1.7} aria-hidden />
+            <span className="flex-1">{label}</span>
+            {count !== undefined && count > 0 && (
+              // Muted text is too light on the active row's fill (WCAG AA), so the count darkens with it.
+              <span className={cn('text-xs font-normal', isActive ? 'text-ink-2' : 'text-muted-foreground')}>{count}</span>
+            )}
+          </>
+        )}
       </NavLink>
     </li>
   )

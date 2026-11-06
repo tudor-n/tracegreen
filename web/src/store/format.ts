@@ -86,6 +86,17 @@ export function formatShare(fraction: number): string {
   return percent.format(noNegativeZero(Math.round(fraction * 100) / 100))
 }
 
+/**
+ * The two halves of the total as whole percentages that add up to 100. The API's estimatedShare is 1 − primaryShare,
+ * so the supplier-confirmed share is rounded and the estimated share is the rest: 0.125 shows as 13% and 87%, never
+ * 13% and 88%. Both are the dash when there are no emissions to share out.
+ */
+export function formatShareSplit(kpis: Pick<Kpis, 'totalKg' | 'primaryShare'>): { confirmed: string; estimated: string } {
+  if (!(kpis.totalKg > 0) || !Number.isFinite(kpis.primaryShare)) return { confirmed: MISSING, estimated: MISSING }
+  const confirmed = Math.min(100, Math.max(0, Math.round(kpis.primaryShare * 100)))
+  return { confirmed: percent.format(confirmed / 100), estimated: percent.format((100 - confirmed) / 100) }
+}
+
 /** A factor row's value as the API sent it, to six significant digits: 0.462 → "0.462", 5000 → "5,000". */
 export function formatFactorValue(value: number): string {
   if (!Number.isFinite(value)) return MISSING

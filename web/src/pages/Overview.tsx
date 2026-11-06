@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { canvasCopy, kpiCopy, overviewCopy } from '@/copy/dashboard'
 import { supplierConfirmedShare } from '@/copy/labels'
-import { CO2E_UNIT, formatKpis, formatShare, selectLoaded, useGraphStore } from '@/store'
+import { byCarbonDesc, CO2E_UNIT, formatKpis, formatShareSplit, selectLoaded, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
 // "Where do I stand?": the total, the supplier-confirmed share and how the total splits, and the one next step. Every
@@ -47,19 +47,15 @@ export default function Overview() {
 
 /** The supplier with the largest figure that is not VERIFIED yet, or null when every supplier has confirmed. */
 function nextToConfirm(nodes: readonly NodeView[]): NodeView | null {
-  return (
-    nodes
-      .filter((n) => n.status !== 'VERIFIED')
-      .sort((a, b) => b.carbonKg - a.carbonKg || a.id.localeCompare(b.id))[0] ?? null
-  )
+  return nodes.filter((n) => n.status !== 'VERIFIED').sort(byCarbonDesc)[0] ?? null
 }
 
 function Cards({ kpis, next }: { kpis: Kpis; next: NodeView | null }) {
   const figures = formatKpis(kpis)
   const hasTotal = kpis.totalKg > 0
-  const confirmed = hasTotal ? formatShare(kpis.primaryShare) : figures.share
-  const estimated = hasTotal ? formatShare(kpis.estimatedShare) : figures.share
+  const { confirmed, estimated } = formatShareSplit(kpis)
   const select = useGraphStore((s) => s.select)
+  const setPanel = useGraphStore((s) => s.setPanel)
   const navigate = useNavigate()
 
   return (
@@ -69,7 +65,7 @@ function Cards({ kpis, next }: { kpis: Kpis; next: NodeView | null }) {
           <h2 className="text-[15px] font-semibold">{kpiCopy.total}</h2>
           <BigFigure value={figures.total} unit={CO2E_UNIT} />
           <p data-testid="kpi-nodes" className="text-[13px] text-muted-foreground">
-            <span data-testid="kpi-spend">{overviewCopy.totalCaption(figures.nodes, figures.spend)}</span>
+            <span data-testid="kpi-spend">{overviewCopy.totalCaption(kpis.nodeCount, figures.nodes, figures.spend)}</span>
           </p>
         </Surface>
         <Surface aria-label={supplierConfirmedShare.label} data-testid="kpi-share" className="flex flex-[1_1_300px] flex-col gap-3">
@@ -125,7 +121,9 @@ function Cards({ kpis, next }: { kpis: Kpis; next: NodeView | null }) {
               size="lg"
               data-testid="overview-next"
               onClick={() => {
+                // The step promises the request card, so the panel opens on Summary even if What if was left open.
                 select(next.id)
+                setPanel('simulator', false)
                 void navigate('/suppliers')
               }}
             >

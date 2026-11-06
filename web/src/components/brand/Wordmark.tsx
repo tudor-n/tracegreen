@@ -1,3 +1,4 @@
+import { dashboardTitle } from '@/copy/dashboard'
 import { cn } from '@/lib/utils'
 
 // The Logo 5 wordmark: "Trace" over a dotted amber trace, "Green" over a solid line cut 45° from amber to green.
@@ -15,7 +16,7 @@ interface WordmarkProps {
   className?: string
 }
 
-export function Wordmark({ size = 20, variant = 'static', label = 'TraceGreen', className }: WordmarkProps) {
+export function Wordmark({ size = 20, variant = 'static', label = dashboardTitle, className }: WordmarkProps) {
   return (
     <span
       className={cn('wordmark', className)}
