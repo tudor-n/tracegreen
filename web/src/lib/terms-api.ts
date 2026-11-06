@@ -1,28 +1,25 @@
 import type { Client } from 'openapi-fetch'
 import { api, type SupplierTerms } from '@/api/client'
 import type { paths } from '@/api/schema'
+import { reply, type Result } from './api-reply'
+import { VERIFY_TIMEOUT_MS } from './verify-api'
 
-// The printable terms page's one request. The terms are public text behind no token, so any failure reads as "could
-// not be loaded" with a retry; a request that hangs counts as failed.
+// The printable terms page's one request. The terms are public text behind no token, so any failure, a hang included,
+// reads as "could not be loaded" with a retry.
 
-export const TERMS_TIMEOUT_MS = 10_000
-
-export type TermsReply = { ok: true; data: SupplierTerms } | { ok: false }
+export type TermsReply = Result<SupplierTerms, 'unavailable'>
 
 export interface TermsApi {
   supplier(): Promise<TermsReply>
 }
 
-export function createTermsApi(client: Client<paths>, timeoutMs = TERMS_TIMEOUT_MS): TermsApi {
+export function createTermsApi(client: Client<paths>, timeoutMs = VERIFY_TIMEOUT_MS): TermsApi {
   return {
-    supplier: async () => {
-      try {
-        const sent = await client.GET('/api/terms/supplier', { signal: AbortSignal.timeout(timeoutMs) })
-        return sent.response.ok && sent.data !== undefined ? { ok: true, data: sent.data } : { ok: false }
-      } catch {
-        return { ok: false }
-      }
-    },
+    supplier: () =>
+      reply(
+        () => client.GET('/api/terms/supplier', { signal: AbortSignal.timeout(timeoutMs) }),
+        () => 'unavailable' as const,
+      ),
   }
 }
 

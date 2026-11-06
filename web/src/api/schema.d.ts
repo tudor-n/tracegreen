@@ -633,7 +633,7 @@ export interface components {
             massT: null | number;
             /** Format: date-time */
             expiresAt: string;
-            terms: components["schemas"]["SupplierTerms"];
+            terms: components["schemas"]["VerifyTerms"];
         };
         VerifyOutcome: {
             /** Format: uuid */
@@ -648,6 +648,12 @@ export interface components {
             /** Format: double */
             massT?: null | number;
             acceptedTerms?: null | string;
+        };
+        VerifyTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsAcceptance"];
+            en: components["schemas"]["TermsAcceptance"];
         };
     };
     responses: never;

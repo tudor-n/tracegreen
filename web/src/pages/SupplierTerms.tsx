@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import type { SupplierTerms as Terms } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { LanguageHeader } from '@/components/verify/LanguageHeader'
 import { ResultMessage } from '@/components/verify/ResultMessage'
 import { TermsSections } from '@/components/verify/TermsSections'
-import { dashboardTitle } from '@/copy/dashboard'
-import { type Lang, verifyCopy } from '@/copy/verify'
+import { verifyCopy } from '@/copy/verify'
 import { termsApi } from '@/lib/terms-api'
 import { resolveLang } from '@/lib/verify-state'
 
@@ -16,7 +16,7 @@ import { resolveLang } from '@/lib/verify-state'
 type Load = { phase: 'loading' } | { phase: 'ready'; terms: Terms } | { phase: 'failed' }
 
 export default function SupplierTerms() {
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const lang = resolveLang(params.get('lang'))
   const copy = verifyCopy[lang]
   const [load, setLoad] = useState<Load>({ phase: 'loading' })
@@ -36,17 +36,6 @@ export default function SupplierTerms() {
     }
   }, [load.phase])
 
-  const other: Lang = lang === 'ro' ? 'en' : 'ro'
-  const switchLanguage = () =>
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        next.set('lang', other)
-        return next
-      },
-      { replace: true },
-    )
-
   return (
     <main
       data-testid="terms-page"
@@ -54,17 +43,7 @@ export default function SupplierTerms() {
       data-version={load.phase === 'ready' ? load.terms.version : undefined}
       className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-6 px-4 py-5"
     >
-      <header className="flex items-center justify-between gap-3 print:hidden">
-        <span className="text-base font-semibold tracking-wide">{dashboardTitle}</span>
-        <button
-          type="button"
-          onClick={switchLanguage}
-          className="min-h-12 rounded-xl border-2 border-border px-4 text-base font-semibold outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <span className="sr-only">{copy.language.switchLabel}: </span>
-          <span lang={other}>{copy.language.switchTo}</span>
-        </button>
-      </header>
+      <LanguageHeader lang={lang} className="print:hidden" />
 
       {load.phase === 'loading' && (
         <p role="status" aria-busy="true" className="py-16 text-center text-lg text-muted-foreground">

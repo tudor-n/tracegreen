@@ -1,4 +1,4 @@
-import type { TermsText } from '@/api/client'
+import type { TermsAcceptance } from '@/api/client'
 import type { Lang, VerifyStrings } from '@/copy/verify'
 import { cn } from '@/lib/utils'
 
@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 // never ticks it.
 
 interface TermsConsentProps {
-  terms: TermsText
+  /** The checkbox statement in the language shown: `before + link + after`, `link` being the link to the full text. */
+  acceptance: TermsAcceptance
   lang: Lang
   accepted: boolean
   disabled: boolean
@@ -17,8 +18,8 @@ interface TermsConsentProps {
   onChange: (accepted: boolean) => void
 }
 
-export function TermsConsent({ terms, lang, accepted, disabled, copy, onChange }: TermsConsentProps) {
-  const { before, link, after } = terms.acceptance
+export function TermsConsent({ acceptance, lang, accepted, disabled, copy, onChange }: TermsConsentProps) {
+  const { before, link, after } = acceptance
   return (
     <label
       className={cn(

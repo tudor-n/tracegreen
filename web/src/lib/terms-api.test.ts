@@ -1,16 +1,8 @@
 import createClient from 'openapi-fetch'
 import { describe, expect, it } from 'vitest'
-import type { SupplierTerms } from '@/api/client'
 import type { paths } from '@/api/schema'
 import { createTermsApi } from './terms-api'
-
-const text = {
-  title: 'Supplier Terms',
-  keyPoints: ['Your answers are your responsibility.'],
-  acceptance: { before: 'I accept the ', link: 'Supplier Terms', after: '.' },
-  sections: [{ number: 1, heading: 'Parties', paragraphs: ['The operator and the supplier.'] }],
-}
-const terms: SupplierTerms = { version: '2026-11-06', sha256: 'a'.repeat(64), ro: text, en: text }
+import { supplierTerms as terms } from './test-fixtures'
 
 function apiWith(handler: (request: Request) => Response | Promise<Response>, timeoutMs?: number) {
   const sent: Request[] = []
@@ -39,17 +31,17 @@ describe('supplier terms', () => {
   })
 
   it('reports a server error, a network error and a hang as not loaded', async () => {
-    expect(await apiWith(() => json(500, {})).termsApi.supplier()).toEqual({ ok: false })
+    expect(await apiWith(() => json(500, {})).termsApi.supplier()).toEqual({ ok: false, failure: 'unavailable' })
     expect(
       await apiWith(() => {
         throw new TypeError('fetch failed')
       }).termsApi.supplier(),
-    ).toEqual({ ok: false })
+    ).toEqual({ ok: false, failure: 'unavailable' })
     const hanging = apiWith(
       (request) =>
         new Promise<Response>((_, reject) => request.signal.addEventListener('abort', () => reject(request.signal.reason))),
       20,
     )
-    expect(await hanging.termsApi.supplier()).toEqual({ ok: false })
+    expect(await hanging.termsApi.supplier()).toEqual({ ok: false, failure: 'unavailable' })
   })
 })
