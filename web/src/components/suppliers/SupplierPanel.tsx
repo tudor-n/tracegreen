@@ -6,9 +6,9 @@ import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
 import { Chip, type ChipTone, Group, GroupRow } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { drawerCopy, energySourceCopy, nodeCopy, suppliersCopy, transportModeCopy } from '@/copy/dashboard'
-import { ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
+import { AI_MAPPED, ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
 import { requestLink, requestPortalLink } from '@/lib/dashboard-actions'
-import { aiMappedLabel, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
+import { aiMappedLabel, aiReason, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
 import { categoryCheckLabel, categorySourceNote } from '@/lib/review-display'
 import { CategoryCheckChip, CategoryReview } from './CategoryReview'
 import { cn } from '@/lib/utils'
@@ -264,6 +264,7 @@ function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
 }
 
 function Details({ node }: { node: NodeView }) {
+  const reason = aiReason(node.classification)
   return (
     <>
       <Group title={drawerCopy.invoice}>
@@ -273,11 +274,23 @@ function Details({ node }: { node: NodeView }) {
         <GroupRow label={drawerCopy.classification}>{node.classification.categoryLabel}</GroupRow>
       </Group>
       <Group title={drawerCopy.invoiceLine}>
-        {/* Invoice text is data: rendered as text, clamped, and in full on hover. */}
-        <p className="line-clamp-3 py-3 text-sm break-words" title={node.classification.lineDescription}>
-          {node.classification.lineDescription}
-        </p>
+        {/* Invoice text is data: rendered as text, clamped (padding outside the clamp, so no fourth line peeks), in full on hover. */}
+        <div className="py-3">
+          <p className="line-clamp-3 text-sm break-words" title={node.classification.lineDescription}>
+            {node.classification.lineDescription}
+          </p>
+        </div>
       </Group>
+      {reason !== null && (
+        <Group title={drawerCopy.whyCategory} tag={AI_MAPPED}>
+          {/* The model's own words: rendered as text, clamped, and in full on hover. */}
+          <div className="py-3">
+            <p className="line-clamp-3 text-sm break-words" title={reason}>
+              {reason}
+            </p>
+          </div>
+        </Group>
+      )}
       <Group title={drawerCopy.lane} tag={ILLUSTRATIVE}>
         <GroupRow label={drawerCopy.route}>
           {node.lane.origin} → {node.lane.dest}

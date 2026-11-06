@@ -49,6 +49,7 @@ internal static class Mapping
         SpendKg = n.SpendKg, ActivityKg = n.ActivityKg, SpendEur = n.SpendEur, CostEur = n.CostEur, LeadDays = n.LeadDays,
         TransportMode = Name(n.TransportMode), EnergySource = Name(n.EnergySource), CreatedAt = Utc(n.CreatedAt),
         Review = Name(n.Review), ReviewedAt = n.ReviewedAt is { } reviewedAt ? Utc(reviewedAt) : null,
+        ClassificationRationale = n.ClassificationRationale,
     };
 
     public static void Apply(NodeRow row, ClassificationPatch patch)
@@ -79,7 +80,7 @@ internal static class Mapping
         Parse<ClassificationSource>(r.ClassificationSource), r.MassT, r.LaneId, Parse<NodeStatus>(r.Status),
         r.SpendKg, r.ActivityKg, r.SpendEur, r.CostEur, r.LeadDays,
         ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt,
-        Parse<ClassificationReview>(r.Review), r.ReviewedAt);
+        Parse<ClassificationReview>(r.Review), r.ReviewedAt, r.ClassificationRationale);
 
     public static VerificationRow ToRow(Verification v) => new()
     {

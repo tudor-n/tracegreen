@@ -42,6 +42,7 @@ public class NodeRow
     public DateTimeOffset CreatedAt { get; set; }
     public string Review { get; set; } = "";
     public DateTimeOffset? ReviewedAt { get; set; }
+    public string? ClassificationRationale { get; set; }
 }
 
 public class VerificationRow

@@ -1,4 +1,5 @@
 using TraceGreen.Domain.Carbon;
+using TraceGreen.Domain.Copy;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
@@ -6,8 +7,11 @@ using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
 
-/// <summary>How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted.</summary>
-public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source);
+/// <summary>
+/// How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted. <see cref="Rationale"/>
+/// is the one-line reason of whatever classified it (the invoice code, the cache or a model).
+/// </summary>
+public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source, string? Rationale = null);
 
 /// <summary>
 /// Builds an invoice and its supplier node the same way for the seed and for imports: spend estimate from the total,
@@ -68,7 +72,35 @@ public static class NodeFactory
             TransportMode: transportMode,
             EnergySource: energySource,
             CreatedAt: createdAt,
-            Review: InitialReview(classification.Source));
+            Review: InitialReview(classification.Source),
+            ClassificationRationale: Reason(classification.Rationale));
+    }
+
+    /// <summary>Longest reason kept, the same cap the AI service applies to a model's rationale.</summary>
+    public const int MaxRationaleChars = 200;
+
+    /// <summary>
+    /// The reason as a reader may see it: whitespace collapsed, capped, and null when empty or against the copy rules. The
+    /// copy rules are checked on the whole text before the cut, so a name the cut would split is still caught, and the cut
+    /// never ends inside a surrogate pair (a lone surrogate is not valid UTF-8, and Postgres refuses it).
+    /// </summary>
+    public static string? Reason(string? rationale)
+    {
+        if (string.IsNullOrWhiteSpace(rationale))
+        {
+            return null;
+        }
+        var text = string.Join(' ', rationale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (BannedTerms.Any(text))
+        {
+            return null;
+        }
+        if (text.Length > MaxRationaleChars)
+        {
+            var cut = char.IsHighSurrogate(text[MaxRationaleChars - 1]) ? MaxRationaleChars - 1 : MaxRationaleChars;
+            text = text[..cut].TrimEnd();
+        }
+        return BannedTerms.Clean(text);
     }
 
     /// <summary>

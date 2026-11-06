@@ -128,4 +128,36 @@ public class NodeViewMapperTests
         Assert.Equal(node.SpendKg, view.Spend.Kg);
         Assert.Equal(2, view.Activity!.Factors.Count);
     }
+
+    [Fact]
+    public void TheViewCarriesTheReasonBehindTheCategory()
+    {
+        foreach (var key in new[] { "N2", "N3", "N4", "N5" })
+        {
+            var view = View(key);
+            var node = State.Nodes.Single(n => n.Id == view.Id);
+            Assert.Equal(node.ClassificationRationale, view.Classification.Rationale);
+            Assert.False(string.IsNullOrWhiteSpace(view.Classification.Rationale));
+        }
+    }
+
+    [Fact]
+    public void NoReasonShowsForUnclassifiedOrAfterABuyersReview()
+    {
+        var spec = Seed.DemoState.Nodes.Single(n => n.Key == "N3");
+        var node = State.Nodes.Single(n => n.Id == spec.NodeId);
+        var invoice = State.Invoices.Single(i => i.Id == node.InvoiceId);
+
+        // A model answer outside the allow-list keeps its source and a rejection note, which is no reason for a category.
+        var rejected = node with
+        {
+            CategoryId = Ids.Unclassified,
+            ClassificationSource = ClassificationSource.Model,
+            ClassificationRationale = "Category outside the allow-list: anything",
+        };
+        var reviewed = node with { ClassificationSource = ClassificationSource.Buyer, ClassificationRationale = "Die-cast zinc housing" };
+
+        Assert.Null(Mapper.Map(rejected, invoice).Classification.Rationale);
+        Assert.Null(Mapper.Map(reviewed, invoice).Classification.Rationale);
+    }
 }

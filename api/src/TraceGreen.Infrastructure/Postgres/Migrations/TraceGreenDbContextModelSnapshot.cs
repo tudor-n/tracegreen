@@ -351,6 +351,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("category_id");
 
+                    b.Property<string>("ClassificationRationale")
+                        .HasColumnType("text")
+                        .HasColumnName("classification_rationale");
+
                     b.Property<string>("ClassificationSource")
                         .IsRequired()
                         .HasColumnType("text")

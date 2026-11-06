@@ -68,7 +68,8 @@ public sealed record SupplierNode(
     EnergySource? EnergySource,
     DateTimeOffset CreatedAt,
     ClassificationReview Review = ClassificationReview.NotNeeded,
-    DateTimeOffset? ReviewedAt = null)
+    DateTimeOffset? ReviewedAt = null,
+    string? ClassificationRationale = null)
 {
     /// <summary>The number the graph shows: activity-based once verified, otherwise the spend-based estimate.</summary>
     public decimal CarbonKg => Status == NodeStatus.Verified && ActivityKg is { } activity ? activity : SpendKg;

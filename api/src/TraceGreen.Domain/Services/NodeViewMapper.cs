@@ -50,7 +50,12 @@ public sealed class NodeViewMapper
             AiMapped: aiMapped,
             LineDescription: line.Description,
             Review: node.Review,
-            ReviewedAt: node.ReviewedAt);
+            ReviewedAt: node.ReviewedAt,
+            // No reason for UNCLASSIFIED (what is kept then is a rejection note, such as the model's out-of-list answer,
+            // not a reason for a category) or after a buyer's review (the kept reason was for the category before it).
+            Rationale: node.CategoryId == Ids.Unclassified || node.ClassificationSource == ClassificationSource.Buyer
+                ? null
+                : node.ClassificationRationale);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).
         var laneView = new LaneView(

@@ -62,6 +62,8 @@ services:
       - /src/artifacts
       - nuget:/root/.nuget/packages
       - ./seed:/seed:ro
+      # Read by the banned-term parity test (BannedTermsTests), so `docker compose exec api dotnet test` passes too.
+      - ./scripts:/scripts:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080

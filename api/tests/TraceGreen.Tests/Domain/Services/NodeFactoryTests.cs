@@ -44,4 +44,53 @@ public class NodeFactoryTests
         Assert.Equal(node.SpendKg, node.CarbonKg);
         Assert.True(node.CarbonKg > 0m);
     }
+
+    [Fact]
+    public void TheNodeKeepsTheClassificationReason()
+    {
+        var invoice = N1Invoice(File.ReadAllText(TestPaths.Invoice("N1-shenzhen.xml")));
+        var classification = ZincDiecast with { Rationale = "Die-cast   zinc\nhousing" };
+
+        var node = NodeFactory.NewNode(Guid.NewGuid(), invoice, classification, CnRo, NodeStatus.Estimated, null, null, Seed, Table, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal("Die-cast zinc housing", node.ClassificationRationale);
+    }
+
+    [Fact]
+    public void AReasonIsCappedAt200Characters()
+    {
+        var reason = NodeFactory.Reason(new string('a', 150) + " " + new string('b', 150));
+
+        Assert.NotNull(reason);
+        Assert.True(reason.Length <= NodeFactory.MaxRationaleChars);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AnEmptyReasonIsNull(string? rationale) => Assert.Null(NodeFactory.Reason(rationale));
+
+    [Fact]
+    public void AReasonAgainstTheCopyRulesIsDropped() =>
+        // Built at run time so this file itself passes the copy guard.
+        Assert.Null(NodeFactory.Reason("Recorded on a " + "block" + "chain"));
+
+    [Fact]
+    public void ATermTheCutWouldSplitIsStillCaught() =>
+        // The term spans characters 194 to 203: cut first, its prefix alone would pass the check.
+        Assert.Null(NodeFactory.Reason(new string('a', 193) + " " + "block" + "chain" + " ledger"));
+
+    [Fact]
+    public void TheCutNeverSplitsASurrogatePair()
+    {
+        // 199 letters, then an emoji (two UTF-16 units): a plain cut at 200 would keep its high surrogate alone.
+        var reason = NodeFactory.Reason(new string('a', 199) + "\U0001F600" + " tail");
+
+        Assert.NotNull(reason);
+        Assert.True(reason.Length <= NodeFactory.MaxRationaleChars);
+        Assert.False(char.IsHighSurrogate(reason[^1]));
+        // Strict UTF-8, as Npgsql writes text: throws on a lone surrogate.
+        _ = new System.Text.UTF8Encoding(false, throwOnInvalidBytes: true).GetBytes(reason);
+    }
 }

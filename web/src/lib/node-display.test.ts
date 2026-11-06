@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { FactorLookup } from '@/api/client'
 import { node } from '@/store/testFixtures'
-import { aiMappedLabel, isPlaceholder, justVerified, provenanceLine, shownFigure } from './node-display'
+import { aiMappedLabel, aiReason, isPlaceholder, justVerified, provenanceLine, shownFigure } from './node-display'
 
 const row = (source: string): FactorLookup => ({ value: 1, unit: 'kgCO2e/t', source, year: 2026, rowLabel: 'row' })
 
@@ -44,6 +44,25 @@ describe('aiMappedLabel', () => {
 
   it('shows nothing when the invoice itself classified the line', () => {
     expect(aiMappedLabel({ ...classification, source: 'invoice', aiMapped: false, confidence: 1 })).toBeNull()
+  })
+})
+
+describe('aiReason', () => {
+  const classification = node('a', 1).classification
+
+  it("is the AI's reason when the AI chose the category", () => {
+    expect(aiReason({ ...classification, source: 'model', aiMapped: true, rationale: ' Zinc die-cast casing ' })).toBe(
+      'Zinc die-cast casing',
+    )
+  })
+
+  it('is hidden when the invoice code chose the category, even though a reason exists', () => {
+    expect(aiReason({ ...classification, source: 'invoice', aiMapped: false, rationale: 'Item code 853400 (HS)' })).toBeNull()
+  })
+
+  it('is hidden when no reason was kept', () => {
+    expect(aiReason({ ...classification, source: 'cache', aiMapped: true, rationale: null })).toBeNull()
+    expect(aiReason({ ...classification, source: 'cache', aiMapped: true, rationale: '   ' })).toBeNull()
   })
 })
 

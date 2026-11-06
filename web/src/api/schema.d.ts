@@ -411,6 +411,7 @@ export interface components {
             review: components["schemas"]["ClassificationReview"];
             /** Format: date-time */
             reviewedAt: null | string;
+            rationale: null | string;
         };
         DomainEvent: components["schemas"]["DomainEventNodeCreated"] | components["schemas"]["DomainEventNodeUpdated"] | components["schemas"]["DomainEventNodeVerified"] | components["schemas"]["DomainEventAuditAppended"] | components["schemas"]["DomainEventScenarioSaved"] | components["schemas"]["DomainEventGraphReset"];
         DomainEventAuditAppended: {

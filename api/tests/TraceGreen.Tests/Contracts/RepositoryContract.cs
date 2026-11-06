@@ -58,6 +58,7 @@ public abstract class RepositoryContract
         Assert.Equal(2, (await repo.ListAlternativesAsync(CancellationToken.None)).Count);
         Assert.Equal("RO99999992", (await repo.GetBuyerAsync(Ctx, CancellationToken.None)).Cui);
         Assert.Single(await repo.ListVerificationsAsync(Ctx, N2, CancellationToken.None));
+        Assert.All(nodes, n => Assert.False(string.IsNullOrWhiteSpace(n.ClassificationRationale)));
     }
 
     [Fact]
@@ -100,6 +101,22 @@ public abstract class RepositoryContract
         var after = await AllAudit(repo);
         Assert.Equal(before.Count + 1, after.Count);
         Assert.True(AuditChain.Verify(after).Valid);
+    }
+
+    [Fact]
+    public async Task TheClassificationReasonRoundTripsAndSurvivesAVerification()
+    {
+        var repo = await MakeAsync();
+        var (invoice, node) = NewImport("raw-reason" + Ids.NewId().ToString("N"));
+        node = node with { ClassificationRationale = "Zinc die-cast casing, sensor alloy" };
+
+        Assert.Equal(InsertInvoiceStatus.Ok, (await repo.InsertInvoiceWithNodeAsync(Ctx, invoice, node, Audit("invoice.imported"), CancellationToken.None)).Status);
+        Assert.Equal("Zinc die-cast casing, sensor alloy", (await repo.GetNodeAsync(Ctx, node.Id, CancellationToken.None))!.ClassificationRationale);
+
+        var recorded = await repo.RecordVerificationAsync(
+            Ctx, NewVerification(node.Id, "nonce-reason" + Ids.NewId().ToString("N")), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        Assert.Equal(RecordVerificationStatus.Ok, recorded.Status);
+        Assert.Equal("Zinc die-cast casing, sensor alloy", (await repo.GetNodeAsync(Ctx, node.Id, CancellationToken.None))!.ClassificationRationale);
     }
 
     private static (Invoice Invoice, SupplierNode Node) NewImport(string rawHash)
