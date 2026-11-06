@@ -71,6 +71,8 @@ export const drawerCopy = {
   leadTime: 'Lead time',
   requestData: 'Request data',
   requesting: 'Requesting…',
+  supplierPage: 'Supplier page link',
+  supplierPageRequesting: 'Making the link…',
   simulate: 'Simulate',
 } as const
 
@@ -131,6 +133,17 @@ export const linkCopy = {
 } as const
 
 /**
+ * The supplier page link (F12) in the same card: one link per supplier that lists every delivery from them on this
+ * graph, reusable until it expires. The expiry, hotspot and loopback lines are the verification link's.
+ */
+export const portalLinkCopy = {
+  ...linkCopy,
+  title: 'Supplier page link',
+  qr: 'QR code of the supplier page link',
+  scan: "Scan it with the supplier's phone. It lists every delivery from this supplier and works until it expires.",
+} as const
+
+/**
  * The audit panel around the words of ./labels.ts (its title and the chain results). It is a tamper-evident audit log
  * and is never called anything else (CLAUDE.md, Copy rules). Actions and actors the API adds later show as their raw
  * names until they get a label here.
@@ -151,6 +164,7 @@ export const auditPanelCopy = {
     'seed.loaded': 'Demo data loaded',
     'invoice.imported': 'Invoice imported',
     'link.requested': 'Verification link requested',
+    'portal.requested': 'Supplier page link requested',
     'verification.submitted': 'Supplier answered',
   } as Readonly<Partial<Record<string, string>>>,
   actors: {
@@ -158,6 +172,7 @@ export const auditPanelCopy = {
     buyer: 'Buyer',
     demo: 'Demo',
     supplier: 'Supplier',
+    portal: 'Supplier page',
   } as Readonly<Partial<Record<string, string>>>,
 } as const
 
@@ -218,6 +233,9 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   InvalidChange: 'Change not accepted.',
   ModeNotAvailable: 'This lane has no such mode.',
   MassUnknown: 'Mass unknown for this item.',
+  AlreadyConfirmed: 'Already confirmed by the supplier.',
+  DeliveryChanged: 'Another answer arrived first.',
+  TermsNotAccepted: 'Supplier terms not accepted.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

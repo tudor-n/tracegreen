@@ -92,7 +92,9 @@ public sealed record Verification(
     decimal? MassTConfirmed,
     DateTimeOffset ConsumedAt,
     string IpHash,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? TermsVersion,
+    string? TermsSha256);
 
 public sealed record AuditEntry(
     long Id,
