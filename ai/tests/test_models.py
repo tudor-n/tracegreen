@@ -8,10 +8,12 @@ tests talk to a fake server on 127.0.0.1 only."""
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 import warnings
 from collections.abc import Callable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -21,10 +23,13 @@ from fastapi.testclient import TestClient
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableLambda
 
+from app import models
+from app.cache import CacheEntry, load_cache
 from app.config import ModelSpec, Settings
 from app.main import create_app
 from app.models import chat_model_factory
 from app.prompts import answer_schema, load_categories, messages, system_prompt
+from app.providers import RuntimeCache, build_chain
 from app.schemas import ClassificationInput
 
 SEED = Path(__file__).resolve().parents[2] / "seed"
@@ -224,6 +229,37 @@ def test_ai_model_alone_still_counts_as_an_anthropic_model() -> None:
     assert [(s.id, s.ready) for s in config.models] == [("anthropic:model-x", True)]
     assert config.model_configured is True
     assert [s.id for s in settings(AI_MODEL="model-x", AI_MODELS=CLOUD_A).models] == [CLOUD_A]
+
+
+def test_a_legacy_ai_model_with_the_anthropic_prefix_is_not_prefixed_twice() -> None:
+    config = settings(AI_MODEL=" anthropic: claude-haiku-4-5", ANTHROPIC_API_KEY="test-key")
+    assert [s.id for s in config.models] == ["anthropic:claude-haiku-4-5"]
+
+
+def test_a_legacy_ai_model_for_another_provider_fails_at_startup() -> None:
+    with pytest.raises(ValueError, match="put 'openai:model-a' in AI_MODELS"):
+        settings(AI_MODEL="openai:model-a")
+
+
+@pytest.mark.parametrize(("budget", "warned"), [("8", False), ("10", True), ("115", True)])
+def test_a_budget_not_under_the_api_timeout_is_warned_about_at_startup(
+    caplog: pytest.LogCaptureFixture, budget: str, warned: bool
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="app.main"):
+        create_app(settings(AI_TIMEOUT_S=budget), Fakes())
+    assert any("AI_TIMEOUT_S" in r.getMessage() for r in caplog.records) is warned
+
+
+def test_the_packages_of_ready_providers_are_imported_at_startup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported: list[str] = []
+    monkeypatch.setattr(models, "import_module", imported.append)
+    create_app(settings(AI_MODELS=f"{CLOUD_A},{CLOUD_B},{LOCAL}", OPENAI_API_KEY="test-key"))
+    # Google has no key here, so it is not ready and not imported; no client is built.
+    assert imported == ["langchain_ollama", "langchain_openai"]
+    create_app(settings(AI_MODELS=CLOUD_A, OPENAI_API_KEY="test-key"), Fakes())
+    assert imported == ["langchain_ollama", "langchain_openai"]  # fakes: nothing imported
 
 
 def test_health_lists_every_model_with_its_readiness() -> None:
@@ -465,6 +501,57 @@ def test_a_stub_answer_is_not_reused() -> None:
     c = client(Fakes(a=FakeModel(output=flaky)), **chain_env(CLOUD_A))
     assert classify(c, line("L1", "Capace ABS"))["classifications"][0]["source"] == "stub"
     assert classify(c, line("L1", "Capace ABS"))["classifications"][0]["source"] == "model"
+
+
+def test_the_runtime_cache_keeps_5000_entries_and_drops_the_oldest_written() -> None:
+    cache = RuntimeCache()
+    for n in range(5001):
+        cache.put(f"key-{n}", CacheEntry("pcb", 0.9, f"answer {n}"))
+    assert len(cache) == 5000
+    assert cache.get("key-0") is None and cache.get("key-1") is not None
+    cache.put("key-1", CacheEntry("pcb", 0.9, "rewritten"))  # now the newest
+    cache.put("key-5001", CacheEntry("pcb", 0.9, "answer 5001"))
+    assert cache.get("key-2") is None
+    assert cache.get("key-1") == CacheEntry("pcb", 0.9, "rewritten")
+
+
+def test_lines_with_the_same_description_are_asked_once_and_share_the_answer() -> None:
+    a = FakeModel(answer("plastics", 0.9))
+    c = client(Fakes(a=a), **chain_env(CLOUD_A))
+    body = classify(
+        c, line("L1", "Capace ABS"), line("L2", "Mânere PP"), line("L3", "  capace  ABS ")
+    )
+    assert a.sent() == [["Capace ABS", "Mânere PP"]]
+    assert [(r["lineId"], r["categoryId"], r["source"]) for r in body["classifications"]] == [
+        ("L1", "plastics", "model"),
+        ("L2", "plastics", "model"),
+        ("L3", "plastics", "model"),
+    ]
+
+
+def test_a_model_failure_is_logged_on_one_short_line(caplog: pytest.LogCaptureFixture) -> None:
+    """A parse error carries the model's whole output, which can echo invoice text."""
+    a = FakeModel(error=ValueError("Invalid json output: " + "Carcase turnate zinc\n" * 500))
+    with caplog.at_level(logging.WARNING, logger="app.providers"):
+        classify(client(Fakes(a=a), **chain_env(CLOUD_A)), line("L1", "Capace ABS"))
+    (record,) = [r for r in caplog.records if "failed" in r.getMessage()]
+    assert "\n" not in record.getMessage() and len(record.getMessage()) < 300
+
+
+def test_concurrent_requests_each_get_their_own_budget(release: threading.Event) -> None:
+    """Eight requests with every model hanging answer side by side, not one after another."""
+    fakes = Fakes(a=FakeModel(hang=release), b=FakeModel(hang=release))
+    env = chain_env(CLOUD_A, CLOUD_B, AI_TIMEOUT_S="0.6", AI_MODEL_TIMEOUT_S="0.3")
+    chain = build_chain(settings(**env), load_cache(SEED), fakes)
+
+    def one(n: int) -> list[Any]:
+        return chain.classify([ClassificationInput(line_id=f"L{n}", description=f"Bolts M{n}")])
+
+    started = time.monotonic()
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        answers = list(pool.map(one, range(8)))
+    assert time.monotonic() - started < 1.5  # one after another would take 4.8 s
+    assert [a[0].source for a in answers] == ["stub"] * 8
 
 
 # --- The dev route -------------------------------------------------------------------------

@@ -3,13 +3,14 @@ only once the chain first calls that model, and never when no model is configure
 
 Every model runs with no retries and a request timeout equal to its cap, so a call the chain
 has given up on ends soon after, and at temperature 0 except Anthropic's (see its factory).
-The provider packages are imported inside the factories, so a service with no models never
-loads them."""
+The provider packages are imported inside the factories, and at startup only for ready
+models, so a service with no models never loads them."""
 
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from importlib import import_module
 from typing import Any
 
 from langchain_core.runnables import Runnable
@@ -18,6 +19,21 @@ from app.config import ModelSpec, Settings
 
 # Builds the runnable for one model: chat messages in, the structured answer out.
 ModelFactory = Callable[[ModelSpec, dict[str, Any]], Runnable]
+
+# The LangChain package each provider's factory imports.
+PROVIDER_PACKAGES = {
+    "anthropic": "langchain_anthropic",
+    "openai": "langchain_openai",
+    "google_genai": "langchain_google_genai",
+    "ollama": "langchain_ollama",
+}
+
+
+def preload_providers(specs: Iterable[ModelSpec]) -> None:
+    """Imports the package of every ready model's provider. It builds no client; it only
+    moves the import, up to half a second, out of the first call's cap."""
+    for provider in sorted({spec.provider for spec in specs if spec.ready}):
+        import_module(PROVIDER_PACKAGES[provider])
 
 
 def chat_model_factory(settings: Settings) -> ModelFactory:

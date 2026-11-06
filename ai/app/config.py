@@ -18,6 +18,9 @@ PROVIDER_KEYS: dict[str, str | None] = {
 }
 
 DEFAULT_OLLAMA_BASE_URL = "http://host.docker.internal:11434"
+# The API's default timeout for this service (AI_TIMEOUT_MS 10000). AI_TIMEOUT_S must stay
+# under it, or the API may give up first; a scoring run sets it higher on purpose.
+API_TIMEOUT_S = 10.0
 
 
 @dataclass(frozen=True)
@@ -91,9 +94,17 @@ def parse_models(
 ) -> tuple[ModelSpec, ...]:
     """AI_MODELS, in order: `<provider>:<model>` entries separated by commas. The provider is
     the text before the first colon, so Ollama tags such as `ollama:qwen3.5:4b` keep theirs.
-    When AI_MODELS is empty, the older AI_MODEL counts as `anthropic:<AI_MODEL>`."""
+    When AI_MODELS is empty, the older AI_MODEL counts as `anthropic:<AI_MODEL>`; a leading
+    `anthropic:` in it is dropped, and another provider's prefix fails."""
     entries = [entry.strip() for entry in raw.split(",") if entry.strip()]
     if not entries and legacy_model:
+        prefix, colon, rest = (part.strip() for part in legacy_model.partition(":"))
+        if colon and prefix == "anthropic":
+            legacy_model = rest
+        elif colon and prefix in PROVIDER_KEYS:
+            raise ValueError(
+                f"AI_MODEL is for an Anthropic model; put {legacy_model!r} in AI_MODELS"
+            )
         entries = [f"anthropic:{legacy_model}"]
     specs: list[ModelSpec] = []
     for entry in entries:

@@ -1,9 +1,10 @@
 """The chain behind /classify, one batch per call, all within AI_TIMEOUT_S:
 
 1. The seed cache answers whatever lines it can, then the runtime cache.
-2. The remaining lines go to the first ready model of AI_MODELS in one structured-output call.
-   The call runs in a worker thread with a hard deadline: the model's own cap or the time
-   left, whichever is shorter.
+2. The remaining lines go to the first ready model of AI_MODELS in one structured-output call,
+   one row per description (lines that share a cache key share the answer). The call runs in
+   a worker thread with a hard deadline: the model's own cap or the time left, whichever is
+   shorter.
 3. The answer is checked. Only line ids that were sent count, and only the first answer for
    each; confidence is clamped to 0-1 and the rationale is capped; a category outside the
    allow-list becomes UNCLASSIFIED; below 0.6 confidence the line becomes UNCLASSIFIED for a
@@ -29,7 +30,7 @@ from pydantic import BaseModel
 
 from app.cache import CacheEntry, cache_key, load_allow_list
 from app.config import Settings
-from app.models import LazyModel, ModelFactory, chat_model_factory
+from app.models import LazyModel, ModelFactory, chat_model_factory, preload_providers
 from app.prompts import (
     MAX_RATIONALE_CHARS,
     UNCLASSIFIED,
@@ -47,6 +48,7 @@ LOW_CONFIDENCE_RATIONALE = "Low confidence, check this line"
 RUNTIME_CACHE_MAX_ENTRIES = 5000
 # Below this much time left, a model attempt is not started.
 MIN_ATTEMPT_S = 0.2
+MAX_LOGGED_ERROR_CHARS = 200
 
 
 class RuntimeCache:
@@ -163,8 +165,12 @@ class Chain:
         cap = min(model.spec.timeout_s, deadline - time.monotonic())
         if cap < MIN_ATTEMPT_S:
             return {}
-        # The model sees short ids of our own, never the invoice's line ids.
-        prompt_ids = {str(n): index for n, index in enumerate(pending, start=1)}
+        # One prompt row per description (by cache key), so a repeated description is asked
+        # once. The model sees short ids of our own, never the invoice's line ids.
+        same: dict[str, list[int]] = {}
+        for index in pending:
+            same.setdefault(cache_key(lines[index].description), []).append(index)
+        prompt_ids = {str(n): group[0] for n, group in enumerate(same.values(), start=1)}
         prompt = messages(self._system, [(pid, lines[i]) for pid, i in prompt_ids.items()])
         try:
             output = call_with_deadline(lambda: model.runnable().invoke(prompt), cap)
@@ -172,9 +178,16 @@ class Chain:
             log.warning("model %s gave no answer within %.1f s", model.id, cap)
             return {}
         except Exception as error:
-            log.warning("model %s failed: %s: %s", model.id, type(error).__name__, error)
+            # A parse error carries the whole model output, so the message is cut to one line.
+            detail = " ".join(str(error).split())[:MAX_LOGGED_ERROR_CHARS]
+            log.warning("model %s failed: %s: %s", model.id, type(error).__name__, detail)
             return {}
-        return self._checked(output, prompt_ids, lines)
+        answers = self._checked(output, prompt_ids, lines)
+        for group in same.values():
+            first = answers.get(group[0])
+            for index in group[1:] if first is not None else ():
+                answers[index] = first.model_copy(update={"line_id": lines[index].line_id})
+        return answers
 
     def _checked(
         self, output: Any, prompt_ids: Mapping[str, int], lines: Sequence[ClassificationInput]
@@ -238,9 +251,12 @@ def build_chain(
     model_factory: ModelFactory | None = None,
 ) -> Chain:
     """The chain for one configuration. The prompt and the answer schema are built here, once;
-    no model client is built until a model is first called."""
+    no model client is built until a model is first called. In production the packages of the
+    ready providers are imported here, so the first call's cap is not spent on the import."""
     categories = load_categories(config.seed_dir)
     schema = answer_schema(categories)
+    if model_factory is None:
+        preload_providers(config.models)
     factory = model_factory or chat_model_factory(config)
     models = [LazyModel(spec, functools.partial(factory, spec, schema)) for spec in config.models]
     return Chain(

@@ -4,10 +4,12 @@ later, suggests alternatives; it never produces a carbon number. The C# API call
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.config import Settings, settings
+from app.config import API_TIMEOUT_S, Settings, settings
 from app.models import ModelFactory
 from app.providers import build_chain
 from app.schemas import (
@@ -19,11 +21,20 @@ from app.schemas import (
     SuggestResponse,
 )
 
+log = logging.getLogger(__name__)
+
 
 def create_app(config: Settings, model_factory: ModelFactory | None = None) -> FastAPI:
     """The app for one configuration. The seed files are read here, so a broken seed fails
     at startup. Tests pass a `model_factory` of fake models; production builds the LangChain
     chat models of AI_MODELS."""
+    if config.ai_timeout_s >= API_TIMEOUT_S:
+        log.warning(
+            "AI_TIMEOUT_S is %g s, not under the API's %g s timeout (AI_TIMEOUT_MS): the API "
+            "may give up before this service answers. Use this only for scoring.",
+            config.ai_timeout_s,
+            API_TIMEOUT_S,
+        )
     entries = load_cache(config.seed_dir)
     chain = build_chain(config, entries, model_factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
