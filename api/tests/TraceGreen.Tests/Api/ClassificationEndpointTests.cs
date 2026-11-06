@@ -69,6 +69,18 @@ public class ClassificationEndpointTests : IClassFixture<VerifyWebAppFactory>
     }
 
     [Fact]
+    public async Task TheCategoriesAreTheAllowListInSeedOrder()
+    {
+        var categories = await _client.GetFromJsonAsync<JsonElement>("/api/categories", Ct);
+
+        var seed = Seed;
+        Assert.Equal(seed.Categories.Select(c => c.Id), categories.EnumerateArray().Select(c => c.GetProperty("id").GetString()));
+        Assert.Equal(seed.Categories.Select(c => c.Label), categories.EnumerateArray().Select(c => c.GetProperty("label").GetString()));
+        Assert.Contains(Ids.Unclassified, categories.EnumerateArray().Select(c => c.GetProperty("id").GetString()));
+        Assert.All(categories.EnumerateArray(), c => Assert.Equal(2, c.EnumerateObject().Count()));
+    }
+
+    [Fact]
     public async Task AnAiMappedNodeWaitsForReviewAndAnInvoiceCodedOneDoesNot()
     {
         await Reset();

@@ -120,6 +120,7 @@ app.MapHealth();
 app.MapEvents();
 app.MapGraph();
 app.MapClassification();
+app.MapCategories();
 app.MapIngest();
 app.MapVerify();
 app.MapPortal();
