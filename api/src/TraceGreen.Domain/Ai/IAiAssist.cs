@@ -26,10 +26,11 @@ public enum ChatModelProblem { Unknown, NotReady }
 public sealed record ChatOutcome(bool Answerable, string Text, IReadOnlyList<string> FactIds, string Provider, ChatModelProblem? ModelProblem = null);
 
 /// <summary>
-/// A model the chat may use (F13; <c>AI_CHAT_MODELS</c>, else <c>AI_MODELS</c>), in the order the chat tries them.
+/// A model the chat may use (F13): its own (<c>AI_CHAT_MODELS</c>, else <c>AI_MODELS</c>) in the order the chat tries
+/// them, with <see cref="Automatic"/> true, then the local Ollama server's other models, asked only when picked.
 /// <see cref="Reason"/> says why one is not ready, e.g. its key is not set.
 /// </summary>
-public sealed record ChatModelInfo(string Id, string Provider, string Model, bool Ready, string? Reason);
+public sealed record ChatModelInfo(string Id, string Provider, string Model, bool Ready, string? Reason, bool Automatic);
 
 /// <summary>One invoice line as a model copied it from a PDF (F9); every value a string as printed, empty when not shown.</summary>
 public sealed record DraftLine(string Description, string Quantity, string UnitCode, string Amount, string ClassificationCode, string ClassificationScheme);

@@ -3,11 +3,12 @@ import type { ChatModels, ChatModelView } from '@/api/client'
 import { AUTO, answeredBy, modelName, modelNote, modelOptions, modelToSend } from './chat-models'
 
 const model = (overrides: Partial<ChatModelView>): ChatModelView => ({
-  id: 'ollama:qwen2.5:14b',
+  id: 'ollama:ministral-3:3b',
   provider: 'ollama',
-  model: 'qwen2.5:14b',
+  model: 'ministral-3:3b',
   ready: true,
   reason: null,
+  automatic: true,
   ...overrides,
 })
 
@@ -18,21 +19,32 @@ const cloud = model({
   ready: false,
   reason: 'ANTHROPIC_API_KEY not set',
 })
-const local = model({})
-const list: ChatModels = { available: true, models: [cloud, local] }
+const configuredLocal = model({})
+const found = model({ id: 'ollama:qwen2.5:14b', model: 'qwen2.5:14b', automatic: false })
+const list: ChatModels = { available: true, models: [cloud, configuredLocal, found] }
+const auto = { value: AUTO, label: 'Automatic', disabled: false }
 
 describe('modelOptions', () => {
-  it('puts Automatic first, then the server order, with a model that is not set up shown with why and not choosable', () => {
-    expect(modelOptions(list)).toEqual([
-      { value: AUTO, label: 'Automatic', disabled: false },
-      { value: 'anthropic:claude-x', label: 'Anthropic · claude-x (not set up: ANTHROPIC_API_KEY not set)', disabled: true },
-      { value: 'ollama:qwen2.5:14b', label: 'Ollama (local) · qwen2.5:14b', disabled: false },
-    ])
+  it('puts Automatic first, then its models in the server order, then the local ones', () => {
+    expect(modelOptions(list)).toEqual({
+      auto,
+      groups: [
+        {
+          label: 'Set up for Automatic',
+          options: [
+            { value: 'anthropic:claude-x', label: 'Anthropic · claude-x (not set up: ANTHROPIC_API_KEY not set)', disabled: true },
+            { value: 'ollama:ministral-3:3b', label: 'Ollama (local) · ministral-3:3b', disabled: false },
+          ],
+        },
+        { label: 'Local models (Ollama)', options: [{ value: 'ollama:qwen2.5:14b', label: 'Ollama (local) · qwen2.5:14b', disabled: false }] },
+      ],
+    })
   })
 
-  it('offers Automatic alone while the list loads or when the server has no model', () => {
-    expect(modelOptions(null)).toEqual([{ value: AUTO, label: 'Automatic', disabled: false }])
-    expect(modelOptions({ available: true, models: [] })).toHaveLength(1)
+  it('leaves out a group with no model, and offers Automatic alone while the list loads or when there is none', () => {
+    expect(modelOptions({ available: true, models: [found] }).groups.map((g) => g.label)).toEqual(['Local models (Ollama)'])
+    expect(modelOptions(null)).toEqual({ auto, groups: [] })
+    expect(modelOptions({ available: true, models: [] })).toEqual({ auto, groups: [] })
   })
 
   it('shows an unknown provider as it is', () => {
@@ -56,10 +68,15 @@ describe('modelNote', () => {
     expect(modelNote(list, 'ollama:qwen2.5:14b')).toMatch(/^Only this model is asked/)
   })
 
+  it('points to the local models when Automatic has nothing ready', () => {
+    expect(modelNote({ available: true, models: [found] }, null)).toMatch(/^Automatic has no model set up yet.*Pick a local model/)
+    expect(modelNote({ available: true, models: [cloud, found] }, null)).toMatch(/Pick a local model/)
+  })
+
   it('says why there is nothing to choose', () => {
     expect(modelNote(null, null)).toBe('Looking for models…')
     expect(modelNote({ available: false, models: [] }, null)).toMatch(/isn't answering/)
-    expect(modelNote({ available: true, models: [] }, null)).toMatch(/^No AI model is set up/)
+    expect(modelNote({ available: true, models: [] }, null)).toMatch(/^No AI model is set up or found/)
     expect(modelNote({ available: true, models: [cloud] }, null)).toMatch(/^No model has its key/)
   })
 })
@@ -70,7 +87,7 @@ describe('answeredBy', () => {
   })
 
   it('names an unlisted model from its id, keeping the colons of its tag', () => {
-    expect(answeredBy('ollama:ministral-3:3b', null)).toBe('Ollama (local) · ministral-3:3b')
+    expect(answeredBy('ollama:llama3.2:3b', null)).toBe('Ollama (local) · llama3.2:3b')
     expect(answeredBy('openai:model-a', list)).toBe('OpenAI · model-a')
   })
 

@@ -504,6 +504,7 @@ export interface components {
             model: string;
             ready: boolean;
             reason: null | string;
+            automatic: boolean;
         };
         ChatModels: {
             available: boolean;

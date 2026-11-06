@@ -260,7 +260,7 @@ describe('fetchChatModels', () => {
   })
 
   it('returns the server list', async () => {
-    const list = { available: true, models: [{ id: 'ollama:m', provider: 'ollama', model: 'm', ready: true, reason: null }] }
+    const list = { available: true, models: [{ id: 'ollama:m', provider: 'ollama', model: 'm', ready: true, reason: null, automatic: false }] }
     const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: list, response: new Response(null, { status: 200 }) } as never)
     const signal = new AbortController().signal
     expect(await fetchChatModels(signal)).toEqual({ ok: true, data: list })

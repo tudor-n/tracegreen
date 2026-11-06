@@ -158,8 +158,8 @@ public class ChatEndpointTests(ChatWebAppFactory factory) : IClassFixture<ChatWe
     {
         factory.Ai.Models = () => Task.FromResult<IReadOnlyList<ChatModelInfo>>(
         [
-            new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set"),
-            new ChatModelInfo("ollama:local:3b", "ollama", "local:3b", true, null),
+            new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set", true),
+            new ChatModelInfo("ollama:local:3b", "ollama", "local:3b", true, null, false),
         ]);
 
         var body = await _client.GetFromJsonAsync<JsonElement>("/api/chat/models", Ct);
@@ -171,6 +171,7 @@ public class ChatEndpointTests(ChatWebAppFactory factory) : IClassFixture<ChatWe
         Assert.Equal("ANTHROPIC_API_KEY not set", models[0].GetProperty("reason").GetString());
         Assert.Equal("local:3b", models[1].GetProperty("model").GetString());
         Assert.Equal("ollama", models[1].GetProperty("provider").GetString());
+        Assert.Equal([true, false], models.Select(m => m.GetProperty("automatic").GetBoolean()));
     }
 
     [Fact]

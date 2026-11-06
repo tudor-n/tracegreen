@@ -3,7 +3,8 @@ import { chatCopy } from '@/copy/chat'
 
 // The chat's model choice (F13). "Automatic" sends no model, so the server asks its chat models in order (AI_CHAT_MODELS,
 // else AI_MODELS); a chosen model answers alone. The list is the server's: a model without its key is listed but cannot
-// be chosen, and says why. Whichever model writes the sentence, the API fills every value in from the data.
+// be chosen, and says why; the local Ollama server's other models follow, asked only when picked. Whichever model writes
+// the sentence, the API fills every value in from the data.
 
 /** The select's value for "Automatic". */
 export const AUTO = 'auto'
@@ -14,19 +15,36 @@ export interface ModelOption {
   disabled: boolean
 }
 
+/** The picker's options: Automatic alone, then the groups that have models, each with its heading. */
+export interface ModelOptions {
+  auto: ModelOption
+  groups: { label: string; options: ModelOption[] }[]
+}
+
 /** A model as a reader knows it: the provider's name, then the model's own. */
 export function modelName(model: Pick<ChatModelView, 'provider' | 'model'>): string {
   return `${chatCopy.models.providers[model.provider] ?? model.provider} · ${model.model}`
 }
 
-/** Automatic first, then the server's models in its order; one that is not set up is shown with why, not choosable. */
-export function modelOptions(list: ChatModels | null): ModelOption[] {
-  const models = (list?.models ?? []).map((m) => ({
+function option(m: ChatModelView): ModelOption {
+  return {
     value: m.id,
     label: m.ready ? modelName(m) : chatCopy.models.notReady(modelName(m), m.reason),
     disabled: !m.ready,
-  }))
-  return [{ value: AUTO, label: chatCopy.models.auto, disabled: false }, ...models]
+  }
+}
+
+/**
+ * Automatic first, then the models Automatic asks, in the server's order (one that is not set up shown with why, not
+ * choosable), then the local models. A group with no model is left out.
+ */
+export function modelOptions(list: ChatModels | null): ModelOptions {
+  const models = list?.models ?? []
+  const groups = [
+    { label: chatCopy.models.autoGroup, options: models.filter((m) => m.automatic).map(option) },
+    { label: chatCopy.models.localGroup, options: models.filter((m) => !m.automatic).map(option) },
+  ].filter((g) => g.options.length > 0)
+  return { auto: { value: AUTO, label: chatCopy.models.auto, disabled: false }, groups }
 }
 
 /**
@@ -38,13 +56,15 @@ export function modelToSend(selected: string, list: ChatModels | null): string |
   return list.models.some((m) => m.id === selected && m.ready) ? selected : null
 }
 
-/** The line under the picker: what the choice does, or why there is nothing to choose. */
+/** The line under the picker: what the choice does, or why Automatic has nothing to ask. */
 export function modelNote(list: ChatModels | null, sent: string | null): string {
   if (list === null) return chatCopy.models.loading
   if (!list.available) return chatCopy.models.serviceDown
-  if (list.models.length === 0) return chatCopy.models.none
-  if (!list.models.some((m) => m.ready)) return chatCopy.models.noneReady
-  return sent === null ? chatCopy.models.autoHelp : chatCopy.models.aloneHelp
+  if (sent !== null) return chatCopy.models.aloneHelp
+  const automatic = list.models.filter((m) => m.automatic)
+  if (automatic.some((m) => m.ready)) return chatCopy.models.autoHelp
+  if (list.models.some((m) => !m.automatic && m.ready)) return chatCopy.models.pickLocal
+  return automatic.length === 0 ? chatCopy.models.none : chatCopy.models.noneReady
 }
 
 /** Which model wrote an answer, from the answer's provider; null when no model wrote it (templates, no AI). */

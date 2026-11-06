@@ -81,8 +81,13 @@ export const chatCopy = {
     loading: 'Looking for models…',
     autoHelp: 'Automatic asks each ready model in turn until one answers.',
     aloneHelp: 'Only this model is asked; if it cannot answer, the question is not answered.',
-    none: 'No AI model is set up on this server (AI_CHAT_MODELS or AI_MODELS). The suggested questions still work.',
+    none: 'No AI model is set up or found on this server (AI_CHAT_MODELS, AI_MODELS or Ollama). The suggested questions still work.',
     noneReady: 'No model has its key on this server yet. The suggested questions still work.',
+    /** Nothing ready for Automatic, but the local model server has models to pick. */
+    pickLocal: 'Automatic has no model set up yet (AI_CHAT_MODELS or AI_MODELS). Pick a local model, or ask a suggested question.',
+    /** The picker's groups: the models Automatic asks, in its order, and the local server's others, asked only when picked. */
+    autoGroup: 'Set up for Automatic',
+    localGroup: 'Local models (Ollama)',
     serviceDown: "The AI service isn't answering. The suggested questions still work.",
     /** A listed model that cannot answer yet, with the server's reason (e.g. its key is not set). */
     notReady: (name: string, reason: string | null) => `${name} (not set up${reason === null ? '' : `: ${reason}`})`,

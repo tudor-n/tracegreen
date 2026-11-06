@@ -23,12 +23,15 @@ public sealed record ChatAnswer(ChatStatus Status, IReadOnlyList<AnswerSegment> 
 /// </summary>
 public sealed record ChatResult(ChatAnswer Answer, string? LogNote);
 
-/// <summary>A model the chat box offers: the id to send back with a question, its provider and name, and whether it can answer now.</summary>
-public sealed record ChatModelView(string Id, string Provider, string Model, bool Ready, string? Reason);
+/// <summary>
+/// A model the chat box offers: the id to send back with a question, its provider and name, whether it can answer now,
+/// and whether "Automatic" asks it (a local Ollama model the server found is asked only when picked).
+/// </summary>
+public sealed record ChatModelView(string Id, string Provider, string Model, bool Ready, string? Reason, bool Automatic);
 
 /// <summary>
-/// The chat box's model choice, in the order "Automatic" tries them. <see cref="Available"/> is false when the AI service
-/// did not answer; an empty list with it true means no model is configured.
+/// The chat box's model choice: the models "Automatic" asks, in its order, then the local ones. <see cref="Available"/>
+/// is false when the AI service did not answer; an empty list with it true means no model is configured or found.
 /// </summary>
 public sealed record ChatModels(bool Available, IReadOnlyList<ChatModelView> Models);
 
@@ -62,7 +65,7 @@ public sealed class ChatService(IRepository repo, GraphService graph, IAiAssist 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(ModelsTimeout);
             var models = await ai.ChatModelsAsync(cts.Token).WaitAsync(ModelsTimeout, ct);
-            return new ChatModels(true, models.Select(m => new ChatModelView(m.Id, m.Provider, m.Model, m.Ready, m.Reason)).ToList());
+            return new ChatModels(true, models.Select(m => new ChatModelView(m.Id, m.Provider, m.Model, m.Ready, m.Reason, m.Automatic)).ToList());
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {

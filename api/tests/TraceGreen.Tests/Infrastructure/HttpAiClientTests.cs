@@ -103,12 +103,22 @@ public class HttpAiClientTests
     public async Task ChatModelsReadsTheList()
     {
         var handler = new CapturingHandler(HttpStatusCode.OK,
-            """{"models":[{"id":"anthropic:claude-x","provider":"anthropic","model":"claude-x","ready":false,"reason":"ANTHROPIC_API_KEY not set"}]}""");
+            """
+            {"models":[
+              {"id":"anthropic:claude-x","provider":"anthropic","model":"claude-x","ready":false,"reason":"ANTHROPIC_API_KEY not set","automatic":true},
+              {"id":"ollama:qwen2.5:14b","provider":"ollama","model":"qwen2.5:14b","ready":true,"reason":null,"automatic":false}
+            ]}
+            """);
 
         var models = await Assist(handler).ChatModelsAsync(CancellationToken.None);
 
         Assert.Equal("/chat/models", handler.Request!.RequestUri!.AbsolutePath);
-        Assert.Equal(new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set"), Assert.Single(models));
+        Assert.Equal(
+            [
+                new ChatModelInfo("anthropic:claude-x", "anthropic", "claude-x", false, "ANTHROPIC_API_KEY not set", true),
+                new ChatModelInfo("ollama:qwen2.5:14b", "ollama", "qwen2.5:14b", true, null, false),
+            ],
+            models);
     }
 
     [Fact]
