@@ -60,6 +60,18 @@ public class TargetFigureTests
     }
 
     [Fact]
+    public void AnAlternativeOfAnotherCategoryNoLongerApplies()
+    {
+        // The node's category was reviewed after the target was set: the alternative supplies another category now.
+        var stale = Seed.Alternatives.First(a => a.NodeCategory != "zinc_diecast");
+        var target = TargetFigure.Compute(N1(new TargetChoice(AlternativeId: stale.Id)), CnRo, ZincDiecast, Seed, Table)!;
+
+        Assert.Null(target.AlternativeId);
+        Assert.True(target.IsDefault);
+        Assert.Equal(TransportMode.Sea, target.Mode);
+    }
+
+    [Fact]
     public void AChoiceTheLaneCannotTakeIsRefused()
     {
         var node = N1();

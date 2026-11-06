@@ -46,8 +46,6 @@ export const CHECK_CATEGORY = 'Check category'
 export const CATEGORY_SET_BY_BUYER = 'Category set by buyer'
 /** F7: the flag on a node whose supplier answers wait for a person (a reduction not backed yet, a contradiction, a weak score). */
 export const CHECK_ANSWERS = 'Check answers'
-/** F7: the third figure of a node, the best state the delivery could reach; illustrative like every lane figure. */
-export const TARGET_LABEL = 'Best possible · illustrative'
 
 /** The simulator's MAC badge, by the generated badge value. */
 export const macBadgeLabel = {

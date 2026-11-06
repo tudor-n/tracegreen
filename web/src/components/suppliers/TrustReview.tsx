@@ -204,10 +204,20 @@ function BuyerRecords({ node }: { node: NodeView }) {
   const { evidence } = node
   const recorded = evidence.receivedOn !== null || evidence.customsBorderMode !== null || evidence.customsMrn !== null
   const [open, setOpen] = useState(false)
-  const [receivedOn, setReceivedOn] = useState(evidence.receivedOn ?? '')
-  const [border, setBorder] = useState<TransportMode | ''>(evidence.customsBorderMode ?? '')
-  const [mrn, setMrn] = useState(evidence.customsMrn ?? '')
+  const [receivedOn, setReceivedOn] = useState('')
+  const [border, setBorder] = useState<TransportMode | ''>('')
+  const [mrn, setMrn] = useState('')
   const [demo, setDemo] = useState(false)
+
+  // The form starts from the records as they are when it opens, not when the panel mounted: another tab or person may
+  // have saved records since, and a save sends all three fields.
+  const openForm = () => {
+    setReceivedOn(evidence.receivedOn ?? '')
+    setBorder(evidence.customsBorderMode ?? '')
+    setMrn(evidence.customsMrn ?? '')
+    setDemo(false)
+    setOpen(true)
+  }
   const demoTools = useDemoTools()
   const { phase, busy, run } = useTrustWrite(node)
   const ids = { received: useId(), border: useId(), mrn: useId() }
@@ -216,7 +226,7 @@ function BuyerRecords({ node }: { node: NodeView }) {
 
   const fill = () => {
     const values = demoRecords(mode, node.leadDays, evidence.dispatchDate, node.invoice.issueDate, new Date().toISOString().slice(0, 10))
-    setReceivedOn(values.receivedOn)
+    setReceivedOn(values.receivedOn ?? '')
     setBorder(values.customsBorderMode)
     setMrn(values.customsMrn)
     setDemo(true)
@@ -242,7 +252,7 @@ function BuyerRecords({ node }: { node: NodeView }) {
               )
             : evidenceCopy.recordsPrompt}
         </p>
-        <Button size="sm" variant="outline" data-testid="records-open" onClick={() => setOpen(true)}>
+        <Button size="sm" variant="outline" data-testid="records-open" onClick={openForm}>
           {recorded ? evidenceCopy.editRecords : evidenceCopy.addRecords}
         </Button>
       </div>

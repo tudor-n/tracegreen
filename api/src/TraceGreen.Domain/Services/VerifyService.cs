@@ -137,7 +137,9 @@ public sealed class VerifyService(
         {
             return Fail(new VerifyError(VerifyErrorCode.InvalidAnswer, problem));
         }
-        if (InvalidEvidence(answer, link.Invoice, now) is { } proofProblem)
+        // Cleaned first (ids trimmed and normalised, blanks dropped), so what is checked is what is stored.
+        var evidence = Normalized(answer.Evidence);
+        if (InvalidEvidence(evidence, answer, link.Invoice, now) is { } proofProblem)
         {
             return Fail(new VerifyError(VerifyErrorCode.InvalidEvidence, proofProblem));
         }
@@ -145,21 +147,34 @@ public sealed class VerifyService(
         var node = link.Node;
         var status = Estimate.DeriveStatus(answer.TransportMode, answer.EnergySource);
         var answerIpHash = Hashing.IpHash(clientAddress ?? "unknown", options.IpHashKey);
-        var evidence = Normalized(answer.Evidence);
-        var trust = await TrustAfterAsync(link, answer, evidence, origin, clientAddress is null ? null : answerIpHash, now, ct);
-        var rebuilt = NodeFactory.NewNode(
-            node.Id, link.Invoice, new NodeClassification(node.CategoryId, node.AiConfidence, node.ClassificationSource, node.ClassificationRationale), link.Lane,
-            status, answer.TransportMode, answer.EnergySource, seed, mapper.Factors, node.CreatedAt, answer.MassT ?? node.MassT, trust);
-        var patch = new NodePatch(
-            status, rebuilt.ActivityKg, answer.TransportMode, answer.EnergySource, rebuilt.MassT, rebuilt.CostEur, rebuilt.LeadDays,
-            rebuilt.Trust, rebuilt.CountedKg);
-        var warnings = PlausibilityRules.For(rebuilt, InvoiceFacts.MassTFromLines(link.Invoice.Extracted.Lines), link.Lane);
-        var assessment = TrustAssessor.Assess(rebuilt, link.Invoice, link.Lane, seed.CategoryOf(rebuilt.CategoryId), mapper.Factors)?.Assessment;
+        var context = await AnswerContextAsync(link, answer, origin, clientAddress is null ? null : answerIpHash, now, ct);
+        var invoiceMassT = InvoiceFacts.MassTFromLines(link.Invoice.Extracted.Lines);
+
+        // Computed by the repository from the node as it is under the write's lock, so a buyer's record, a decision or a
+        // category review that landed after this request read the node is kept, and the figures rest on it.
+        IReadOnlyList<PlausibilityWarning> warnings = [];
+        TrustAssessment? assessment = null;
+        NodePatch Patch(SupplierNode current)
+        {
+            var trust = TrustAfter(current, answer, evidence, context);
+            var rebuilt = NodeFactory.NewNode(
+                current.Id, link.Invoice,
+                new NodeClassification(current.CategoryId, current.AiConfidence, current.ClassificationSource, current.ClassificationRationale), link.Lane,
+                status, answer.TransportMode, answer.EnergySource, seed, mapper.Factors, current.CreatedAt, answer.MassT ?? current.MassT, trust);
+            warnings = PlausibilityRules.For(rebuilt, invoiceMassT, link.Lane);
+            assessment = TrustAssessor.Assess(rebuilt, link.Invoice, link.Lane, seed.CategoryOf(rebuilt.CategoryId), mapper.Factors)?.Assessment;
+            return new NodePatch(
+                status, rebuilt.ActivityKg, answer.TransportMode, answer.EnergySource, rebuilt.MassT, rebuilt.CostEur, rebuilt.LeadDays,
+                rebuilt.Trust, rebuilt.CountedKg);
+        }
 
         var verification = new Verification(
             Ids.NewId(), node.WorkspaceId, node.Id, link.Nonce, answer.TransportMode, answer.EnergySource, answer.MassT, now,
             answerIpHash, now, terms.Version, terms.Sha256, evidence);
         // Strings only (see IngestService): jsonb may re-render decimals and break the chain hash. No nonce, no address.
+        // Built when the audit entry is, right after the patch under the same lock, so the warnings and score are the patch's.
+        JsonObject Payload()
+        {
         var payload = new JsonObject
         {
             ["nodeId"] = node.Id.ToString("D"),
@@ -176,16 +191,16 @@ public sealed class VerifyService(
         // the score it got. Business identifiers only: no token, nonce or address.
         if (evidence is not null)
         {
-            payload["shippingDocType"] = evidence.ShippingDocType is { } docType ? Camel(docType.ToString()) : null;
+            payload["shippingDocType"] = evidence.ShippingDocType is { } docType ? TrustAssessor.Camel(docType) : null;
             payload["shippingDocId"] = evidence.ShippingDocId;
             payload["dispatchDate"] = evidence.DispatchDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-            payload["energyCertType"] = evidence.EnergyCertType is { } certType ? Camel(certType.ToString()) : null;
+            payload["energyCertType"] = evidence.EnergyCertType is { } certType ? TrustAssessor.Camel(certType) : null;
             payload["energyCertId"] = evidence.EnergyCertId;
         }
         if (assessment is not null)
         {
             payload["trustScore"] = assessment.Score.ToString(CultureInfo.InvariantCulture);
-            payload["trustBand"] = Camel(assessment.Band.ToString());
+            payload["trustBand"] = TrustAssessor.Camel(assessment.Band);
             payload["trustSignals"] = new JsonArray(assessment.Signals.Select(sig => (JsonNode)JsonValue.Create(SignalName(sig.Code))).ToArray());
         }
         if (answer.Simulated)
@@ -193,8 +208,10 @@ public sealed class VerifyService(
             // The terms were accepted by the demo tool, not by a person at the supplier; the log must not pass it off as one.
             payload["simulated"] = true;
         }
+        return payload;
+        }
         var recorded = await repo.RecordVerificationAsync(
-            link.Ctx, verification, patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", payload),
+            link.Ctx, verification, Patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", Payload()),
             expected, ct);
         if (recorded.Status == RecordVerificationStatus.NodeChanged)
         {
@@ -258,6 +275,10 @@ public sealed class VerifyService(
         {
             return "Answer at least one question.";
         }
+        if (answer.EnergySource is { } energy && !Enum.IsDefined(energy))
+        {
+            return "Unknown power source.";
+        }
         if (answer.TransportMode is { } mode && !Simulator.AvailableModes(lane).Contains(mode))
         {
             return $"Lane {lane.Id} has no {Name(mode)} leg.";
@@ -269,30 +290,32 @@ public sealed class VerifyService(
         return null;
     }
 
-    /// <summary>
-    /// What the trust assessment reads after this answer: the evidence (what this answer gives, plus what an earlier answer
-    /// gave for a question it leaves as it was), how the answer arrived, the buyer's records as they are, and a person's
-    /// decisions, each dropped when the answer it was about changes.
-    /// </summary>
-    private async Task<TrustInputs> TrustAfterAsync(
-        Link link, VerifyAnswer answer, AnswerEvidence? evidence, AnswerOrigin? origin, string? answerIpHash, DateTimeOffset now, CancellationToken ct)
+    /// <summary>How the answer arrived: from the link maker's network, how soon after the link, and the supplier's history.</summary>
+    private async Task<AnswerContext> AnswerContextAsync(
+        Link link, VerifyAnswer answer, AnswerOrigin? origin, string? answerIpHash, DateTimeOffset now, CancellationToken ct)
     {
-        var node = link.Node;
-        var before = node.Trust ?? TrustInputs.None;
-        var modeChanged = node.TransportMode != answer.TransportMode;
-        var energyChanged = node.EnergySource != answer.EnergySource;
-        var massChanged = answer.MassT is not null && answer.MassT != node.MassT;
-
         var issuedAt = origin?.IssuedAt ?? link.ExpiresAt - options.LinkTtl;
         var makerIpHash = origin is null ? origins.MakerOf(LinkOriginStore.VerifyKey(link.Nonce)) : origin.MakerIpHash;
         var (modeChangedOnLane, priorRejection) = await HistoryAsync(link, answer.TransportMode, ct);
-        var context = new AnswerContext(
+        return new AnswerContext(
             SameNetworkAsLinkMaker: makerIpHash is null || answerIpHash is null ? null : string.Equals(makerIpHash, answerIpHash, StringComparison.Ordinal),
             LinkAgeSeconds: (int)Math.Clamp((now - issuedAt).TotalSeconds, 0, int.MaxValue),
             ModeChangedOnLane: modeChangedOnLane,
             PriorRejection: priorRejection,
             Simulated: answer.Simulated);
+    }
 
+    /// <summary>
+    /// What the trust assessment reads after this answer, from the node as it is under the write's lock: the evidence (what
+    /// this answer gives, plus what an earlier answer gave for a question it leaves as it was), how the answer arrived, the
+    /// buyer's records as they are, and a person's decisions, each dropped when the answer it was about changes.
+    /// </summary>
+    private static TrustInputs TrustAfter(SupplierNode current, VerifyAnswer answer, AnswerEvidence? evidence, AnswerContext context)
+    {
+        var before = current.Trust ?? TrustInputs.None;
+        var modeChanged = current.TransportMode != answer.TransportMode;
+        var energyChanged = current.EnergySource != answer.EnergySource;
+        var massChanged = answer.MassT is not null && answer.MassT != current.MassT;
         return before with
         {
             Evidence = AnswerEvidence.Merge(before.Evidence, evidence, modeChanged, energyChanged),
@@ -327,29 +350,42 @@ public sealed class VerifyService(
         return (modeChanged, others.Any(o => o.Trust?.HasRejection == true));
     }
 
-    /// <summary>The evidence with its ids normalised (uppercase, no spaces) and trimmed, or null when it holds nothing.</summary>
+    /// <summary>
+    /// The evidence with blank ids dropped and the rest trimmed and normalised (uppercase, no spaces), or null when nothing
+    /// is left, so proof made of spaces leaves no trace in the row or the audit entry.
+    /// </summary>
     private static AnswerEvidence? Normalized(AnswerEvidence? evidence)
     {
-        if (evidence is null || evidence.IsEmpty)
+        if (evidence is null)
         {
             return null;
         }
-        return evidence with
+        static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        var docId = Clean(evidence.ShippingDocId);
+        var cleaned = evidence with
         {
-            ShippingDocId = evidence.ShippingDocType is { } type && evidence.ShippingDocId is { } id ? DocumentIds.Normalize(type, id) : null,
-            EnergyCertId = evidence.EnergyCertId?.Trim(),
+            ShippingDocId = evidence.ShippingDocType is { } type && docId is { } id ? DocumentIds.Normalize(type, id) : docId,
+            EnergyCertId = Clean(evidence.EnergyCertId),
         };
+        return cleaned.IsEmpty ? null : cleaned;
     }
 
-    /// <summary>Why the evidence cannot be recorded with this answer, or null. The page checks the same rules before it sends.</summary>
-    private static string? InvalidEvidence(VerifyAnswer answer, Invoice invoice, DateTimeOffset now)
+    /// <summary>
+    /// Why the (cleaned) evidence cannot be recorded with this answer, or null. The page checks the same rules before it
+    /// sends. A type outside its list (a number where a name belongs) is refused too.
+    /// </summary>
+    private static string? InvalidEvidence(AnswerEvidence? evidence, VerifyAnswer answer, Invoice invoice, DateTimeOffset now)
     {
-        if (answer.Evidence is not { } evidence || evidence.IsEmpty)
+        if (evidence is null)
         {
             return null;
         }
-        var hasDocId = !string.IsNullOrWhiteSpace(evidence.ShippingDocId);
-        if ((evidence.ShippingDocType is null) == hasDocId)
+        if (evidence.ShippingDocType is { } shownType && !Enum.IsDefined(shownType)
+            || evidence.EnergyCertType is { } certKind && !Enum.IsDefined(certKind))
+        {
+            return "Unknown document or certificate type.";
+        }
+        if ((evidence.ShippingDocType is null) == (evidence.ShippingDocId is not null))
         {
             return "Give the shipping document's type and its number together.";
         }
@@ -363,7 +399,7 @@ public sealed class VerifyService(
             {
                 return $"A {TrustAssessor.Label(type)} does not go with {Name(mode)} freight.";
             }
-            if (DocumentIds.Problem(type, DocumentIds.Normalize(type, evidence.ShippingDocId!)) is { } problem)
+            if (DocumentIds.Problem(type, evidence.ShippingDocId!) is { } problem)
             {
                 return problem;
             }
@@ -380,8 +416,7 @@ public sealed class VerifyService(
                 return "The dispatch date is more than a year before the invoice.";
             }
         }
-        var hasCertId = !string.IsNullOrWhiteSpace(evidence.EnergyCertId);
-        if ((evidence.EnergyCertType is null) == hasCertId)
+        if ((evidence.EnergyCertType is null) == (evidence.EnergyCertId is not null))
         {
             return "Give the certificate's type and its id together.";
         }
@@ -391,7 +426,7 @@ public sealed class VerifyService(
             {
                 return "A certificate goes with a renewable power answer.";
             }
-            if (DocumentIds.CertificateProblem(evidence.EnergyCertId!.Trim()) is { } problem)
+            if (DocumentIds.CertificateProblem(evidence.EnergyCertId!) is { } problem)
             {
                 return problem;
             }
@@ -399,9 +434,7 @@ public sealed class VerifyService(
         return null;
     }
 
-    private static string Name(TransportMode mode) => mode.ToString().ToLowerInvariant();
-
-    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
+    private static string Name(TransportMode mode) => TrustAssessor.Name(mode);
 
     private static string Name(PlausibilityCode code) => code switch
     {

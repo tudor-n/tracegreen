@@ -53,11 +53,9 @@ describe('answers to check', () => {
     expect(answersToCheck(nodes).map((n) => n.id)).toEqual(['risky', 'big', 'small'])
   })
 
-  it('says how many tonnes are at stake, or why they are listed when nothing is', () => {
-    expect(answersBody([node('a', 1, { trust: trust({ kgAtRisk: 3000 }) }), node('b', 1, { trust: trust({ kgAtRisk: 1100 }) })])).toContain(
-      '4.10 tCO₂e',
-    )
-    expect(answersBody([node('a', 1, { trust: trust({ kgAtRisk: 0 }) })])).toContain('contradiction')
+  it('says how many tonnes are at stake, from the API, or why they are listed when nothing is', () => {
+    expect(answersBody(4100)).toContain('4.10 tCO₂e')
+    expect(answersBody(0)).toContain('contradiction')
     expect(ANSWERS_LIST_PATH).toBe('/suppliers?filter=answers')
   })
 })
@@ -75,8 +73,10 @@ describe('claims', () => {
     expect(canDecide(claim({ reduces: false, level: 'notNeeded' }))).toBe(false)
   })
 
-  it('offers none on a partial answer, whose figure is the estimate whatever is decided', () => {
+  it('offers none on a partial answer that lowers the figure, but keeps a contradiction or a decision clearable', () => {
     expect(canDecide(claim(), 'PARTIAL')).toBe(false)
+    expect(canDecide(claim({ level: 'contradicted', review: 'rejected' }), 'PARTIAL')).toBe(true)
+    expect(canDecide(claim({ level: 'reviewed', review: 'accepted', reduces: false }), 'PARTIAL')).toBe(true)
     expect(atRiskLine(trust({ kgAtRisk: 0 }), 'PARTIAL')).toBe('Partial answer: the spend estimate counts until both questions are answered.')
   })
 

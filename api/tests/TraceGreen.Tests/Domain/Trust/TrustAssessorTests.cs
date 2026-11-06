@@ -209,6 +209,28 @@ public class TrustAssessorTests
     }
 
     [Fact]
+    public void AShippingMassWithNoInvoiceMassToCompareNeedsBackingToo()
+    {
+        // The invoice counts pieces, not kilograms, so only the supplier's mass gives an activity figure.
+        var xml = File.ReadAllText(TestPaths.Invoice("N1-shenzhen.xml")).Replace("unitCode=\"KGM\"", "unitCode=\"H87\"");
+        var invoice = NodeFactory.NewInvoice(Guid.NewGuid(), Ids.DemoWorkspace, new UblInvoiceParser().Parse(xml).Value, xml, DateTimeOffset.UnixEpoch);
+        var node = NodeFactory.NewNode(
+            Guid.NewGuid(), invoice, ZincDiecast, CnRo, NodeStatus.Verified, TransportMode.Air, EnergySource.Grid, Seed, Table,
+            DateTimeOffset.UnixEpoch, confirmedMassT: 0.001m);
+        var result = TrustAssessor.Assess(node, invoice, CnRo, Seed.CategoryOf("zinc_diecast"), Table)!;
+
+        var mass = Claim(result, ClaimKind.Mass);
+        Assert.Equal(EvidenceLevel.Unproven, mass.Level);
+        Assert.True(mass.Reduces);
+        // Until something backs it, no activity figure counts: the spend estimate stands.
+        Assert.Equal(node.SpendKg, result.CountedKg);
+        Assert.Equal(node.SpendKg, node.CarbonKg);
+        Assert.Null(result.CountedState.MassT);
+        Assert.Equal(node.SpendKg - result.ClaimedKg, result.Assessment.KgAtRisk);
+        Assert.True(result.Assessment.NeedsReview);
+    }
+
+    [Fact]
     public void HowTheAnswerArrivedTakesPointsOffTheChannelPart()
     {
         var context = new AnswerContext(SameNetworkAsLinkMaker: true, LinkAgeSeconds: 30, ModeChangedOnLane: false, PriorRejection: false, Simulated: false);

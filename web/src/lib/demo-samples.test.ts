@@ -21,8 +21,12 @@ describe('demo samples', () => {
       customsMrn: '26RODEMO0000000001',
     })
     expect(demoRecords('air', 7, null, '2026-10-05', '2026-11-07').receivedOn).toBe('2026-10-12')
-    // Never in the future: the API refuses that.
-    expect(demoRecords('sea', 40, null, '2026-10-28', '2026-11-07').receivedOn).toBe('2026-11-07')
+    // Not yet arrived by sea: no receipt at all, since one pulled back to today would read as too fast for sea.
+    expect(demoRecords('sea', 40, '2026-10-28', '2026-10-28', '2026-11-07')).toEqual({
+      receivedOn: null,
+      customsBorderMode: 'sea',
+      customsMrn: '26RODEMO0000000001',
+    })
     expect(addDays('2026-12-30', 3)).toBe('2027-01-02')
   })
 })

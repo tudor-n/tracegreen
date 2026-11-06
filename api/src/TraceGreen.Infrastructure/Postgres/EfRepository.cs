@@ -100,7 +100,7 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
     }
 
     public async Task<RecordVerificationResult> RecordVerificationAsync(
-        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
+        Ctx ctx, Verification verification, VerificationPatcher build, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -119,7 +119,7 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         {
             return new RecordVerificationResult(RecordVerificationStatus.NodeChanged, current, null);
         }
-        Mapping.Apply(nodeRow, patch);
+        Mapping.Apply(nodeRow, build(current));
         db.Verifications.Add(Mapping.ToRow(verification));
         var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, audit, ct);
         try

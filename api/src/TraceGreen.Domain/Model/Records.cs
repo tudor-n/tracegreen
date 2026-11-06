@@ -131,6 +131,13 @@ public sealed record NodePatch(
     decimal? CountedKg = null);
 
 /// <summary>
+/// Computes a verification's patch from the node as the repository holds it under the write's lock, so the answer's trust
+/// inputs keep a buyer's record or decision that landed after the caller read the node, and the figures rest on its
+/// current category (F7).
+/// </summary>
+public delegate NodePatch VerificationPatcher(SupplierNode current);
+
+/// <summary>
 /// A change to what a node's trust assessment reads (the buyer's records, a person's decision on a claim) or to its target,
 /// with the counted figure recomputed from it and the audit entry that records it. Written whole: the computing side copies
 /// what it does not change from the node it was given.

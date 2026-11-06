@@ -31,8 +31,7 @@ public static class PlausibilityRules
                 PlausibilityCode.AirHeavy,
                 string.Create(CultureInfo.InvariantCulture, $"Air freight confirmed for {massT:0.###} t; more than {AirHeavyThresholdT} t by air is unusual.")));
         }
-        if (confirmedMode == TransportMode.Sea && transitDays is { } days and >= 0 && seaLeadDays is { } lead
-            && days < lead * TrustPolicy.TransitTooFastShare)
+        if (confirmedMode == TransportMode.Sea && transitDays is { } days && seaLeadDays is { } lead && TrustAssessor.TooFast(days, lead))
         {
             warnings.Add(new PlausibilityWarning(
                 PlausibilityCode.SeaTooFast,

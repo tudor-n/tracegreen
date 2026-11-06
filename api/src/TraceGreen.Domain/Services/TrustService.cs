@@ -49,6 +49,10 @@ public sealed partial class TrustService(
         {
             normalized = normalized with { CustomsMrn = null };
         }
+        if (normalized.CustomsBorderMode is { } border && !Enum.IsDefined(border))
+        {
+            return Fail(TrustErrorCode.InvalidRecord, "Unknown transport mode.");
+        }
         if (RecordProblem(normalized, loaded.Invoice, now) is { } problem)
         {
             return Fail(TrustErrorCode.InvalidRecord, problem);
@@ -86,6 +90,10 @@ public sealed partial class TrustService(
     public async Task<Result<NodeView, TrustError>> ReviewClaimAsync(
         Ctx ctx, Guid nodeId, ClaimKind kind, ClaimDecision decision, string expectedValue, CancellationToken ct)
     {
+        if (!Enum.IsDefined(kind) || !Enum.IsDefined(decision))
+        {
+            return Fail(TrustErrorCode.NoClaim, "Unknown answer or decision.");
+        }
         if (await LoadAsync(ctx, nodeId, ct) is not { } loaded)
         {
             return NotFound(nodeId);
@@ -113,7 +121,7 @@ public sealed partial class TrustService(
                 ["claim"] = Name(kind),
                 ["value"] = claim.Value,
                 ["decision"] = decision == ClaimDecision.Accepted ? "accepted" : "rejected",
-                ["fromLevel"] = Camel(claim.Level.ToString()),
+                ["fromLevel"] = TrustAssessor.Camel(claim.Level),
             };
             return new TrustWrite(trust, Counted(current with { Trust = trust }, loaded), current.Target, Audit(ctx, now, ClaimAction, payload));
         }
@@ -213,8 +221,6 @@ public sealed partial class TrustService(
     }
 
     private static string Name(ClaimKind kind) => kind.ToString().ToLowerInvariant();
-
-    private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 
     private static Result<NodeView, TrustError> NotFound(Guid nodeId) => Fail(TrustErrorCode.NodeNotFound, $"No node {nodeId} on the graph.");
 

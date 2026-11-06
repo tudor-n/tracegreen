@@ -270,6 +270,61 @@ public class TrustEndpointTests : IClassFixture<VerifyWebAppFactory>
     }
 
     [Fact]
+    public async Task TheSimulatorKeepsTheAnswersTheCountedFigureRestsOn()
+    {
+        await Reset();
+        await Submit(N3, "road", "renewable");
+        var node = await Node(N3);
+
+        // Road is N3's mode already: an unbacked renewable answer must not show up as a saving of the "change".
+        var result = await Json(await _client.PostAsJsonAsync("/api/simulate", new { nodeId = N3, mode = "road" }, Ct));
+
+        Assert.Equal(node.GetProperty("carbonKg").GetDecimal(), result.GetProperty("carbonKg").GetDecimal());
+        Assert.Equal(0m, result.GetProperty("delta").GetProperty("carbonKg").GetDecimal());
+    }
+
+    [Fact]
+    public async Task TheFactorRowsAreThoseOfTheFigureThatCounts()
+    {
+        await Reset();
+        Assert.Equal(HttpStatusCode.Created, (await _client.PostAsync("/api/ingest/demo", null, Ct)).StatusCode);
+        var n1 = Guid.Parse("11111111-1111-4111-8111-000000000001");
+        await Submit(n1, "sea", "grid");
+
+        var node = await Node(n1);
+
+        // Sea is not backed yet, so N1 counts air: the figure and its transport row are air's.
+        var activity = node.GetProperty("activity");
+        Assert.Equal(node.GetProperty("carbonKg").GetDecimal(), activity.GetProperty("kg").GetDecimal());
+        var transport = activity.GetProperty("factors")[0];
+        Assert.Equal(0.5313m, transport.GetProperty("value").GetDecimal());
+    }
+
+    [Fact]
+    public async Task ANumberInPlaceOfATypeNameIsRefused()
+    {
+        await Reset();
+
+        var response = await Submit(N3, "road", "renewable", new { energyCertType = 42, energyCertId = "ABCD1234" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(NodeStatus.Estimated, (await Repo.GetNodeAsync(Ctx, N3, Ct))!.Status);
+    }
+
+    [Fact]
+    public async Task ProofMadeOfSpacesLeavesNoTrace()
+    {
+        await Reset();
+
+        var response = await Submit(N3, "road", "grid", new { shippingDocId = "   ", energyCertId = "  " });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(Assert.Single(await Repo.ListVerificationsAsync(Ctx, N3, Ct)).Evidence);
+        var entry = (await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Last(a => a.Action == "verification.submitted");
+        Assert.False(entry.Payload.AsObject().ContainsKey("shippingDocId"));
+    }
+
+    [Fact]
     public async Task TheBuyerSetsAndClearsTheTarget()
     {
         await Reset();

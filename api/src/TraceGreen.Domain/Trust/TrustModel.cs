@@ -197,5 +197,15 @@ public sealed record TrustAssessment(
     IReadOnlyList<ClaimAssessment> Claims,
     IReadOnlyList<TrustSignal> Signals);
 
-/// <summary>The assessment and the two activity figures behind it: as the supplier claimed, and as counted.</summary>
-public sealed record TrustResult(TrustAssessment Assessment, decimal? ClaimedKg, decimal? CountedKg);
+/// <summary>
+/// The answers an activity figure is computed from: the mode, the power source and the mass. A null mass means no
+/// activity figure: the spend estimate stands.
+/// </summary>
+public sealed record ActivityState(TransportMode Mode, EnergySource? Energy, decimal? MassT);
+
+/// <summary>
+/// The assessment and the two activity figures behind it: as the supplier claimed, and as counted (null unless the node
+/// is VERIFIED). <see cref="CountedState"/> is what the counted figure rests on: each answer nothing backs yet replaced by
+/// its fallback. The simulator and the factor rows on screen use it, so they describe the figure that counts.
+/// </summary>
+public sealed record TrustResult(TrustAssessment Assessment, decimal? ClaimedKg, decimal? CountedKg, ActivityState CountedState);

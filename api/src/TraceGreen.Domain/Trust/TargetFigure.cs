@@ -25,6 +25,14 @@ public static class TargetFigure
     public static TargetView? Compute(SupplierNode node, Lane lane, Category category, SeedBundle seed, FactorTable table)
     {
         var choice = node.Target;
+        // An alternative that no longer supplies the node's category (after a category review) no longer applies: the
+        // target goes on without it, and says it is the default when nothing else was chosen.
+        if (choice?.AlternativeId is { } staleId
+            && !(seed.Alternatives.FirstOrDefault(a => a.Id == staleId && a.NodeCategory == node.CategoryId) is { } usable
+                && seed.Lanes.Any(l => l.Id == usable.LaneId)))
+        {
+            choice = choice with { AlternativeId = null };
+        }
         var energy = choice?.Energy ?? EnergySource.Renewable;
         if (choice?.AlternativeId is { } alternativeId
             && seed.Alternatives.FirstOrDefault(a => a.Id == alternativeId && a.NodeCategory == node.CategoryId) is { } alternative
@@ -52,6 +60,10 @@ public static class TargetFigure
     /// <summary>Why <paramref name="choice"/> cannot be the node's target, or null when it can.</summary>
     public static (TargetProblem Problem, string Message)? Problem(SupplierNode node, Lane lane, TargetChoice choice, SeedBundle seed)
     {
+        if (choice.Mode is { } anyMode && !Enum.IsDefined(anyMode) || choice.Energy is { } anyEnergy && !Enum.IsDefined(anyEnergy))
+        {
+            return (TargetProblem.InvalidChange, "Unknown mode or power source.");
+        }
         if (choice.AlternativeId is { } alternativeId)
         {
             var alternative = seed.Alternatives.FirstOrDefault(a => a.Id == alternativeId);
@@ -63,7 +75,10 @@ public static class TargetFigure
             {
                 return (TargetProblem.InvalidChange, $"Alternative {alternativeId} is for {alternative.NodeCategory}, not {node.CategoryId}.");
             }
-            var alternativeLane = seed.Lanes.First(l => l.Id == alternative.LaneId);
+            if (seed.Lanes.FirstOrDefault(l => l.Id == alternative.LaneId) is not { } alternativeLane)
+            {
+                return (TargetProblem.InvalidChange, $"Alternative {alternativeId} has no lane.");
+            }
             if (choice.Mode is { } m && !Simulator.AvailableModes(alternativeLane).Contains(m))
             {
                 return (TargetProblem.ModeNotAvailable, $"Lane {alternativeLane.Id} has no {TrustAssessor.Name(m)} leg.");

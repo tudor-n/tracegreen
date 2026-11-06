@@ -70,12 +70,13 @@ public interface IRepository
     /// </summary>
     Task<InsertInvoiceResult> InsertInvoiceWithNodeAsync(Ctx ctx, Invoice invoice, SupplierNode node, AuditBuilder audit, CancellationToken ct);
 
+    /// <param name="patch">Called under the write's lock with the node as stored, after the nonce and expected-state checks, and before <paramref name="audit"/>.</param>
     /// <param name="expected">
     /// When set, the write happens only if the node still has this status and these answers; otherwise
     /// <see cref="RecordVerificationStatus.NodeChanged"/> with nothing written. Null writes whatever the node holds (the phone page).
     /// </param>
     Task<RecordVerificationResult> RecordVerificationAsync(
-        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct);
+        Ctx ctx, Verification verification, VerificationPatcher patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct);
 
     Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct);
 

@@ -37,11 +37,15 @@ export function claimValueLabel(claim: Pick<ClaimAssessment, 'kind' | 'value'>):
 }
 
 /**
- * A person may decide an answer that changes the figure or that something contradicts, once the node is VERIFIED. A
- * partial answer leaves the node on its spend estimate, so a decision there would change no figure.
+ * A person may decide an answer that something contradicts, or change a decision already made, whatever the node's
+ * status (a rejection kept through a partial answer must stay clearable); and an answer that lowers the figure once the
+ * node is VERIFIED. On a partial answer that lowers it, a decision would change no figure, so none is offered.
  */
-export function canDecide(claim: Pick<ClaimAssessment, 'reduces' | 'level'>, status: NodeView['status'] = 'VERIFIED'): boolean {
-  return status === 'VERIFIED' && (claim.reduces || claim.level === 'contradicted')
+export function canDecide(
+  claim: Pick<ClaimAssessment, 'reduces' | 'level' | 'review'>,
+  status: NodeView['status'] = 'VERIFIED',
+): boolean {
+  return claim.level === 'contradicted' || claim.review !== null || (status === 'VERIFIED' && claim.reduces)
 }
 
 /**
@@ -63,10 +67,9 @@ export function atRiskLine(
   return trustCopy.atRisk(gap)
 }
 
-/** The Overview counter's body: the tonnes at stake across the answers to check. */
-export function answersBody(nodes: readonly Pick<NodeView, 'trust'>[]): string {
-  const kg = nodes.reduce((sum, n) => sum + (n.trust?.kgAtRisk ?? 0), 0)
-  return kg > 0 ? answersCopy.countBody(formatTonnesCo2e(kg)) : answersCopy.countBodyNoRisk
+/** The Overview counter's body: the API's tonnes at stake (`kpis.kgAtRisk`), or why the answers are listed when none are. */
+export function answersBody(kgAtRisk: number): string {
+  return kgAtRisk > 0 ? answersCopy.countBody(formatTonnesCo2e(kgAtRisk)) : answersCopy.countBodyNoRisk
 }
 
 /**

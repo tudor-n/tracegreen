@@ -48,10 +48,11 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * The buyer's demo records for a delivery: received the claimed mode's lead time after dispatch (or after the invoice
- * date, when the supplier gave no dispatch date), never after `today` (the API refuses a receipt in the future), with
- * that mode at the border and a demo MRN, so the transport answer matches them. Choosing another border mode afterwards
- * shows a contradiction.
+ * The buyer's demo records for a delivery: the answered mode at the border and a demo MRN, so the transport answer
+ * matches them, and a receipt the claimed mode's lead time after dispatch (or after the invoice date, when the supplier
+ * gave no dispatch date). When that receipt would still be in the future, none is filled: a receipt pulled back to today
+ * would make the transit too short for the mode and contradict the very answer the demo backs. Choosing another border
+ * mode afterwards shows a contradiction.
  */
 export function demoRecords(
   mode: TransportMode,
@@ -59,11 +60,11 @@ export function demoRecords(
   dispatchDate: string | null,
   issueDate: string,
   today: string,
-): { receivedOn: string; customsBorderMode: TransportMode; customsMrn: string } {
+): { receivedOn: string | null; customsBorderMode: TransportMode; customsMrn: string } {
   const start = dispatchDate ?? issueDate
   const received = addDays(start, leadDays)
   return {
-    receivedOn: received > today ? today : received,
+    receivedOn: received > today ? null : received,
     customsBorderMode: mode,
     customsMrn: demoMrn(Number(start.slice(0, 4))),
   }

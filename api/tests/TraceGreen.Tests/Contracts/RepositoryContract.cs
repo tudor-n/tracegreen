@@ -33,6 +33,9 @@ public abstract class RepositoryContract
 
     private static readonly NodePatch VerifiedPatch = new(NodeStatus.Verified, 123m, TransportMode.Road, EnergySource.Grid, 1.4m, 4321m, 3);
 
+    /// <summary>A patcher that ignores the node it is given: for tests about the write itself, not what it computes.</summary>
+    private static VerificationPatcher Always(NodePatch patch) => _ => patch;
+
     private static async Task<IReadOnlyList<AuditEntry>> AllAudit(IRepository repo) =>
         await repo.ListAuditAsync(Ctx, 0, 10_000, CancellationToken.None);
 
@@ -115,7 +118,7 @@ public abstract class RepositoryContract
         Assert.Equal("Zinc die-cast casing, sensor alloy", (await repo.GetNodeAsync(Ctx, node.Id, CancellationToken.None))!.ClassificationRationale);
 
         var recorded = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(node.Id, "nonce-reason" + Ids.NewId().ToString("N")), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+            Ctx, NewVerification(node.Id, "nonce-reason" + Ids.NewId().ToString("N")), Always(VerifiedPatch), Audit("verification.submitted"), null, CancellationToken.None);
         Assert.Equal(RecordVerificationStatus.Ok, recorded.Status);
         Assert.Equal("Zinc die-cast casing, sensor alloy", (await repo.GetNodeAsync(Ctx, node.Id, CancellationToken.None))!.ClassificationRationale);
     }
@@ -182,7 +185,7 @@ public abstract class RepositoryContract
         var repo = await MakeAsync();
         var auditBefore = (await AllAudit(repo)).Count;
 
-        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "fresh-nonce-1"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "fresh-nonce-1"), Always(VerifiedPatch), Audit("verification.submitted"), null, CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.Ok, result.Status);
         Assert.Equal(NodeStatus.Verified, result.Node!.Status);
@@ -220,7 +223,7 @@ public abstract class RepositoryContract
         var auditBefore = (await AllAudit(repo)).Count;
         var usedNonce = Bundle.DemoState.Nodes.Single(n => n.Key == "N2").Nonce!;
 
-        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, usedNonce), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, usedNonce), Always(VerifiedPatch), Audit("verification.submitted"), null, CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.AlreadyUsed, result.Status);
         Assert.Null(result.Node);
@@ -234,7 +237,7 @@ public abstract class RepositoryContract
         var repo = await MakeAsync();
 
         var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(_ =>
-            Task.Run(() => repo.RecordVerificationAsync(Ctx, NewVerification(N3, "race-nonce"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None))));
+            Task.Run(() => repo.RecordVerificationAsync(Ctx, NewVerification(N3, "race-nonce"), Always(VerifiedPatch), Audit("verification.submitted"), null, CancellationToken.None))));
 
         Assert.Equal(1, results.Count(r => r.Status == RecordVerificationStatus.Ok));
         Assert.Equal(9, results.Count(r => r.Status == RecordVerificationStatus.AlreadyUsed));
@@ -249,7 +252,7 @@ public abstract class RepositoryContract
         var repo = await MakeAsync();
 
         var result = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "expected-ok"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
+            Ctx, NewVerification(N3, "expected-ok"), Always(VerifiedPatch), Audit("verification.submitted"), Unanswered, CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.Ok, result.Status);
         Assert.Equal(NodeStatus.Verified, (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!.Status);
@@ -260,14 +263,14 @@ public abstract class RepositoryContract
     {
         var repo = await MakeAsync();
         var first = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "first"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
+            Ctx, NewVerification(N3, "first"), Always(VerifiedPatch), Audit("verification.submitted"), Unanswered, CancellationToken.None);
         Assert.Equal(RecordVerificationStatus.Ok, first.Status);
         var auditBefore = (await AllAudit(repo)).Count;
         var otherPatch = VerifiedPatch with { EnergySource = EnergySource.Renewable, ActivityKg = 99m };
 
         // Built on the node as it was before the first answer.
         var stale = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "stale"), otherPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None);
+            Ctx, NewVerification(N3, "stale"), Always(otherPatch), Audit("verification.submitted"), Unanswered, CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.NodeChanged, stale.Status);
         Assert.Null(stale.Entry);
@@ -278,7 +281,7 @@ public abstract class RepositoryContract
         Assert.Equal(auditBefore, (await AllAudit(repo)).Count);
         // The refused answer did not use up its nonce.
         var retried = await repo.RecordVerificationAsync(
-            Ctx, NewVerification(N3, "stale"), otherPatch, Audit("verification.submitted"), NodeAnswerState.Of(stored), CancellationToken.None);
+            Ctx, NewVerification(N3, "stale"), Always(otherPatch), Audit("verification.submitted"), NodeAnswerState.Of(stored), CancellationToken.None);
         Assert.Equal(RecordVerificationStatus.Ok, retried.Status);
     }
 
@@ -289,7 +292,7 @@ public abstract class RepositoryContract
 
         var results = await Task.WhenAll(Enumerable.Range(0, 10).Select(i =>
             Task.Run(() => repo.RecordVerificationAsync(
-                Ctx, NewVerification(N3, $"same-state-{i}"), VerifiedPatch, Audit("verification.submitted"), Unanswered, CancellationToken.None))));
+                Ctx, NewVerification(N3, $"same-state-{i}"), Always(VerifiedPatch), Audit("verification.submitted"), Unanswered, CancellationToken.None))));
 
         Assert.Equal(1, results.Count(r => r.Status == RecordVerificationStatus.Ok));
         Assert.Equal(9, results.Count(r => r.Status == RecordVerificationStatus.NodeChanged));
@@ -429,7 +432,7 @@ public abstract class RepositoryContract
     public async Task ReviewSeesAVerificationThatLandedBeforeIt()
     {
         var repo = await MakeAsync();
-        await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "before-review"), VerifiedPatch, Audit("verification.submitted"), null, CancellationToken.None);
+        await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "before-review"), Always(VerifiedPatch), Audit("verification.submitted"), null, CancellationToken.None);
         SupplierNode? seen = null;
 
         await repo.ReviewClassificationAsync(Ctx, N3, "wire_harness", current =>
@@ -547,7 +550,7 @@ public abstract class RepositoryContract
         var verification = NewVerification(N3, "nonce-evidence") with { Evidence = SomeTrust.Evidence };
         var patch = VerifiedPatch with { Trust = SomeTrust, CountedKg = 150m };
 
-        var result = await repo.RecordVerificationAsync(Ctx, verification, patch, Audit("verification.submitted"), null, CancellationToken.None);
+        var result = await repo.RecordVerificationAsync(Ctx, verification, Always(patch), Audit("verification.submitted"), null, CancellationToken.None);
 
         Assert.Equal(RecordVerificationStatus.Ok, result.Status);
         Assert.Equal(SomeTrust, result.Node!.Trust);
@@ -557,6 +560,25 @@ public abstract class RepositoryContract
         Assert.Equal(150m, stored.CarbonKg);
         var kept = Assert.Single(await repo.ListVerificationsAsync(Ctx, N3, CancellationToken.None));
         Assert.Equal(SomeTrust.Evidence, kept.Evidence);
+    }
+
+    [Fact]
+    public async Task AVerificationIsComputedFromTheNodeAsStoredUnderTheLock()
+    {
+        var repo = await MakeAsync();
+        var records = new BuyerRecords(new DateOnly(2026, 11, 2), TransportMode.Road, null);
+        await repo.UpdateTrustAsync(Ctx, N3, _ => new TrustWrite(new TrustInputs(Records: records), null, null, Audit("receipt.recorded")), CancellationToken.None);
+        SupplierNode? seen = null;
+
+        var result = await repo.RecordVerificationAsync(Ctx, NewVerification(N3, "under-lock"), current =>
+        {
+            seen = current;
+            return VerifiedPatch with { Trust = current.Trust };
+        }, Audit("verification.submitted"), null, CancellationToken.None);
+
+        Assert.Equal(RecordVerificationStatus.Ok, result.Status);
+        Assert.Equal(records, seen!.Trust!.Records);
+        Assert.Equal(records, (await repo.GetNodeAsync(Ctx, N3, CancellationToken.None))!.Trust!.Records);
     }
 
     [Fact]

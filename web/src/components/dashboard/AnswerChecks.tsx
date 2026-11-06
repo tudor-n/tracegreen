@@ -9,7 +9,7 @@ import { useGraphStore } from '@/store'
 // or a weak score. It opens the supplier list filtered to them, the most kilograms at risk first, with the side panel
 // closed. Nothing when no answer waits. Test hook: `overview-answers` with `data-count`.
 
-export function AnswerChecks({ nodes }: { nodes: readonly NodeView[] }) {
+export function AnswerChecks({ nodes, kgAtRisk }: { nodes: readonly NodeView[]; kgAtRisk: number }) {
   const select = useGraphStore((s) => s.select)
   if (nodes.length === 0) return null
   return (
@@ -23,7 +23,7 @@ export function AnswerChecks({ nodes }: { nodes: readonly NodeView[] }) {
       <CircleAlertIcon className="size-5 shrink-0" strokeWidth={2.2} aria-hidden />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[17px] font-semibold tracking-[-0.015em]">{answersCopy.count(nodes.length)}</span>
-        <span className="text-sm">{answersBody(nodes)}</span>
+        <span className="text-sm">{answersBody(kgAtRisk)}</span>
       </span>
       <ChevronRightIcon className="size-5 shrink-0" aria-hidden />
     </Link>

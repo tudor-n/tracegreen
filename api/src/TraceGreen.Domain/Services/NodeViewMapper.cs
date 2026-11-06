@@ -34,9 +34,14 @@ public sealed class NodeViewMapper
         var mode = node.TransportMode ?? lane.ModeDefault;
 
         var spend = new CarbonFigure(node.SpendKg, Factors.SpendInputs(node.SectorId, invoice.IssueDate).ToList());
-        var activity = node.ActivityKg is { } activityKg
-            ? new CarbonFigure(activityKg, Rows(
-                (FactorKind.Transport, FactorTable.TransportKey(mode)),
+        var trust = TrustAssessor.Assess(node, invoice, lane, category, Factors);
+        // F7: a verified node's activity figure is the counted one, so its rows are those of the state it is counted from
+        // (an unbacked mode counts the lane's default mode's row). When no mass backs it, no activity figure counts and the
+        // spend estimate stands.
+        var counted = node.Status == NodeStatus.Verified ? trust?.CountedState : null;
+        var activity = node.ActivityKg is { } activityKg && counted is not { MassT: null }
+            ? new CarbonFigure(node.Status == NodeStatus.Verified ? node.CarbonKg : activityKg, Rows(
+                (FactorKind.Transport, FactorTable.TransportKey(counted?.Mode ?? mode)),
                 (FactorKind.Material, category.MaterialKey)))
             : null;
         var basis = node.Status == NodeStatus.Verified && activity is not null ? CarbonBasis.Activity : CarbonBasis.Spend;
@@ -69,7 +74,6 @@ public sealed class NodeViewMapper
             DistanceKm: lane.DistanceKm.GetValueOrDefault(mode),
             Illustrative: true);
 
-        var trust = TrustAssessor.Assess(node, invoice, lane, category, Factors);
         var figures = new NodeFigures(
             EstimateKg: node.SpendKg,
             ClaimedKg: trust?.ClaimedKg,

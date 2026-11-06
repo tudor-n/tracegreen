@@ -41,7 +41,7 @@ export default function Overview() {
     body = (
       <>
         <CategoryChecks count={checks} />
-        <AnswerChecks nodes={answers} />
+        <AnswerChecks nodes={answers} kgAtRisk={kpis.kgAtRisk} />
         <Cards kpis={kpis} next={next} />
       </>
     )

@@ -27,19 +27,26 @@ public static class TrustAssessor
         var invoiceMassT = InvoiceFacts.MassTFromLines(invoice.Extracted.Lines);
         var transitDays = TransitDays(inputs);
         var mode = node.TransportMode ?? lane.ModeDefault;
-        var claimed = new State(mode, node.EnergySource, node.MassT);
-        var fallback = new State(
+        var claimed = new ActivityState(mode, node.EnergySource, node.MassT);
+        // A mass is the supplier's own when it differs from the invoice's, or when the invoice gives none. Its fallback is
+        // the invoice's mass when larger; with no invoice mass, no activity figure at all, so the spend estimate stands.
+        var fallback = new ActivityState(
             lane.ModeDefault,
             node.EnergySource is null ? null : EnergySource.Grid,
-            node.MassT is { } m && invoiceMassT is { } im && m < im ? im : node.MassT);
+            node.MassT is { } m && invoiceMassT is { } im && m < im ? im
+            : invoiceMassT is null ? null
+            : node.MassT);
 
-        decimal? Activity(State s) => s.MassT is not { } massT
+        decimal? Activity(ActivityState s) => s.MassT is not { } massT
             ? null
             : Estimate.ActivityBasedKg(
                 new ActivityInput(massT, lane.DistanceKm.GetValueOrDefault(s.Mode) ?? 0m, s.Mode, category.MaterialKey, s.Energy), table).TotalKg;
 
+        // The figure a state gives: its activity figure, or the spend estimate when it has no mass.
+        decimal Figure(ActivityState s) => Activity(s) ?? node.SpendKg;
+
         var claimedKg = Activity(claimed);
-        decimal Impact(State substituted) => claimedKg is { } c && Activity(substituted) is { } s ? Math.Max(0m, s - c) : 0m;
+        decimal Impact(ActivityState substituted) => claimedKg is { } c ? Math.Max(0m, Figure(substituted) - c) : 0m;
 
         var claims = new List<ClaimAssessment>();
         if (node.TransportMode is { } claimedMode)
@@ -52,10 +59,10 @@ public static class TrustAssessor
             var impact = Impact(claimed with { Energy = fallback.Energy });
             claims.Add(EnergyClaim(energy, impact, inputs));
         }
-        if (node.MassT is { } massT && invoiceMassT is { } invoiceMass && massT != invoiceMass)
+        if (node.MassT is { } massT && invoiceMassT != massT)
         {
             var impact = Impact(claimed with { MassT = fallback.MassT });
-            claims.Add(MassClaim(massT, invoiceMass, impact, inputs));
+            claims.Add(MassClaim(massT, invoiceMassT, impact, inputs));
         }
 
         // The counted figure keeps the fallback of every reduction nothing backs yet, all at once.
@@ -70,7 +77,7 @@ public static class TrustAssessor
             };
         }
         var verified = node.Status == NodeStatus.Verified && node.ActivityKg is not null;
-        var countedKg = verified ? Activity(counted) : null;
+        var countedKg = verified ? Figure(counted) : (decimal?)null;
         var kgAtRisk = verified && claimedKg is { } ck && countedKg is { } cn ? Math.Max(0m, cn - ck) : 0m;
 
         var signals = Signals(node, invoice, inputs);
@@ -83,7 +90,7 @@ public static class TrustAssessor
         // a verified node waits for one whenever a reduction is not backed or the band says so.
         var needsReview = verified ? band == TrustBand.Review || kgAtRisk > 0m : contradicted;
         var assessment = new TrustAssessment(score, band, kgAtRisk, needsReview, claims, signals);
-        return new TrustResult(assessment, verified ? claimedKg : null, countedKg);
+        return new TrustResult(assessment, verified ? claimedKg : null, countedKg, counted);
     }
 
     /// <summary>The claim's current value as text, which a person's decision must name (stale pages are refused).</summary>
@@ -115,7 +122,7 @@ public static class TrustAssessor
             reasons.Add(new(ClaimReasonCode.CustomsDisagrees, $"The customs declaration gives {Name(b)} at the border, not {Name(mode)}."));
             contradicted = true;
         }
-        if (transitDays is { } days and >= 0 && lead is { } l && days < l * TrustPolicy.TransitTooFastShare)
+        if (transitDays is { } days && lead is { } l && TooFast(days, l))
         {
             reasons.Add(new(ClaimReasonCode.TransitTooFast, $"Received {days} days after dispatch; {Name(mode)} takes about {l} days on this lane."));
             contradicted = true;
@@ -185,13 +192,17 @@ public static class TrustAssessor
         return new ClaimAssessment(ClaimKind.Energy, Name(energy), level, impact > 0m, impact, review, reasons);
     }
 
-    private static ClaimAssessment MassClaim(decimal massT, decimal invoiceMassT, decimal impact, TrustInputs inputs)
+    private static ClaimAssessment MassClaim(decimal massT, decimal? invoiceMass, decimal impact, TrustInputs inputs)
     {
         var reasons = new List<ClaimReason>();
         var review = inputs.MassReview;
         var value = massT.ToString(CultureInfo.InvariantCulture);
         var contradicted = false;
-        if (massT < invoiceMassT)
+        if (invoiceMass is not { } invoiceMassT)
+        {
+            // Nothing on the invoice to compare it with: Decide marks it unproven, or nothing to back if it raises the figure.
+        }
+        else if (massT < invoiceMassT)
         {
             reasons.Add(new(ClaimReasonCode.MassBelowInvoice, Invariant($"{massT:0.###} t shipped is less than the invoice's {invoiceMassT:0.###} t of goods.")));
             contradicted = true;
@@ -295,7 +306,18 @@ public static class TrustAssessor
     private static bool Fits(int days, int leadDays) =>
         days >= leadDays * TrustPolicy.TransitTooFastShare && days <= leadDays * TrustPolicy.TransitFitsUpTo;
 
-    private sealed record State(TransportMode Mode, EnergySource? Energy, decimal? MassT);
+    /// <summary>
+    /// The one transit rule, shared with <c>SEA_TOO_FAST</c>: received in under half the mode's lead time. A negative
+    /// transit (received before dispatch) is a data error, signalled apart, never a contradiction.
+    /// </summary>
+    public static bool TooFast(int transitDays, int leadDays) => transitDays >= 0 && transitDays < leadDays * TrustPolicy.TransitTooFastShare;
+
+    /// <summary>An enum value as the wire spells it: "containerNumber", "strong".</summary>
+    public static string Camel<TEnum>(TEnum value) where TEnum : struct, Enum
+    {
+        var name = value.ToString();
+        return char.ToLowerInvariant(name[0]) + name[1..];
+    }
 
     public static string Name(TransportMode mode) => mode.ToString().ToLowerInvariant();
 

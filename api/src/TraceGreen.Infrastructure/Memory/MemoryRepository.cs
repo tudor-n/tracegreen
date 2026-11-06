@@ -87,7 +87,7 @@ public sealed class MemoryRepository : IRepository
     }
 
     public Task<RecordVerificationResult> RecordVerificationAsync(
-        Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
+        Ctx ctx, Verification verification, VerificationPatcher build, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
     {
         lock (_gate)
         {
@@ -104,6 +104,7 @@ public sealed class MemoryRepository : IRepository
                 return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.NodeChanged, node, null));
             }
             ws.Nonces.Add(verification.TokenNonce);
+            var patch = build(node);
             var patched = node with
             {
                 Status = patch.Status,
