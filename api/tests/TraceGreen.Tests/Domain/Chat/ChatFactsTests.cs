@@ -136,31 +136,31 @@ public class ChatFactsTests
         Assert.All(State.Nodes, n => Assert.Contains(n.Label, Pack.Names));
     }
 
-    // The seed by emissions: S1 Oradea (estimated), S2 Taiwan (supplier-confirmed), S3 Sibiu (estimated), S4 Hamburg (partly).
+    // The seed by emissions since the sourced factors (#45): S1 Taiwan (supplier-confirmed), S2 Oradea (estimated), S3 Sibiu (estimated), S4 Hamburg (partly).
     [Fact]
     public void TheSeedRanksAsTheClaimTestsExpect()
     {
-        Assert.Equal(["ESTIMATED", "VERIFIED", "ESTIMATED", "PARTIAL"], Enumerable.Range(1, 4).Select(i => F($"S{i}.status").Value));
+        Assert.Equal(["VERIFIED", "ESTIMATED", "ESTIMATED", "PARTIAL"], Enumerable.Range(1, 4).Select(i => F($"S{i}.status").Value));
         Assert.Equal(4, Pack.SupplierCount);
     }
 
     [Theory]
-    [InlineData("{{S1.name}} and {{S3.name}} are still estimated.")]
-    [InlineData("{{S2.name}} is supplier-confirmed, at {{S2.carbon}}.")]
+    [InlineData("{{S2.name}} and {{S3.name}} are still estimated.")]
+    [InlineData("{{S1.name}} is supplier-confirmed, at {{S1.carbon}}.")]
     [InlineData("{{S4.name}} is partly confirmed.")]
-    [InlineData("{{S1.name}} is not yet confirmed.")]
+    [InlineData("{{S2.name}} is not yet confirmed.")]
     [InlineData("The largest emitter is {{S1.name}}; the smallest is {{S4.name}}.")]
     [InlineData("{{S1.name}} emits more than {{S3.name}}.")]
     [InlineData("{{S3.name}} emits less than {{S1.name}}.")]
     [InlineData("Still estimated: {{list.estimated}}.")]
-    [InlineData("{{S2.name}} is confirmed. {{S1.name}} is estimated.")]
+    [InlineData("{{S1.name}} is confirmed. {{S2.name}} is estimated.")]
     public void ClaimsTheDataHoldsPass(string text) =>
         Assert.True(AnswerCheck.Check(text, Pack).Ok, AnswerCheck.Check(text, Pack).Problem);
 
     [Theory]
-    [InlineData("The supplier still estimated is {{S2.name}}, with {{S2.carbon}}.", "a status claim the data does not hold")]
+    [InlineData("The supplier still estimated is {{S1.name}}, with {{S1.carbon}}.", "a status claim the data does not hold")]
     [InlineData("{{S4.name}} is confirmed.", "a status claim the data does not hold")]
-    [InlineData("{{S2.name}} is not confirmed yet.", "a status claim the data does not hold")]
+    [InlineData("{{S1.name}} is not confirmed yet.", "a status claim the data does not hold")]
     [InlineData("The largest emitter is {{S2.name}}.", "a largest claim the data does not hold")]
     [InlineData("The smallest emitter is {{S1.name}}.", "a smallest claim the data does not hold")]
     [InlineData("{{S3.name}} emits more than {{S1.name}}.", "a comparison the data does not hold")]
