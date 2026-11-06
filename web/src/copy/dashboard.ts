@@ -239,6 +239,8 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   AlreadyConfirmed: 'Already confirmed by the supplier.',
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
+  CategoryNotAllowed: 'Category not in the list.',
+  CategoryChanged: 'Category changed since this page loaded.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

@@ -41,13 +41,17 @@ public sealed class NodeViewMapper
         var basis = node.Status == NodeStatus.Verified && activity is not null ? CarbonBasis.Activity : CarbonBasis.Spend;
 
         var line = InvoiceFacts.DominantLine(invoice.Extracted.Lines);
+        var aiMapped = node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model;
         var classification = new ClassificationView(
             CategoryId: node.CategoryId,
             CategoryLabel: category.Label,
             Source: node.ClassificationSource,
             Confidence: node.AiConfidence,
-            AiMapped: node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model,
-            LineDescription: line.Description);
+            AiMapped: aiMapped,
+            LineDescription: line.Description,
+            // Contract stage: derived until the review is stored on the node.
+            Review: aiMapped ? ClassificationReview.Pending : ClassificationReview.NotNeeded,
+            ReviewedAt: null);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).
         var laneView = new LaneView(

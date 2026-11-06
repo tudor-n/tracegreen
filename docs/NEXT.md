@@ -245,6 +245,16 @@ Not rehearsed: steps 4 and 5 with cloud models, which need API keys, and step 5'
 
 **B's scores (`docs/ai-eval.md`)** for `ministral-3:3b`: 80% over 10 runs of the 30 lines, connectors 0% (they come back `UNCLASSIFIED`), and one of the two injection lines (ro-30) followed in one call. The demo does not lean on either weakness: R1's node comes from its zinc lines (100%), R3's from its harness line (100%), and `adversarial.xml` is answered from the cache. No demo step changes (D5).
 
+## Classification review (F6)
+
+Every AI-mapped node waits for a person to confirm or change its category; a change recomputes the node's figures and is recorded in the audit log. Contract first (this section), then the review itself; the SPA's review controls are the next ticket and build on this contract.
+
+| Route | Success | Errors |
+|---|---|---|
+| `POST /api/nodes/{nodeId}/classification {categoryId, expectedCategoryId}` | 200 `NodeView`, the node as it now is | `NodeNotFound` → 404; `CategoryNotAllowed` → 422 (a category outside `seed/categories.json`; `UNCLASSIFIED` is allowed); `CategoryChanged` → 409 (`expectedCategoryId` is no longer the node's category) |
+
+`ClassificationView` gained `review: "notNeeded" | "pending" | "confirmed" | "corrected"` and `reviewedAt` (null until a person reviewed), and `ClassificationSource` gained `buyer`. Sending the node's current category confirms it; another category corrects it. Status: **contract only**; the route answers 501 until the review lands, and `review` is derived on read (`pending` when `aiMapped`, else `notNeeded`).
+
 ## Seed XML validation (2026-10-23)
 
 `node scripts/validate-seed-anaf.mjs` (Node 24 or later, no dependencies) posts every file in `seed/invoices/` to ANAF's public validator (`POST https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`, the XML as `text/plain`, no authentication). For each file it prints OK, or ANAF's exact messages and raw answer, and it exits 1 if any file fails. Pass file paths to check single files. Final output:

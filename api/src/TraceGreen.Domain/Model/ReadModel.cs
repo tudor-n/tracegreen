@@ -14,6 +14,8 @@ public sealed record CarbonFigure(decimal Kg, IReadOnlyList<FactorLookup> Factor
 /// <summary>
 /// How the node's category was decided. <see cref="AiMapped"/> is true when the category came from the AI (live or
 /// pre-computed cache), so the UI must label it "AI-mapped". <see cref="LineDescription"/> is invoice text: render it as text.
+/// <see cref="Review"/> says whether a person still has to confirm or change the category; <see cref="ReviewedAt"/> is when
+/// a person last did (null before). After a review the source is <c>buyer</c> and the confidence null.
 /// </summary>
 public sealed record ClassificationView(
     string CategoryId,
@@ -21,7 +23,9 @@ public sealed record ClassificationView(
     ClassificationSource Source,
     double? Confidence,
     bool AiMapped,
-    string LineDescription);
+    string LineDescription,
+    ClassificationReview Review,
+    DateTimeOffset? ReviewedAt);
 
 /// <summary>
 /// The node's freight lane. <see cref="Mode"/> is the confirmed mode, or the lane default before the supplier answers;

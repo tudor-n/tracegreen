@@ -118,6 +118,7 @@ app.MapOpenApi();
 app.MapHealth();
 app.MapEvents();
 app.MapGraph();
+app.MapClassification();
 app.MapIngest();
 app.MapVerify();
 app.MapPortal();
