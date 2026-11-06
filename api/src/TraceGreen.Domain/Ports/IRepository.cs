@@ -22,6 +22,18 @@ public sealed record NodeAnswerState(NodeStatus Status, TransportMode? Transport
 
 public enum InsertInvoiceStatus { Ok, Duplicate }
 
+/// <summary>A planned correction: the node rebuilt with the new category, the correction to keep and its audit entry.</summary>
+public sealed record CorrectionPlan(SupplierNode Rebuilt, ClassificationCorrection Correction, AuditBuilder Audit);
+
+/// <summary>Runs under the repository's lock on the node as stored; null when the node already has that category.</summary>
+public delegate CorrectionPlan? CorrectionWrite(SupplierNode current);
+
+/// <summary><see cref="Unchanged"/>: the plan was null, nothing was written.</summary>
+public enum RecordCorrectionStatus { Ok, NodeNotFound, Unchanged }
+
+/// <summary><see cref="Before"/> is the node as stored when the write ran; <see cref="Node"/> is it afterwards.</summary>
+public sealed record RecordCorrectionResult(RecordCorrectionStatus Status, SupplierNode? Before, SupplierNode? Node, AuditEntry? Entry);
+
 /// <summary><see cref="ExistingNodeId"/> is the node that already holds the invoice when <see cref="Status"/> is Duplicate.</summary>
 public sealed record InsertInvoiceResult(InsertInvoiceStatus Status, AuditEntry? Entry, Guid? ExistingNodeId);
 
@@ -63,6 +75,14 @@ public interface IRepository
         Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct);
 
     Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct);
+
+    /// <summary>
+    /// Rebuilds a node with a corrected category, keeps the correction (one per description key, replacing an earlier one)
+    /// and appends its audit entry, all under one lock, so the plan is built on the node as stored.
+    /// </summary>
+    Task<RecordCorrectionResult> RecordCorrectionAsync(Ctx ctx, Guid nodeId, CorrectionWrite write, CancellationToken ct);
+
+    Task<IReadOnlyList<ClassificationCorrection>> ListCorrectionsAsync(Ctx ctx, CancellationToken ct);
 
     Task<AuditEntry> AppendAuditAsync(Ctx ctx, AuditBuilder build, CancellationToken ct);
 

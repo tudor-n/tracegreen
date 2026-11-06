@@ -11,6 +11,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
     public DbSet<VerificationRow> Verifications => Set<VerificationRow>();
     public DbSet<AuditRow> AuditLog => Set<AuditRow>();
     public DbSet<ScenarioRow> Scenarios => Set<ScenarioRow>();
+    public DbSet<CorrectionRow> Corrections => Set<CorrectionRow>();
     public DbSet<FactorRow> Factors => Set<FactorRow>();
     public DbSet<LaneRow> Lanes => Set<LaneRow>();
     public DbSet<AlternativeRow> Alternatives => Set<AlternativeRow>();
@@ -53,6 +54,11 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
             e.HasIndex(x => new { x.WorkspaceId, x.NodeId });
             e.Property(x => x.ChangeJson).HasColumnType("jsonb");
             e.Property(x => x.ResultJson).HasColumnType("jsonb");
+        });
+        model.Entity<CorrectionRow>(e =>
+        {
+            e.ToTable("classification_corrections");
+            e.HasKey(x => new { x.WorkspaceId, x.CacheKey });
         });
         model.Entity<FactorRow>(e => { e.ToTable("factors"); e.HasKey(x => x.Id); });
         model.Entity<LaneRow>(e =>

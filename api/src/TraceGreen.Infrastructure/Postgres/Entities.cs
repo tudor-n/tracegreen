@@ -82,6 +82,16 @@ public class ScenarioRow
     public DateTimeOffset CreatedAt { get; set; }
 }
 
+public class CorrectionRow
+{
+    public Guid WorkspaceId { get; set; }
+    public string CacheKey { get; set; } = "";
+    public string CategoryId { get; set; } = "";
+    public Guid NodeId { get; set; }
+    public string Actor { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
 public class FactorRow
 {
     public string Id { get; set; } = "";

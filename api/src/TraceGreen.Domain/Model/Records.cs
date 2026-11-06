@@ -169,3 +169,15 @@ public sealed record GraphSnapshot(
     IReadOnlyList<AuditEntry> Audit,
     long LastSeq,
     string Mode);
+
+/// <summary>
+/// The buyer's own word on what an invoice line is (F6): the category to use for every line whose description has this
+/// <see cref="CacheKey"/>, in this workspace. One per description; a later correction replaces it.
+/// </summary>
+public sealed record ClassificationCorrection(
+    Guid WorkspaceId,
+    string CacheKey,
+    string CategoryId,
+    Guid NodeId,
+    string Actor,
+    DateTimeOffset CreatedAt);
