@@ -12,7 +12,7 @@ flowchart LR
   A -- "HTTP, 10 s timeout" --> I["ai :8000<br/>Python FastAPI"]
   A -- "EF Core / Npgsql" --> D[("db :5432<br/>Postgres 17")]
   I -- "HTTPS, at most 4 s each" --> M["Cloud model APIs<br/>(AI_MODELS)"]
-  I -- "host.docker.internal:11434, at most 6 s" --> O["Ollama on the host<br/>Qwen 3.5"]
+  I -- "host.docker.internal:11434, at most 6 s" --> O["Ollama on the host<br/>ministral-3:3b"]
 ```
 
 | Service | Owns | Never does |
@@ -79,7 +79,7 @@ flowchart LR
   R["POST /classify<br/>lines"] --> C["cache<br/>seed/ai-cache.json + runtime cache"]
   C -- "lines left" --> M1["model 1<br/>cloud, at most 4 s"]
   M1 -- "lines left" --> M2["model 2<br/>cloud, at most 4 s"]
-  M2 -- "lines left" --> M3["Qwen 3.5 on Ollama<br/>at most 6 s"]
+  M2 -- "lines left" --> M3["ministral-3:3b on Ollama<br/>at most 6 s"]
   M3 -- "lines left" --> S["stub<br/>UNCLASSIFIED"]
 ```
 

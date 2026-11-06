@@ -166,14 +166,31 @@ Imported through `POST /api/ingest/ubl` into a throwaway API in memory mode with
 | `/classify` with no model reachable | 200 in 0.18 s: the cached line from the cache, the other from the stub ("AI unavailable") |
 | Dev route with `AI_DEV_ROUTES=1` | 400 "Model not ready: openai:<placeholder> (OPENAI_API_KEY not set)"; 400 "Unknown model: nope:x" |
 | The container reaching Ollama on the Windows host | `http://host.docker.internal:11434/api/tags` answers with Ollama's default settings |
-| The local model, `ollama:ministral-3:3b` (the only model on the dev machine; Qwen 3.5 is still to be timed) | Warm: one line in 1.2–1.4 s, R1's two and R3's first and last lines in 3.4 s (R1 both `zinc_diecast`, 0.95 and 0.90; the connector line `connectors`, 0.90; the harness line `UNCLASSIFIED`, 0.60). Cold, after unloading the model: 4.7 s for one line. The first two calls after the service started gave no answer within 8 s and fell to the stub. The same prompt and schema sent straight to Ollama, and through the service's own model factory without a deadline, answered in 1–2 s, so the misses were start-up and model load, not the prompt. Hence the warm-up step in `RUNBOOK.md`. |
+| The local model, `ollama:ministral-3:3b` (the one chosen in Phase 2), through a throwaway service on Ollama 0.21.1 | Warm: one line in 1.2–1.4 s, R1's two and R3's first and last lines in 3.4 s (R1 both `zinc_diecast`, 0.95 and 0.90; the connector line `connectors`, 0.90; the harness line `UNCLASSIFIED`, 0.60). Cold, after unloading the model: 4.7 s for one line. The first two calls after the service started gave no answer within 8 s and fell to the stub. The same prompt and schema sent straight to Ollama, and through the service's own model factory without a deadline, answered in 1–2 s, so the misses were start-up and model load, not the prompt. Hence the warm-up step in `RUNBOOK.md`. |
 
 **Phase 2 for C, the AI demo steps,** are in `RUNBOOK.md`, "AI demo steps (F6)". Two of the plan's steps say less on screen than the plan expected:
 
 - **Step 1:** the node shows the category and "AI-mapped · <confidence>", but not the model's reason; `NodeView` carries no rationale. The script shows the reason with a `curl` to the AI service.
 - **Step 3:** `adversarial.xml` is answered from `seed/ai-cache.json` by the API, so no live model sees its injected line on stage. The live models' handling of injection is in the scoring table (`docs/ai-eval.md`, Terminal B's Phase 2).
 
-Neither step has been rehearsed with live cloud models yet.
+**Rehearsal on the merged branches (2026-11-06).** A throwaway worktree merged A (`bc98c47`), then C, then B, with no conflict. It ran the demo image under its own Compose project, with `AI_MODELS=ollama:ministral-3:3b` only (Ollama 0.23.4, no API keys on this machine), and the stack was removed afterwards:
+
+| Step | Result |
+|---|---|
+| Before: `/health`, and `api/tags` from the container | the model `ready`; the container lists `ministral-3:3b` |
+| 1. R1, model warm (after `ollama run ministral-3:3b "ok"`), AI service freshly restarted | 201 in 2.5 s: "RO · Zinc die-cast parts", "AI-mapped · 0.95", source `model` |
+| 1. R1, model unloaded | 201 in 6.0 s, the answer just inside the 6 s cap; an earlier cold try missed it and showed "RO · Unclassified" from the stub |
+| 1. The reason command | rationale "Zinc die-cast casing with pressure-turned sensor alloy (CZ-40)", source `model` |
+| 2. R2 | 201 in 12 ms: "RO · Printed circuit boards", no tag, source `invoice` |
+| 3. `adversarial.xml` | 201 in 11 ms: "RO · Wire harnesses", "AI-mapped · 0.86", source `cache` |
+| R3 (step 4's invoice), model warm | 201 in 2.7 s: "RO · Wire harnesses", "AI-mapped · 0.90" |
+| "Reset demo", then R1 and R3 again without restarting the AI service | 62 ms and 7 ms, from the service's memory, as the RUNBOOK warns |
+| The same imports in memory mode (API recreated) | the same categories and sources |
+| `pnpm e2e` | passes on Postgres and in memory mode |
+
+Not rehearsed: steps 4 and 5 with cloud models, which need API keys, and step 5's offline timing. While Terminal B's scoring run used the same Ollama (12:19–12:26), the chain's calls waited behind its 25 s calls and fell to the stub; hence the RUNBOOK's rule that nothing else uses Ollama during the demo. B's calls after the overlap took the same 23–25 s as before, so its times look unaffected.
+
+**B's scores (`docs/ai-eval.md`)** for `ministral-3:3b`: 80% over 10 runs of the 30 lines, connectors 0% (they come back `UNCLASSIFIED`), and one of the two injection lines (ro-30) followed in one call. The demo does not lean on either weakness: R1's node comes from its zinc lines (100%), R3's from its harness line (100%), and `adversarial.xml` is answered from the cache. No demo step changes (D5).
 
 ## Seed XML validation (2026-10-23)
 
@@ -261,7 +278,7 @@ Current order, from the 2026-10-22 review's slice order (vertical slices toward 
 1. **Slice 4 check (M2, A8 with B and C):** the API-level part passed on 2026-11-05 in both modes ("M2 pre-check" above). Left: the timed two-device run-through over the hotspot (T16), where the phone flips the node green in under 2 s. Measure import → node and submit → flip, and log failures in `docs/run-log.md` (people write it).
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** done; `pnpm e2e` passes against Compose and the demo image, and CI runs it on the demo image in both data modes (A9).
-4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Phase 2: the AI demo steps are in `RUNBOOK.md` (C, done); left are timing Qwen 3.5 on R1–R3 through the dev route (A) and the real scores in `docs/ai-eval.md` with the keys (B). Phase 3 merges A, then C, then B, runs the full check and rehearses the AI demo steps on the demo laptop.
+4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Phase 2 is done for the local model: A chose `ministral-3:3b` (Ollama 0.23.4 cannot pull `qwen3.5:4b`), B scored it in `docs/ai-eval.md`, and C wrote the AI demo steps and rehearsed them with it on the merged branches ("Rehearsal on the merged branches" above). Left: scoring the two cloud models and rehearsing steps 4 and 5 once API keys are on the demo laptop, then Phase 3, which merges A, then C, then B, runs the full check and rehearses on the demo laptop.
 5. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
 
 The task list below is the original plan, kept for its specifications; where it and the order above disagree on order, the order above wins.
