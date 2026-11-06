@@ -2,18 +2,17 @@ import { connectionCopy } from '@/copy/dashboard'
 import type { Connection } from '@/hooks/useGraphEvents'
 import { cn } from '@/lib/utils'
 
-// The state of the live updates from useGraphEvents: `connecting` until the first snapshot only, then `live`,
-// `polling` while the event stream is down, or `offline` while the API cannot be reached. The dot is neutral while
-// live, so green keeps meaning "supplier-confirmed". The Playwright smoke reads `data-state`.
+// The state of the live updates from useGraphEvents, shown only when something is wrong: `polling` while the event
+// stream is down, or `offline` while the API cannot be reached. While `connecting` (until the first snapshot) and
+// `live` there is nothing to say, so the sidebar shows nothing. Green keeps meaning "supplier-confirmed".
 
-const dot: Record<Connection, string> = {
-  connecting: 'bg-muted-foreground pulse-dot',
-  live: 'bg-muted-foreground',
-  polling: 'bg-estimated',
+const dot: Record<'polling' | 'offline', string> = {
+  polling: 'bg-estimated pulse-dot',
   offline: 'bg-destructive',
 }
 
 export function ConnectionBadge({ connection }: { connection: Connection }) {
+  if (connection === 'connecting' || connection === 'live') return null
   return (
     <span
       role="status"

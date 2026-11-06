@@ -8,7 +8,8 @@ import type { Connection } from '@/hooks/useGraphEvents'
 import { cn } from '@/lib/utils'
 import { useGraphStore } from '@/store'
 
-// The v2 sidebar: the wordmark, one link per screen, the live-updates badge, and the invoice actions at the bottom.
+// The v2 sidebar: the wordmark, one link per screen, and the invoice actions at the bottom. The connection badge
+// appears beside the wordmark only while live updates are down.
 // On a narrow screen it sits above the content as a band. `toolbar-audit` is a frozen test hook (RUNBOOK).
 
 export function Sidebar({ connection }: { connection: Connection }) {
