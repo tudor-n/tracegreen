@@ -32,6 +32,7 @@ export const chatCopy = {
   /** The chip's accessible name and tooltip: what the value is and whose. */
   factLabel: (field: string, subject: string | null) => (subject === null ? field : `${field} · ${subject}`),
   openSupplier: (subject: string) => `Open ${subject}`,
+  openWhatIf: (subject: string) => `Open What if for ${subject}`,
   openAudit: 'Open the audit log',
   none: 'none',
   /** The questions answered from the data without the AI, and their fixed sentences around the values. */
@@ -80,6 +81,9 @@ export const chatCopy = {
     change: 'Scenario change',
     carbonDelta: 'Change in emissions',
     costDelta: 'Change in cost (illustrative)',
+    leadDelta: 'Change in lead time (illustrative)',
+    badge: 'Simulator verdict',
+    whatIfs: 'What-ifs worked out',
     auditEntries: 'Audit log entries',
     action: 'Audit log entry',
     when: 'Date',

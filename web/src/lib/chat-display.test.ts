@@ -73,3 +73,23 @@ describe('answerTag', () => {
     expect(answerTag(answer([]), false)).toMatchObject({ kind: 'aiGeneral', label: 'AI-written · general, no values from your data' })
   })
 })
+
+describe('what-if facts', () => {
+  const nodeId = '00000000-0000-0000-0000-000000000001'
+
+  it('read as signed changes and the What if tab verdict', () => {
+    expect(factValue(fact({ id: 'W1.leadDelta', field: 'leadDelta', kind: 'days', value: '33' }))).toBe('+33 days')
+    expect(factValue(fact({ id: 'W1.leadDelta', field: 'leadDelta', kind: 'days', value: '-20' }))).toMatch(/^[−-]20 days$/)
+    expect(factValue(fact({ id: 'W1.badge', field: 'badge', kind: 'text', value: 'win-win' }))).toBe('Win-win')
+    expect(factValue(fact({ id: 'W1.badge', field: 'badge', kind: 'text', value: 'premium' }))).toBe('Premium option')
+  })
+
+  it('open the supplier on What if, while a supplier fact opens its summary', () => {
+    expect(factLink(fact({ id: 'W2.carbonDelta', nodeId, subject: 'Oradea Harness SRL' }))).toEqual({
+      kind: 'whatIf',
+      nodeId,
+      label: 'Open What if for Oradea Harness SRL',
+    })
+    expect(factLink(fact({ id: 'S2.carbon', nodeId, subject: 'Oradea Harness SRL' }))?.kind).toBe('node')
+  })
+})

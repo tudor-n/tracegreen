@@ -187,8 +187,10 @@ export function ChatPanel() {
   const onLink = (fact: ChatFactView) => {
     const link = factLink(fact)
     if (link === null) return
-    if (link.kind === 'node') {
+    if (link.kind === 'node' || link.kind === 'whatIf') {
+      // Picking a supplier shows its side panel, and the chat steps aside; a what-if opens it on What if.
       select(link.nodeId)
+      if (link.kind === 'whatIf') setPanel('simulator', true)
       void navigate('/suppliers')
     } else {
       setPanel('chat', false)

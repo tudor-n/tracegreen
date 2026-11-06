@@ -202,6 +202,15 @@ Built in order from the plan of 2026-11-06: the AI's reason, buyer corrections (
       - In Chromium, desktop and Pixel 7, there were no console errors, and the smoke passed in both specs.
     - **The AI assistant panel (2026-11-06).** The chat is called "AI assistant" in the sidebar and the panel. Only the conversation scrolls, inside the panel: the header and the question box stay put, and the conversation never scrolls the page. A new question brings it to the end; an answer does so only for a reader already there, else a button jumps to the latest. Each answer has one label line and its sources folded under "Sources (n)". A typing indicator shows while an answer is on its way. The question box grows with its text, with the model picker and a send button inside. New chat empties the conversation, and a failed request offers Try again.
       - Checked in Chromium at 1280×820 and on a Pixel 7 against Compose with seven messages: the question box kept its place (y 734 and 753 before and after) and the page never scrolled. The conversation ended at the latest message, the jump button came and went, the sources folded open, and New chat cleared it, with no console errors.
+    - **A buyer's conversation, fixed (2026-11-07; `DECISIONS.md`, "What the chat may say about changes").** A real conversation with `ministral-3:3b` went wrong in several ways: it said switching to air would "cut … by +3.8 t" and "save +€1,620", promised to "add a what-if" twice, answered a cake recipe in English with cost figures, said the same supplier twice for two deliveries, showed Markdown, and named a place as a supplier.
+      - **Replayed** turn by turn against Compose (Postgres mode, the same saved air scenario, no `.env`). All ten turns are now answered correctly:
+        - lower costs → Hamburg Connectors by rail, −€120 and −0.6 t;
+        - "can you change it" and "add a what if to Oradea" → it can't, and where to do it;
+        - Oradea → "has no what-if: road only and no alternative supplier";
+        - the recipes → a short redirect with no figures, in the message's language;
+        - "show me the results" → the real what-if.
+      - **The earlier twelve questions** still pass, except "Cat de mult CO2 avem in total?". In Romanian the 3B model keeps typing digits or inventing a fact id, so the checks refuse it and the suggested questions show; the same question in English passes. Expect better Romanian from a cloud model.
+      - **A rough edge left:** "For Oradea Harness SRL, Hamburg Connectors GmbH shows switch to rail…" names both suppliers. It passes the checks because the what-if is named with its own supplier, but it reads muddled.
     - **Left:** small models still write the odd clumsy sentence ("[sea] sea freight") that no check can call false, and the history still sends earlier questions only, not answers.
   - **Checked on 2026-11-06** with a throwaway stack (memory mode) and the host's Ollama:
     - `qwen2.5:1.5b` answered "Which supplier emits the most?" correctly. Its "still estimated" answer about a supplier-confirmed node was refused once the status check was in.
