@@ -50,9 +50,18 @@ services:
       - ./seed:/seed:ro
     environment: !override
       SEED_DIR: /seed
+      # The model variables of compose.yml (F6), read from the root .env; extra_hosts comes from compose.yml.
+      AI_MODELS: ${AI_MODELS:-}
       AI_MODEL: ${AI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_TIMEOUT_S: "10"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
+      AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      # The scoring route never runs on the demo image.
+      AI_DEV_ROUTES: "0"
 
   web:
     build:
