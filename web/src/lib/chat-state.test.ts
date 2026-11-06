@@ -52,3 +52,12 @@ describe('historyOf', () => {
     expect(historyOf(state)).toEqual(['two', 'three', 'four'])
   })
 })
+
+describe('a new chat', () => {
+  it('drops every turn, and an answer that arrives after it changes nothing', () => {
+    let state = chatReducer(initialChat, { type: 'asked', id: 1, question: 'Who?', asked: 'ai' })
+    state = chatReducer(state, { type: 'cleared' })
+    expect(state).toEqual(initialChat)
+    expect(chatReducer(state, { type: 'answered', id: 1, answer: answer('answered') })).toEqual(initialChat)
+  })
+})

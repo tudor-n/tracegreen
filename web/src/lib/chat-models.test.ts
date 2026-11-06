@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatModels, ChatModelView } from '@/api/client'
-import { AUTO, answeredBy, modelName, modelNote, modelOptions, modelToSend } from './chat-models'
+import { AUTO, answeredBy, modelName, modelNote, modelNoteShown, modelOptions, modelToSend } from './chat-models'
 
 const model = (overrides: Partial<ChatModelView>): ChatModelView => ({
   id: 'ollama:ministral-3:3b',
@@ -95,5 +95,15 @@ describe('answeredBy', () => {
 
   it('names no model for an answer no model wrote', () => {
     for (const provider of ['template', 'stub', 'none']) expect(answeredBy(provider, list)).toBeNull()
+  })
+})
+
+describe('modelNoteShown', () => {
+  it('shows the note only when no AI will answer', () => {
+    expect(modelNoteShown(list)).toBe(false)
+    expect(modelNoteShown(null)).toBe(false)
+    expect(modelNoteShown({ available: false, models: [] })).toBe(true)
+    expect(modelNoteShown({ available: true, models: [] })).toBe(true)
+    expect(modelNoteShown({ available: true, models: [cloud, found] })).toBe(true)
   })
 })

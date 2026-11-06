@@ -70,6 +70,17 @@ export function modelNote(list: ChatModels | null, sent: string | null): string 
   return automatic.length === 0 ? chatCopy.models.none : chatCopy.models.noneReady
 }
 
+/**
+ * Whether the note must show under the question box: only when it explains why no AI will answer (the service is
+ * down, no model is set up, none has its key). Otherwise it stays the picker's description for screen readers and on
+ * hover, so a working chat keeps a quiet composer.
+ */
+export function modelNoteShown(list: ChatModels | null): boolean {
+  if (list === null) return false
+  if (!list.available) return true
+  return !list.models.some((m) => m.automatic && m.ready)
+}
+
 /** Which model wrote an answer, from the answer's provider; null when no model wrote it (templates, no AI). */
 export function answeredBy(provider: string, list: ChatModels | null): string | null {
   if (provider === 'template' || provider === 'stub' || provider === 'none') return null

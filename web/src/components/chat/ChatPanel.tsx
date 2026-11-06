@@ -1,27 +1,46 @@
-import { XIcon } from 'lucide-react'
-import { type FormEvent, useEffect, useReducer, useRef, useState } from 'react'
+import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, SparklesIcon, SquarePenIcon, XIcon } from 'lucide-react'
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router'
 import type { ChatAnswer, ChatFactView, ChatModels } from '@/api/client'
 import { ChatModelPicker } from '@/components/chat/ChatModelPicker'
-import { ExplainedTag, PageMessage } from '@/components/shell/Page'
+import { ExplainedTag } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { chatCopy, type TemplateId } from '@/copy/chat'
 import { answerTag, factLabel, factLink, factValue } from '@/lib/chat-display'
-import { AUTO, answeredBy, modelToSend } from '@/lib/chat-models'
+import { AUTO, answeredBy, modelNote, modelNoteShown, modelToSend } from '@/lib/chat-models'
 import { chatReducer, historyOf, initialChat, isPending, type Turn } from '@/lib/chat-state'
 import { templateAnswer } from '@/lib/chat-templates'
 import { askChat, fetchChatModels } from '@/lib/dashboard-actions'
 import { cn } from '@/lib/utils'
 import { useGraphStore } from '@/store'
 
-// The data chat (F13), opened from the sidebar on every screen. It sits where the side panel sits and covers it;
+// The AI assistant (F13), opened from the sidebar on every screen. It sits where the side panel sits and covers it;
 // closing it brings the side panel back as it was. The conversation stays while the app is open. Typed questions go to
 // the API, which has the AI write the sentence and fills every value in from the data after checking it; the suggested
 // questions are answered from the store's data with a fixed sentence. Every value is a chip that says what it is.
+//
+// The header and the question box stay where they are; only the conversation scrolls, inside the panel, and its
+// scrolling never carries over to the page. A new question brings the conversation to its end; an answer does so only
+// for a reader already there, so someone reading an earlier answer is not pulled away (a button offers the way down).
 
 const MAX_QUESTION = 300
 const TEMPLATES = Object.keys(chatCopy.questions) as TemplateId[]
+/** Within this many pixels of its end, the conversation counts as read to the end and follows new messages. */
+const NEAR_END = 64
+/** The question box grows with its text up to this height, then scrolls. */
+const MAX_INPUT_HEIGHT = 132
 
 export function ChatPanel() {
   const open = useGraphStore((s) => s.openPanels.chat)
@@ -33,11 +52,26 @@ export function ChatPanel() {
   const [state, dispatch] = useReducer(chatReducer, initialChat)
   const [draft, setDraft] = useState('')
   const nextId = useRef(1)
-  const end = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const atEnd = useRef(true)
+  const [following, setFollowing] = useState(true)
+  const [scrolled, setScrolled] = useState(false)
   const pending = isPending(state)
   const [models, setModels] = useState<ChatModels | null>(null)
   const [picked, setPicked] = useState(AUTO)
   const sent = modelToSend(picked, models)
+  const noteId = useId()
+
+  // Each opening starts at the end of the conversation, with no scroll shadow (state adjusted while rendering).
+  const [shownOpen, setShownOpen] = useState(open)
+  if (open !== shownOpen) {
+    setShownOpen(open)
+    if (open) {
+      setFollowing(true)
+      setScrolled(false)
+    }
+  }
 
   // The model list is read each time the chat opens, so a model set up meanwhile shows; the last list stays while it
   // loads. A list that cannot be read leaves Automatic alone.
@@ -53,7 +87,7 @@ export function ChatPanel() {
   // Escape closes the chat before anything else hears it (the side panel under it would close too).
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
         event.preventDefault()
         setPanel('chat', false)
@@ -63,12 +97,52 @@ export function ChatPanel() {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [open, setPanel])
 
+  // Scrolls the conversation itself, never the page around it (scrollIntoView would move both).
+  const scrollToEnd = useCallback((smooth: boolean) => {
+    const list = listRef.current
+    if (list === null) return
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    list.scrollTo({ top: list.scrollHeight, behavior: smooth && !still ? 'smooth' : 'auto' })
+  }, [])
+
+  // On opening: at the end, and the question box ready for a keyboard (not on a phone, where it would raise the keyboard).
+  useLayoutEffect(() => {
+    if (!open) return
+    atEnd.current = true
+    scrollToEnd(false)
+    if (window.matchMedia('(pointer: fine)').matches) inputRef.current?.focus()
+  }, [open, scrollToEnd])
+
+  const turnCount = state.turns.length
   useEffect(() => {
-    if (open) end.current?.scrollIntoView({ block: 'nearest' })
-  }, [open, state.turns])
+    if (turnCount === 0) return
+    atEnd.current = true
+    scrollToEnd(true)
+  }, [turnCount, scrollToEnd])
+
+  useEffect(() => {
+    if (atEnd.current) scrollToEnd(true)
+  }, [state.turns, scrollToEnd])
+
+  // The question box grows with its text, up to a few lines.
+  useLayoutEffect(() => {
+    const input = inputRef.current
+    if (input === null) return
+    input.style.height = 'auto'
+    input.style.height = `${Math.min(input.scrollHeight, MAX_INPUT_HEIGHT)}px`
+  }, [draft, open])
 
   // Returning nothing keeps the conversation: the component stays mounted while the chat is closed.
   if (!open) return null
+
+  const onScroll = () => {
+    const list = listRef.current
+    if (list === null) return
+    const end = list.scrollHeight - list.scrollTop - list.clientHeight < NEAR_END
+    atEnd.current = end
+    setFollowing(end)
+    setScrolled(list.scrollTop > 2)
+  }
 
   const ask = async (question: string) => {
     const id = nextId.current++
@@ -84,12 +158,30 @@ export function ChatPanel() {
     dispatch({ type: 'answered', id, answer: templateAnswer(template, Object.values(nodes), kpis) })
   }
 
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault()
+  const submit = () => {
     const question = draft.trim()
     if (question === '' || pending) return
     setDraft('')
     void ask(question)
+  }
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    submit()
+  }
+
+  // Enter sends, Shift+Enter starts a new line; a word still being composed (an input method) is left alone.
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      submit()
+    }
+  }
+
+  const newChat = () => {
+    dispatch({ type: 'cleared' })
+    setDraft('')
+    inputRef.current?.focus()
   }
 
   const onLink = (fact: ChatFactView) => {
@@ -104,58 +196,159 @@ export function ChatPanel() {
     }
   }
 
+  const noteShown = modelNoteShown(models)
+
   return (
     <aside
       data-testid="chat-panel"
       aria-label={chatCopy.title}
-      className="fixed inset-0 z-40 flex flex-col gap-4 overflow-y-auto bg-card px-6 pt-6 pb-6 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-6 motion-safe:duration-300 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:w-[360px] lg:shrink-0 lg:shadow-[-0.5px_0_0_var(--hairline),-18px_0_40px_-30px_rgb(0_0_0/0.35)]"
+      className="fixed inset-0 z-40 flex flex-col overflow-hidden bg-card motion-safe:animate-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 lg:sticky lg:inset-auto lg:top-0 lg:z-auto lg:h-dvh lg:w-[360px] lg:shrink-0 lg:shadow-[-0.5px_0_0_var(--hairline),-18px_0_40px_-30px_rgb(0_0_0/0.35)] lg:motion-safe:fade-in-0 lg:motion-safe:slide-in-from-bottom-0 lg:motion-safe:slide-in-from-right-6"
     >
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <h2 className="font-display text-[22px] leading-tight font-semibold tracking-[-0.02em]">{chatCopy.title}</h2>
-          <p className="text-[13px] text-muted-foreground">{chatCopy.intro}</p>
+      <header
+        className={cn(
+          'flex shrink-0 items-center gap-3 px-5 pt-5 pb-3.5 transition-shadow duration-200',
+          scrolled && 'shadow-[0_0.5px_0_var(--hairline)]',
+        )}
+      >
+        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[11px] bg-fill text-primary" aria-hidden>
+          <SparklesIcon className="size-[18px]" strokeWidth={1.8} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h2 className="font-display text-[17px] leading-tight font-semibold tracking-[-0.01em]">{chatCopy.title}</h2>
+          <p className="truncate text-[12px] text-muted-foreground">{chatCopy.subtitle}</p>
         </div>
-        <button
-          type="button"
-          aria-label={chatCopy.close}
-          onClick={() => setPanel('chat', false)}
-          className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full bg-fill text-ink-2 transition-colors outline-none hover:bg-fill-strong focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        {turnCount > 0 && (
+          <HeaderButton label={chatCopy.newChat} onClick={newChat} testId="chat-new">
+            <SquarePenIcon className="size-[15px]" strokeWidth={2} aria-hidden />
+          </HeaderButton>
+        )}
+        <HeaderButton label={chatCopy.close} onClick={() => setPanel('chat', false)}>
           <XIcon className="size-3.5" strokeWidth={2.6} aria-hidden />
-        </button>
+        </HeaderButton>
+      </header>
+
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={listRef}
+          onScroll={onScroll}
+          role="log"
+          aria-live="polite"
+          aria-label={chatCopy.title}
+          data-testid="chat-log"
+          className="h-full overflow-y-auto overscroll-contain px-5 pt-1 pb-6 [scrollbar-color:var(--fill-strong)_transparent] [scrollbar-width:thin]"
+        >
+          <div className="flex flex-col gap-6">
+            {turnCount === 0 ? (
+              <Welcome onPick={askTemplate} disabled={pending} />
+            ) : (
+              state.turns.map((turn) => (
+                <TurnView
+                  key={turn.id}
+                  turn={turn}
+                  onLink={onLink}
+                  onPick={askTemplate}
+                  onRetry={(question) => void ask(question)}
+                  pending={pending}
+                  models={models}
+                />
+              ))
+            )}
+          </div>
+        </div>
+        {!following && (
+          <button
+            type="button"
+            aria-label={chatCopy.jumpToLatest}
+            onClick={() => scrollToEnd(true)}
+            className="absolute bottom-3 left-1/2 inline-flex size-8 -translate-x-1/2 items-center justify-center rounded-full bg-card text-ink-2 shadow-[var(--shadow-raised)] transition-colors outline-none hover:bg-fill focus-visible:ring-2 focus-visible:ring-ring motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95"
+          >
+            <ArrowDownIcon className="size-4" strokeWidth={2.2} aria-hidden />
+          </button>
+        )}
       </div>
 
-      <div role="log" aria-live="polite" className="flex flex-1 flex-col gap-4">
-        {state.turns.length === 0 && <Suggestions heading={chatCopy.tryThese} onPick={askTemplate} disabled={pending} />}
-        {state.turns.map((turn) => (
-          <TurnView key={turn.id} turn={turn} onLink={onLink} onPick={askTemplate} pending={pending} models={models} />
-        ))}
-        <div ref={end} />
-      </div>
-
-      <form onSubmit={onSubmit} className="flex flex-col gap-1.5">
-        <ChatModelPicker list={models} sent={sent} onChange={setPicked} />
-        <label htmlFor="chat-question" className="sr-only">
-          {chatCopy.inputLabel}
-        </label>
-        <div className="flex items-center gap-2">
-          <input
+      <form
+        onSubmit={onSubmit}
+        className={cn(
+          'flex shrink-0 flex-col gap-1.5 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] transition-shadow duration-200',
+          !following && 'shadow-[0_-0.5px_0_var(--hairline)]',
+        )}
+      >
+        <div className="flex flex-col gap-1.5 rounded-[20px] bg-fill px-3.5 pt-2.5 pb-2 transition-shadow duration-200 focus-within:shadow-[0_0_0_2px_var(--ring)]">
+          <label htmlFor="chat-question" className="sr-only">
+            {chatCopy.inputLabel}
+          </label>
+          <textarea
             id="chat-question"
+            ref={inputRef}
             data-testid="chat-input"
+            rows={1}
             value={draft}
             maxLength={MAX_QUESTION}
             autoComplete="off"
             placeholder={chatCopy.placeholder}
             onChange={(event) => setDraft(event.target.value)}
-            className="h-10 min-w-0 flex-1 rounded-full bg-fill px-4 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            onKeyDown={onKeyDown}
+            className="block w-full resize-none bg-transparent text-[14px] leading-6 outline-none placeholder:text-muted-foreground"
           />
-          <Button type="submit" data-testid="chat-send" disabled={pending || draft.trim() === ''} className="h-10 rounded-full">
-            {chatCopy.send}
-          </Button>
+          <div className="flex items-center gap-2">
+            <ChatModelPicker list={models} sent={sent} onChange={setPicked} noteId={noteId} />
+            {draft.length >= MAX_QUESTION - 50 && (
+              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums" aria-live="polite">
+                {draft.length}/{MAX_QUESTION}
+              </span>
+            )}
+            <button
+              type="submit"
+              data-testid="chat-send"
+              aria-label={chatCopy.send}
+              disabled={pending || draft.trim() === ''}
+              className={cn(
+                'inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors duration-200 outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:bg-fill-strong disabled:text-muted-foreground',
+                draft.length < MAX_QUESTION - 50 && 'ml-auto',
+              )}
+            >
+              <ArrowUpIcon className="size-4" strokeWidth={2.4} aria-hidden />
+            </button>
+          </div>
         </div>
-        {draft.length >= MAX_QUESTION && <p className="px-4 text-[11px] text-muted-foreground">{chatCopy.tooLong(MAX_QUESTION)}</p>}
+        {/* One note for the model choice: shown when it explains why no AI will answer, else read out with the picker. */}
+        <p id={noteId} className={noteShown ? 'px-2 text-[11.5px] leading-snug text-muted-foreground' : 'sr-only'}>
+          {modelNote(models, sent)}
+        </p>
+        {draft.length >= MAX_QUESTION && <p className="px-2 text-[11.5px] text-muted-foreground">{chatCopy.tooLong(MAX_QUESTION)}</p>}
       </form>
     </aside>
+  )
+}
+
+function HeaderButton({ label, onClick, testId, children }: { label: string; onClick: () => void; testId?: string; children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<button type="button" />}
+        aria-label={label}
+        data-testid={testId}
+        onClick={onClick}
+        className="inline-flex size-[30px] shrink-0 items-center justify-center rounded-full bg-fill text-ink-2 transition-colors outline-none hover:bg-fill-strong focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** The empty conversation: what the assistant is for, the promise about values, and four questions to start from. */
+function Welcome({ onPick, disabled }: { onPick: (template: TemplateId) => void; disabled: boolean }) {
+  return (
+    <div className="flex flex-col gap-5 pt-4">
+      <div className="flex flex-col gap-1.5">
+        <p className="text-[15px] leading-snug font-medium text-balance">{chatCopy.welcome}</p>
+        <p className="text-[12.5px] leading-snug text-muted-foreground">{chatCopy.intro}</p>
+      </div>
+      <Suggestions heading={chatCopy.tryThese} onPick={onPick} disabled={disabled} />
+    </div>
   )
 }
 
@@ -163,20 +356,24 @@ function TurnView({
   turn,
   onLink,
   onPick,
+  onRetry,
   pending,
   models,
 }: {
   turn: Turn
   onLink: (fact: ChatFactView) => void
   onPick: (template: TemplateId) => void
+  onRetry: (question: string) => void
   pending: boolean
   models: ChatModels | null
 }) {
   const { state } = turn
   return (
     <div data-testid={`chat-turn-${turn.id}`} data-phase={state.phase} className="flex flex-col gap-2">
-      <p className="max-w-[85%] self-end rounded-2xl bg-fill px-3.5 py-2 text-sm break-words">{turn.question}</p>
-      {state.phase === 'pending' && <PageMessage busy>{chatCopy.sending}</PageMessage>}
+      <p className="max-w-[85%] self-end rounded-[18px] rounded-br-[6px] bg-fill px-3.5 py-2 text-[14px] leading-snug break-words whitespace-pre-wrap">
+        {turn.question}
+      </p>
+      {state.phase === 'pending' && <Typing />}
       {state.phase === 'answered' && (
         <AnswerView answer={state.answer} fromData={state.fromData} onLink={onLink} by={answeredBy(state.answer.provider, models)} />
       )}
@@ -185,15 +382,37 @@ function TurnView({
       )}
       {state.phase === 'unavailable' && <Suggestions heading={chatCopy.unavailable} onPick={onPick} disabled={pending} />}
       {state.phase === 'error' && (
-        <p role="alert" className="text-[13px] text-destructive">
-          {state.message}
-        </p>
+        <div role="alert" className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[13px]">
+          <span className="text-destructive">{state.message}</span>
+          {turn.asked === 'ai' && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onRetry(turn.question)}
+              className="rounded-md font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground"
+            >
+              {chatCopy.retry}
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-/** One answer: whose sentence it is (and which model wrote it), the sentence with its value chips, and what each value is. */
+/** The answer on its way: three dots in the assistant's place, and the words for a screen reader. */
+function Typing() {
+  return (
+    <div role="status" className="flex w-fit items-center gap-1 rounded-[18px] rounded-bl-[6px] bg-grouped px-3.5 py-3">
+      <span className="sr-only">{chatCopy.sending}</span>
+      {['[animation-delay:0ms]', '[animation-delay:160ms]', '[animation-delay:320ms]'].map((delay) => (
+        <span key={delay} aria-hidden className={cn('size-1.5 rounded-full bg-muted-foreground/70 motion-safe:animate-pulse', delay)} />
+      ))}
+    </div>
+  )
+}
+
+/** One answer: whose sentence it is (and which model wrote it), the sentence with its value chips, and the sources. */
 function AnswerView({
   answer,
   fromData,
@@ -208,30 +427,53 @@ function AnswerView({
   const byId = new Map(answer.facts.map((f) => [f.id, f]))
   const tag = answerTag(answer, fromData)
   return (
-    <div data-testid="chat-answer" data-provider={answer.provider} data-kind={tag.kind} className="flex flex-col gap-2.5 rounded-2xl bg-grouped p-3.5">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <div
+      data-testid="chat-answer"
+      data-provider={answer.provider}
+      data-kind={tag.kind}
+      className="flex flex-col gap-2 rounded-[18px] rounded-bl-[6px] bg-grouped px-3.5 pt-2.5 pb-3"
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <ExplainedTag help={tag.help}>{tag.label}</ExplainedTag>
-        {!fromData && by !== null && <span className="text-[11px] text-muted-foreground">{chatCopy.models.writtenBy(by)}</span>}
+        {!fromData && by !== null && <span className="min-w-0 truncate text-[11px] text-muted-foreground">{chatCopy.models.writtenBy(by)}</span>}
       </div>
-      <p className="text-sm leading-relaxed break-words">
+      <p className="text-[14px] leading-relaxed break-words">
         {answer.segments.map((segment, i) => {
           const fact = segment.factId === null ? undefined : byId.get(segment.factId)
           if (fact !== undefined) return <FactChip key={i} fact={fact} onLink={onLink} />
           return <span key={i}>{segment.text}</span>
         })}
       </p>
-      {answer.facts.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <h3 className="text-[11px] font-medium text-muted-foreground">{chatCopy.sources}</h3>
-          <ul className="flex flex-col gap-0.5">
-            {answer.facts.map((fact) => (
-              <li key={fact.id} className="flex flex-col text-xs">
-                <span className="text-[11px] text-muted-foreground">{factLabel(fact)}</span>
-                <span className="font-medium break-words">{factValue(fact)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {answer.facts.length > 0 && <Sources facts={answer.facts} />}
+    </div>
+  )
+}
+
+/** Each value of an answer with what it is, folded away until asked for: the chips already say it on hover. */
+function Sources({ facts }: { facts: ChatFactView[] }) {
+  const [shown, setShown] = useState(false)
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={shown}
+        aria-controls={id}
+        onClick={() => setShown((s) => !s)}
+        className="inline-flex w-fit items-center gap-1 rounded-md text-[11.5px] font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {chatCopy.showSources(facts.length)}
+        <ChevronDownIcon className={cn('size-3.5 transition-transform duration-200', shown && 'rotate-180')} aria-hidden />
+      </button>
+      {shown && (
+        <ul id={id} aria-label={chatCopy.sources} className="flex flex-col gap-1.5 pt-2 shadow-[0_-0.5px_0_var(--hairline)]">
+          {facts.map((fact) => (
+            <li key={fact.id} className="flex items-baseline justify-between gap-3 text-[12px]">
+              <span className="min-w-0 text-muted-foreground">{factLabel(fact)}</span>
+              <span className="text-right font-medium break-words tabular-nums">{factValue(fact)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -292,7 +534,7 @@ function Suggestions({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[13px] text-ink-2">{heading}</p>
-      {sub !== undefined && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+      {sub !== undefined && <p className="text-[11.5px] text-muted-foreground">{sub}</p>}
       <div className="flex flex-wrap gap-1.5">
         {TEMPLATES.map((template) => (
           <Button

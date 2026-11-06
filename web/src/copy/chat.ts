@@ -2,17 +2,23 @@
 // them is filled in from the workspace's data and shown as a chip that says what it is.
 
 export const chatCopy = {
-  open: 'Ask',
-  title: 'Ask about your data',
-  close: 'Close the chat',
-  intro:
-    'Ask about your suppliers and emissions, or for help with TraceGreen. Every value in an answer is filled in from your data, never by the AI.',
-  placeholder: 'Ask anything about your suppliers and emissions',
+  open: 'AI assistant',
+  title: 'AI assistant',
+  subtitle: 'Answers from your supplier data',
+  close: 'Close the AI assistant',
+  newChat: 'New chat',
+  welcome: 'Ask about your suppliers and emissions, or for help with TraceGreen.',
+  intro: 'Every value in an answer is filled in from your data, never by the AI.',
+  placeholder: 'Ask about your suppliers and emissions',
   inputLabel: 'Your question',
-  send: 'Ask',
+  send: 'Send',
   sending: 'Checking your data…',
   tryThese: 'Try one of these',
   sources: 'Sources',
+  /** The toggle that shows or hides an answer's sources, with how many there are. */
+  showSources: (count: number) => `Sources (${count})`,
+  jumpToLatest: 'Jump to the latest message',
+  retry: 'Try again',
   aiWrittenHelp:
     'An AI wrote this sentence. Every value in it was filled in from your data, and its claims were checked against the data before it was shown.',
   fromDataHelp: 'Answered from your data with a fixed sentence; no AI was involved.',
