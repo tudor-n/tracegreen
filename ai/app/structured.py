@@ -84,13 +84,16 @@ def bind_models(
     factory: ModelFactory,
     schema: dict[str, Any],
     cap_s: float | None = None,
+    max_tokens: int | None = None,
 ) -> list[LazyModel]:
     """A lazy model per spec with this task's answer schema bound in. `cap_s` replaces each
     model's own timeout for a task with a longer budget; the client is built with it, so the
-    request timeout follows."""
+    request timeout follows. `max_tokens` caps each answer for a task whose answer is short."""
     bound = []
     for spec in specs:
         if cap_s is not None:
             spec = dataclasses.replace(spec, timeout_s=cap_s)
+        if max_tokens is not None:
+            spec = dataclasses.replace(spec, max_tokens=max_tokens)
         bound.append(LazyModel(spec, functools.partial(factory, spec, schema)))
     return bound

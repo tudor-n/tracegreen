@@ -166,8 +166,11 @@ def test_without_a_model_or_facts_nothing_is_asked() -> None:
     assert fakes.prompts == []
 
 
-def client(fakes: ChatFakes, **env: str) -> TestClient:
-    return TestClient(create_app(Settings.from_env({**ENV, **env}), fakes))
+def client(fakes: ChatFakes, local: tuple[str, ...] = (), **env: str) -> TestClient:
+    """`local` stands in for the Ollama server's models, so no test asks a real server."""
+    return TestClient(
+        create_app(Settings.from_env({**ENV, **env}), fakes, local_models=lambda: local)
+    )
 
 
 def post(test_client: TestClient, model: str | None) -> Any:
@@ -189,6 +192,7 @@ def test_the_chat_lists_its_models_in_order_with_why_one_is_not_ready() -> None:
                 "model": "claude-x",
                 "ready": False,
                 "reason": "ANTHROPIC_API_KEY not set",
+                "automatic": True,
             },
             {
                 "id": "ollama:local:3b",
@@ -196,6 +200,7 @@ def test_the_chat_lists_its_models_in_order_with_why_one_is_not_ready() -> None:
                 "model": "local:3b",
                 "ready": True,
                 "reason": None,
+                "automatic": True,
             },
         ]
     }
@@ -258,3 +263,59 @@ def test_no_model_named_keeps_the_order() -> None:
     )
 
     assert post(client(fakes), None).json()["provider"] == "ollama:local:3b"
+
+
+def test_the_ollama_servers_other_models_follow_and_automatic_does_not_ask_them() -> None:
+    body = client(ChatFakes({}), local=("local:3b", "qwen2.5:14b")).get("/chat/models").json()
+
+    assert [(m["id"], m["ready"], m["automatic"]) for m in body["models"]] == [
+        ("openai:model-a", True, True),
+        ("ollama:local:3b", True, True),
+        ("ollama:qwen2.5:14b", True, False),
+    ]
+
+
+def test_a_picked_local_model_answers_alone_with_the_chat_caps() -> None:
+    fakes = ChatFakes({"ollama:qwen2.5:14b": answer("{{S1.name}} emits {{S1.carbon}}.")})
+
+    body = post(client(fakes, local=("qwen2.5:14b",), AI_MODELS=""), "ollama:qwen2.5:14b").json()
+
+    assert body["provider"] == "ollama:qwen2.5:14b"
+    (spec,) = fakes.specs
+    assert (spec.timeout_s, spec.max_tokens) == (12, 400)
+
+
+def test_automatic_with_only_local_models_asks_none_and_a_model_the_server_lacks_is_422() -> None:
+    fakes = ChatFakes({})
+    test_client = client(fakes, local=("qwen2.5:14b",), AI_MODELS="")
+
+    assert post(test_client, None).json()["provider"] == "stub"
+    assert post(test_client, "ollama:llama9:70b").json()["detail"]["code"] == "unknown_model"
+    assert fakes.prompts == []
+
+
+def test_every_chat_model_gets_the_answer_cap() -> None:
+    fakes = ChatFakes({"openai:model-a": answer("{{S1.name}}.")})
+
+    post(client(fakes), None)
+
+    assert fakes.specs[0].max_tokens == 400
+
+
+def test_a_prompt_too_long_for_the_ollama_context_skips_the_local_model() -> None:
+    many = [
+        {"id": f"S{i}.name", "about": f"supplier S{i}: name", "value": "A supplier name " * 10}
+        for i in range(1, 200)
+    ]
+    fakes = ChatFakes(
+        {
+            "openai:model-a": answer("{{S1.name}} emits 4.7 t."),
+            "ollama:local:3b": answer("{{S1.name}}."),
+        }
+    )
+    test_client = client(fakes, OLLAMA_NUM_CTX="2048")
+
+    body = test_client.post("/chat", json={"question": "Who?", "facts": many}).json()
+
+    assert body["provider"] == "none"
+    assert [s.id for s in fakes.specs] == ["openai:model-a"]

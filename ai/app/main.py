@@ -6,6 +6,7 @@ carbon number. The C# API calls it with a
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Sequence
 
 from fastapi import FastAPI, HTTPException
 
@@ -19,6 +20,7 @@ from app.config import (
     settings,
 )
 from app.extract import build_extractor
+from app.local_models import OllamaTags
 from app.models import ModelFactory, chat_model_factory
 from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
@@ -41,10 +43,15 @@ from app.suggest import build_suggester
 log = logging.getLogger(__name__)
 
 
-def create_app(config: Settings, model_factory: ModelFactory | None = None) -> FastAPI:
+def create_app(
+    config: Settings,
+    model_factory: ModelFactory | None = None,
+    local_models: Callable[[], Sequence[str]] | None = None,
+) -> FastAPI:
     """The app for one configuration. The seed files are read here, so a broken seed fails
     at startup. Tests pass a `model_factory` of fake models; production builds the LangChain
-    chat models of AI_MODELS."""
+    chat models of AI_MODELS. `local_models` lists the Ollama server's models for the chat box;
+    by default the server is asked (GET /api/tags) when OLLAMA_DISCOVER is on."""
     if config.ai_timeout_s >= API_TIMEOUT_S:
         log.warning(
             "AI_TIMEOUT_S is %g s, not under the API's %g s timeout (AI_TIMEOUT_MS): the API "
@@ -69,7 +76,9 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
     # model is first called.
     factory = model_factory or chat_model_factory(config)
     suggester = build_suggester(config, factory)
-    chat_task = build_chat(config, factory)
+    if local_models is None and config.ollama_discover:
+        local_models = OllamaTags(config.ollama_base_url).names
+    chat_task = build_chat(config, factory, local_models)
     extractor = build_extractor(config, factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
 
@@ -111,8 +120,9 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
 
     @app.get("/chat/models", response_model=ChatModelsResponse)
     def chat_models() -> ChatModelsResponse:
-        # The models the chat box offers, in the order the chat tries them; a model without
-        # its key is listed, not ready, with the reason, so the picker can say why.
+        # The models the chat box offers: the chat's own in the order Automatic tries them, a
+        # model without its key listed, not ready, with the reason; then the Ollama server's
+        # other models, which are asked only when picked.
         return ChatModelsResponse(
             models=[
                 ChatModel(
@@ -121,8 +131,9 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
                     model=spec.model,
                     ready=spec.ready,
                     reason=spec.reason,
+                    automatic=automatic,
                 )
-                for spec in config.chat_specs
+                for spec, automatic in chat_task.listed()
             ]
         )
 

@@ -81,12 +81,16 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
 
             # ChatOllama has no retry setting: its HTTP client never retries. reasoning=False
             # turns off a thinking mode, such as Qwen 3.5's, which would use up the budget; a
-            # model without one, such as ministral-3, accepts it.
+            # model without one, such as ministral-3, accepts it. num_ctx is one value for every
+            # task (OLLAMA_NUM_CTX), since Ollama reloads the model when it changes; num_predict
+            # caps a short task's answer (the chat), so a confused model stops in seconds.
             model = ChatOllama(
                 model=spec.model,
                 base_url=settings.ollama_base_url,
                 temperature=0,
                 reasoning=False,
+                num_ctx=settings.ollama_num_ctx,
+                num_predict=spec.max_tokens,
                 client_kwargs={"timeout": spec.timeout_s},
             )
             # stream=False: ChatOllama streams by default, so its timeout would bound each chunk,

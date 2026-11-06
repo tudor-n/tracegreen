@@ -37,6 +37,10 @@ class ModelSpec:
     timeout_s: float
     ready: bool
     reason: str | None
+    # The most tokens one answer may take, for a task whose answer is short (the chat); None:
+    # the model's own limit. Applied to Ollama models (num_predict), so a confused local model
+    # stops in seconds instead of writing until its cap.
+    max_tokens: int | None = None
 
     @property
     def id(self) -> str:
@@ -58,6 +62,13 @@ class Settings:
     # AI_CHAT_MODELS: the models the chat may use, when it should not use all of AI_MODELS (the
     # chat sends supplier names and figures, which /classify never does). None: AI_MODELS.
     chat_models: tuple[ModelSpec, ...] | None = None
+    # OLLAMA_NUM_CTX: Ollama's context window in tokens, the same for every task, since Ollama
+    # reloads the model whenever it changes. Ollama's own 4096 is too small for the chat's facts
+    # (about 5,700 tokens with eight deliveries), and it cuts a longer prompt without a word.
+    ollama_num_ctx: int = 12288
+    # OLLAMA_DISCOVER: the chat box also offers the models the Ollama server has (GET /api/tags),
+    # to be picked by name; Automatic keeps to AI_CHAT_MODELS, else AI_MODELS.
+    ollama_discover: bool = True
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
@@ -105,6 +116,8 @@ class Settings:
             )
             or None,
             ollama_base_url=_text(source, "OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
+            ollama_num_ctx=_tokens(source, "OLLAMA_NUM_CTX", 12288),
+            ollama_discover=_flag(source, "OLLAMA_DISCOVER", default="1"),
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
             openai_api_key=keys["OPENAI_API_KEY"],
@@ -176,8 +189,20 @@ def _seconds(source: Mapping[str, str], name: str, default: float) -> float:
     return value
 
 
-def _flag(source: Mapping[str, str], name: str) -> bool:
-    raw = _text(source, name) or "0"
+MIN_OLLAMA_NUM_CTX = 2048
+
+
+def _tokens(source: Mapping[str, str], name: str, default: int) -> int:
+    raw = _text(source, name)
+    if raw is None:
+        return default
+    if not raw.isdigit() or int(raw) < MIN_OLLAMA_NUM_CTX:
+        raise ValueError(f"{name} must be a whole number >= {MIN_OLLAMA_NUM_CTX}, not {raw!r}")
+    return int(raw)
+
+
+def _flag(source: Mapping[str, str], name: str, default: str = "0") -> bool:
+    raw = _text(source, name) or default
     if raw not in ("0", "1"):
         raise ValueError(f"{name} must be 0 or 1, not {raw!r}")
     return raw == "1"

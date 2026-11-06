@@ -108,14 +108,16 @@ class ChatRequest(Wire):
 
 
 class ChatModel(Wire):
-    """A model the chat may use (AI_CHAT_MODELS, else AI_MODELS), in the order the chat tries
-    them; `reason` says why one is not ready, e.g. a missing key."""
+    """A model the chat may use: its own (AI_CHAT_MODELS, else AI_MODELS) in the order the chat
+    tries them, which Automatic asks, then the local Ollama models, which are asked only when
+    picked. `reason` says why one is not ready, e.g. a missing key."""
 
     id: str
     provider: str
     model: str
     ready: bool
     reason: str | None = None
+    automatic: bool
 
 
 class ChatModelsResponse(Wire):
