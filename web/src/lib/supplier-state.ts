@@ -18,7 +18,8 @@ import { type Answers, canSubmit, offeredEnergy, offeredModes, preselect } from 
 
 /**
  * What a failed request means. `invalid`, `expired` and `gone` end the link; `changed` means the one delivery moved on
- * (already confirmed, no longer listed) and the list should be loaded again; `rateLimited` and `offline` can be retried.
+ * (already confirmed, answered from elsewhere a moment earlier, no longer listed) and the list should be loaded again;
+ * `rateLimited` and `offline` can be retried.
  */
 export type SupplierFailure = 'invalid' | 'expired' | 'gone' | 'changed' | 'rateLimited' | 'offline'
 
@@ -51,6 +52,7 @@ export function supplierFailureFor(status: number | null, code: ProblemCode | nu
     case 'RateLimited':
       return 'rateLimited'
     case 'AlreadyConfirmed':
+    case 'DeliveryChanged':
     case 'NodeNotFound':
     case 'InvalidAnswer':
       return 'changed'

@@ -54,6 +54,7 @@ describe('supplierFailureFor', () => {
     [410, 'LinkExpired', 'expired'],
     [410, 'InvoiceChanged', 'gone'],
     [409, 'AlreadyConfirmed', 'changed'],
+    [409, 'DeliveryChanged', 'changed'],
     [404, 'NodeNotFound', 'changed'],
     [422, 'InvalidAnswer', 'changed'],
     [429, 'RateLimited', 'rateLimited'],

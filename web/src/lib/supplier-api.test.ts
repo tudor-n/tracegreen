@@ -82,6 +82,7 @@ describe('answer', () => {
 
   it.each([
     [409, 'AlreadyConfirmed', 'changed'],
+    [409, 'DeliveryChanged', 'changed'],
     [404, 'NodeNotFound', 'changed'],
     [422, 'InvalidAnswer', 'changed'],
     [401, 'InvalidToken', 'invalid'],

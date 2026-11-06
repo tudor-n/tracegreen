@@ -37,7 +37,7 @@ Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven ste
 
 Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 22 script tests (`node --test scripts/lib/*.test.mjs`, 10 of them for demo-check).
 
-Test counts after F12: 303 .NET tests, 289 in memory mode (the 14 Postgres contract tests skipped), 303 with `DATABASE_URL` on `tracegreen_test`; 234 web unit tests; two Playwright specs (the demo-path smoke and `supplier-portal.spec.ts`).
+Test counts after F12: 311 .NET tests, 294 in memory mode (the 17 Postgres contract tests skipped), 311 with `DATABASE_URL` on `tracegreen_test`; 236 web unit tests; two Playwright specs (the demo-path smoke and `supplier-portal.spec.ts`).
 
 ## Wire contract (slice 1)
 
@@ -113,9 +113,9 @@ One link per supplier, opened on the supplier's phone, that lists every delivery
 |---|---|---|
 | `POST /api/portal-link {nodeId}` | 201 `RequestLinkResponse { nodeId, url, expiresAt, loopback }`, where `url` is `<baseUrl>/supplier?t=p1.…`; appends `portal.requested` | `NodeNotFound` → 404 |
 | `POST /api/portal/view {t}` | 200 `PortalView { supplierLabel, buyerName, expiresAt, items }`. Each `PortalItem` holds the invoice number and date, the dominant line's description, the lane's origin, destination and modes, `status`, `answeredMode` and `answeredEnergy`, and the answers to pre-select (`defaultMode`, `defaultEnergy`). Open deliveries come first. No carbon figure, nothing personal | `InvalidToken` → 401; `LinkExpired`, `InvoiceChanged` (the link's delivery is gone) → 410; `RateLimited` → 429 |
-| `POST /api/portal/answer {t, nodeId, transportMode?, energySource?}` | 200 `PortalAnswerResult { outcome: VerifyOutcome, view: PortalView }`, through a fresh single-use verification link, so `link.requested` (actor `portal`), `verification.submitted`, `node.verified` and `audit.appended` are those of a phone answer | as above, plus `NodeNotFound` → 404 (not this supplier's), `AlreadyConfirmed` → 409, `InvalidAnswer` → 422 |
+| `POST /api/portal/answer {t, nodeId, transportMode?, energySource?}` | 200 `PortalAnswerResult { outcome: VerifyOutcome, view: PortalView }`, through a fresh single-use verification link, so `link.requested` (actor `portal`), `verification.submitted`, `node.verified` and `audit.appended` are those of a phone answer | as above, plus `NodeNotFound` → 404 (not this supplier's), `AlreadyConfirmed` → 409, `DeliveryChanged` → 409 (another answer to the same delivery landed first; nothing written), `InvalidAnswer` → 422 |
 
-Pre-selection: the answer a delivery already has, else the lane's default mode and the power source of the supplier's most recent answer, else grid. The page's rate limit is 3 × `RATE_LIMIT_PER_MIN` per address, counted apart from `/api/verify*`.
+Pre-selection: the answer a delivery already has, else the lane's default mode and the power source of the supplier's most recent answer, else grid. A question skipped on this page keeps the answer the delivery already has, so a PARTIAL delivery only gains answers. The page's rate limit is 3 × `RATE_LIMIT_PER_MIN` per address, counted apart from `/api/verify*`.
 
 On stage: Reset demo → Import `seed/invoices/adversarial.xml` (a second invoice from N3's seller, Oradea Harness SRL) → click N3 → "Supplier page link" → scan with the phone → confirm both deliveries; each flips on the dashboard. The adversarial line's injected instruction shows on its card as plain text, which is itself the proof that invoice text is only rendered. Skip the import to show N3 alone.
 

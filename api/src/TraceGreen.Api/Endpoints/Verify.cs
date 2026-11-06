@@ -80,6 +80,8 @@ public static class VerifyEndpoints
             VerifyErrorCode.AlreadyUsed => ProblemCode.AlreadyUsed,
             VerifyErrorCode.InvalidAnswer => ProblemCode.InvalidAnswer,
             VerifyErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
+            // Only a submit that passes an expected node state gets this; the phone routes never do.
+            VerifyErrorCode.NodeChanged => ProblemCode.DeliveryChanged,
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, null),
         },
         error.Message);

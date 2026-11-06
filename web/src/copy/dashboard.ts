@@ -233,4 +233,5 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   ModeNotAvailable: 'This lane has no such mode.',
   MassUnknown: 'Mass unknown for this item.',
   AlreadyConfirmed: 'Already confirmed by the supplier.',
+  DeliveryChanged: 'Another answer arrived first.',
 }

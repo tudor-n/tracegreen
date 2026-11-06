@@ -14,8 +14,9 @@ namespace TraceGreen.Domain.Services;
 /// <summary>
 /// Ruling 5 maps these to HTTP: <see cref="InvalidToken"/> 401, <see cref="Expired"/> and <see cref="InvoiceChanged"/>
 /// 410, <see cref="AlreadyUsed"/> 409, <see cref="InvalidAnswer"/> 422, <see cref="NodeNotFound"/> 404 (dev path only).
+/// <see cref="NodeChanged"/> 409 comes only from a submit that passes the node state it expects (the supplier page, F12).
 /// </summary>
-public enum VerifyErrorCode { InvalidToken, Expired, InvoiceChanged, AlreadyUsed, InvalidAnswer, NodeNotFound }
+public enum VerifyErrorCode { InvalidToken, Expired, InvoiceChanged, AlreadyUsed, InvalidAnswer, NodeNotFound, NodeChanged }
 
 public sealed record VerifyError(VerifyErrorCode Code, string Message);
 
@@ -79,7 +80,16 @@ public sealed class VerifyService(
     }
 
     /// <param name="clientAddress">Hashed with <see cref="ServiceOptions.IpHashKey"/> before it is stored; never stored as is.</param>
-    public async Task<Result<VerifyOutcome, VerifyError>> SubmitAsync(VerifyAnswer answer, string? clientAddress, CancellationToken ct)
+    public Task<Result<VerifyOutcome, VerifyError>> SubmitAsync(VerifyAnswer answer, string? clientAddress, CancellationToken ct) =>
+        SubmitAsync(answer, clientAddress, expected: null, ct);
+
+    /// <param name="clientAddress">Hashed with <see cref="ServiceOptions.IpHashKey"/> before it is stored; never stored as is.</param>
+    /// <param name="expected">
+    /// The node's status and answers the caller built this answer on. The repository compares them under the write's lock and
+    /// refuses with <see cref="VerifyErrorCode.NodeChanged"/> when another answer landed first. Null for the phone page.
+    /// </param>
+    public async Task<Result<VerifyOutcome, VerifyError>> SubmitAsync(
+        VerifyAnswer answer, string? clientAddress, NodeAnswerState? expected, CancellationToken ct)
     {
         var opened = await OpenAsync(answer.Token, ct);
         if (!opened.IsOk)
@@ -121,7 +131,12 @@ public sealed class VerifyService(
             ["warnings"] = new JsonArray(warnings.Select(w => (JsonNode)JsonValue.Create(Name(w.Code))).ToArray()),
         };
         var recorded = await repo.RecordVerificationAsync(
-            link.Ctx, verification, patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", payload), ct);
+            link.Ctx, verification, patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", payload),
+            expected, ct);
+        if (recorded.Status == RecordVerificationStatus.NodeChanged)
+        {
+            return Fail(new VerifyError(VerifyErrorCode.NodeChanged, "Another answer for this item arrived first."));
+        }
         if (recorded.Status == RecordVerificationStatus.AlreadyUsed || recorded is not { Node: { } patched, Entry: { } entry })
         {
             return Fail(Used());

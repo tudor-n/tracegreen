@@ -236,6 +236,49 @@ public class PortalEndpointTests : IClassFixture<VerifyWebAppFactory>
     }
 
     [Fact]
+    public async Task ASkippedQuestionKeepsTheAnswerTheDeliveryAlreadyHas()
+    {
+        await Reset();
+        var token = await Token(N5);
+        Assert.Equal(TransportMode.Road, (await Repo.GetNodeAsync(Ctx, N5, Ct))!.TransportMode);
+
+        // Mode skipped, energy given: the road answer N5 already had stays, so N5 completes instead of losing it.
+        var response = await Answer(token, N5, mode: null, energy: "grid");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("VERIFIED", (await Json(response)).GetProperty("outcome").GetProperty("status").GetString());
+        var node = (await Repo.GetNodeAsync(Ctx, N5, Ct))!;
+        Assert.Equal(TransportMode.Road, node.TransportMode);
+        Assert.Equal(EnergySource.Grid, node.EnergySource);
+        var latest = (await Repo.ListVerificationsAsync(Ctx, N5, Ct))[^1];
+        Assert.Equal(TransportMode.Road, latest.TransportMode);
+        Assert.Equal(EnergySource.Grid, latest.EnergySource);
+    }
+
+    [Fact]
+    public async Task SimultaneousAnswersToOneDeliveryLandOnce()
+    {
+        await Reset();
+        var token = await Token(N4);
+        var energies = new[] { "grid", "renewable", "unknown", "grid", "renewable", "unknown", "grid", "renewable" };
+
+        var responses = await Task.WhenAll(energies.Select(energy => Answer(token, N4, "road", energy)));
+
+        var winners = responses.Select((r, i) => (r, i)).Where(x => x.r.StatusCode == HttpStatusCode.OK).ToList();
+        var winner = Assert.Single(winners);
+        foreach (var loser in responses.Where(r => r.StatusCode != HttpStatusCode.OK))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, loser.StatusCode);
+            Assert.Contains((await Json(loser)).GetProperty("code").GetString(), new[] { "AlreadyConfirmed", "DeliveryChanged" });
+        }
+        // One verification, and the node holds the answer that landed.
+        Assert.Single(await Repo.ListVerificationsAsync(Ctx, N4, Ct));
+        var node = (await Repo.GetNodeAsync(Ctx, N4, Ct))!;
+        Assert.Equal(energies[winner.i], node.EnergySource.ToString()!.ToLowerInvariant());
+        Assert.True(TraceGreen.Domain.Audit.AuditChain.Verify(await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Valid);
+    }
+
+    [Fact]
     public async Task AnotherSuppliersDeliveryIs404()
     {
         await Reset();

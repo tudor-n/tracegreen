@@ -15,7 +15,8 @@ public sealed record PortalAnswerRequest(string? T, Guid NodeId, TransportMode? 
 /// on the buyer's graph. The token travels in request bodies only, so no API URL carries it; like the verify routes it never
 /// appears in a response body, an audit payload or a log line. Statuses: malformed or bad signature → 401
 /// <c>InvalidToken</c>; expired → 410 <c>LinkExpired</c>; the link's delivery gone → 410 <c>InvoiceChanged</c>; a delivery
-/// that is not this supplier's → 404 <c>NodeNotFound</c>; already confirmed → 409 <c>AlreadyConfirmed</c>; over
+/// that is not this supplier's → 404 <c>NodeNotFound</c>; already confirmed → 409 <c>AlreadyConfirmed</c>; answered by
+/// someone else between the page's read and this write (two answers at once) → 409 <c>DeliveryChanged</c>; over
 /// <see cref="RateLimitFactor"/> × <c>RATE_LIMIT_PER_MIN</c> per client address → 429 <c>RateLimited</c>, counted apart
 /// from the verify routes.
 /// </summary>
@@ -83,6 +84,7 @@ public static class PortalEndpoints
             PortalErrorCode.SupplierGone => ProblemCode.InvoiceChanged,
             PortalErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
             PortalErrorCode.AlreadyConfirmed => ProblemCode.AlreadyConfirmed,
+            PortalErrorCode.DeliveryChanged => ProblemCode.DeliveryChanged,
             PortalErrorCode.InvalidAnswer => ProblemCode.InvalidAnswer,
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, null),
         },

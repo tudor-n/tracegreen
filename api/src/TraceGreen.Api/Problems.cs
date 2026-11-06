@@ -27,6 +27,7 @@ public enum ProblemCode
     [JsonStringEnumMemberName("ModeNotAvailable")] ModeNotAvailable,
     [JsonStringEnumMemberName("MassUnknown")] MassUnknown,
     [JsonStringEnumMemberName("AlreadyConfirmed")] AlreadyConfirmed,
+    [JsonStringEnumMemberName("DeliveryChanged")] DeliveryChanged,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -61,6 +62,7 @@ public static class Problems
             ProblemCode.ModeNotAvailable => (StatusCodes.Status422UnprocessableEntity, "Mode not available on this lane"),
             ProblemCode.MassUnknown => (StatusCodes.Status422UnprocessableEntity, "Mass unknown"),
             ProblemCode.AlreadyConfirmed => (StatusCodes.Status409Conflict, "Delivery already confirmed"),
+            ProblemCode.DeliveryChanged => (StatusCodes.Status409Conflict, "Delivery changed since the page read it"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

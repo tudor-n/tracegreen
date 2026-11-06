@@ -11,10 +11,10 @@ namespace TraceGreen.Domain.Services;
 
 /// <summary>
 /// Mapped to HTTP by the portal endpoints: <see cref="InvalidToken"/> 401, <see cref="Expired"/> and
-/// <see cref="SupplierGone"/> 410, <see cref="NodeNotFound"/> 404, <see cref="AlreadyConfirmed"/> 409,
-/// <see cref="InvalidAnswer"/> 422.
+/// <see cref="SupplierGone"/> 410, <see cref="NodeNotFound"/> 404, <see cref="AlreadyConfirmed"/> and
+/// <see cref="DeliveryChanged"/> 409, <see cref="InvalidAnswer"/> 422.
 /// </summary>
-public enum PortalErrorCode { InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, InvalidAnswer }
+public enum PortalErrorCode { InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, DeliveryChanged, InvalidAnswer }
 
 public sealed record PortalError(PortalErrorCode Code, string Message);
 
@@ -25,6 +25,9 @@ public sealed record PortalError(PortalErrorCode Code, string Message);
 /// An answer goes the way <see cref="DemoService.SimulateAnswerAsync"/> goes: a fresh single-use verification link for
 /// that node, submitted through <see cref="VerifyService"/>. So validation, status, plausibility, the verification row,
 /// the audit entries and the <c>node.verified</c> event are those of an answer from the phone page.
+/// Two rules keep a reusable link from undoing what a supplier confirmed: a question skipped here keeps the answer the
+/// delivery already has, and the answer is recorded only if the delivery is still as this page read it (checked under the
+/// repository's lock), so of two answers sent at once the second gets <see cref="PortalErrorCode.DeliveryChanged"/>.
 /// </summary>
 public sealed class PortalService(
     IRepository repo,
@@ -78,7 +81,11 @@ public sealed class PortalService(
         return Result<PortalView, PortalError>.Ok(await BuildViewAsync(opened.Value, ct));
     }
 
-    /// <summary>Answers one delivery, then returns the list as it now is: new order, and the answer's power source pre-selected elsewhere.</summary>
+    /// <summary>
+    /// Answers one delivery, then returns the list as it now is: new order, and the answer's power source pre-selected
+    /// elsewhere. A skipped question keeps the delivery's earlier answer; the verification row records the answers the
+    /// delivery rests on after this one.
+    /// </summary>
     /// <param name="clientAddress">Passed on to <see cref="VerifyService.SubmitAsync"/>, which stores only its hash.</param>
     public async Task<Result<PortalAnswerResult, PortalError>> AnswerAsync(
         string? token, Guid nodeId, TransportMode? mode, EnergySource? energy, string? clientAddress, CancellationToken ct)
@@ -107,7 +114,10 @@ public sealed class PortalService(
         {
             return Fail(new PortalError(PortalErrorCode.InvalidAnswer, "Answer at least one question."));
         }
-        if (mode is { } m && !Simulator.AvailableModes(lane).Contains(m))
+        // A half-confirmed delivery only gains answers here: skipping the question it already has keeps that answer.
+        var keptMode = mode ?? node.TransportMode;
+        var keptEnergy = energy ?? node.EnergySource;
+        if (keptMode is { } m && !Simulator.AvailableModes(lane).Contains(m))
         {
             return Fail(new PortalError(PortalErrorCode.InvalidAnswer, $"Lane {lane.Id} has no {m.ToString().ToLowerInvariant()} leg."));
         }
@@ -117,7 +127,8 @@ public sealed class PortalService(
         {
             return Fail(new PortalError(PortalErrorCode.NodeNotFound, minted.Error.Message));
         }
-        var submitted = await verify.SubmitAsync(new VerifyAnswer(minted.Value.Token, mode, energy, null), clientAddress, ct);
+        var submitted = await verify.SubmitAsync(
+            new VerifyAnswer(minted.Value.Token, keptMode, keptEnergy, null), clientAddress, NodeAnswerState.Of(node), ct);
         return submitted.IsOk
             ? Result<PortalAnswerResult, PortalError>.Ok(new PortalAnswerResult(submitted.Value, await BuildViewAsync(supplier, ct)))
             : Fail(From(submitted.Error));
@@ -247,6 +258,7 @@ public sealed class PortalService(
             VerifyErrorCode.Expired => PortalErrorCode.Expired,
             VerifyErrorCode.InvoiceChanged => PortalErrorCode.SupplierGone,
             VerifyErrorCode.AlreadyUsed => PortalErrorCode.AlreadyConfirmed,
+            VerifyErrorCode.NodeChanged => PortalErrorCode.DeliveryChanged,
             _ => PortalErrorCode.InvalidToken,
         },
         error.Message);
