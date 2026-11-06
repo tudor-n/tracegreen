@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import type { ProblemCode, VerifyContext } from '@/api/client'
 import { verifyCopy } from '@/copy/verify'
+import { DEMO_CERT_IDS, DEMO_CONTAINER, demoDocId } from './demo-samples'
+import { EMPTY_EVIDENCE } from './evidence'
 import {
   canSend,
   canSubmit,
+  demoEvidenceInputs,
+  demoTags,
   failureFor,
   formatIssueDate,
   initialVerifyState,
   offeredEnergy,
   offeredModes,
+  proofProblems,
   reconfirmLines,
   resolveLang,
   submitBody,
   verifyReducer,
+  type VerifyInput,
   type VerifyState,
 } from './verify-state'
 import { verifyTerms } from './test-fixtures'
+
+const TODAY = '2026-11-06'
 
 const context = (overrides: Partial<VerifyContext> = {}): VerifyContext => ({
   nodeId: '11111111-1111-4111-8111-000000000001',
@@ -36,7 +44,9 @@ const context = (overrides: Partial<VerifyContext> = {}): VerifyContext => ({
   ...overrides,
 })
 
-const ready = (ctx = context()): VerifyState => verifyReducer({ phase: 'loading' }, { kind: 'contextLoaded', context: ctx })
+const loaded = (ctx = context()): VerifyInput => ({ kind: 'contextLoaded', context: ctx, today: TODAY })
+
+const ready = (ctx = context()): VerifyState => verifyReducer({ phase: 'loading' }, loaded(ctx))
 
 /** Ready, with the supplier's tick on the terms. */
 const ticked = (ctx = context()): VerifyState => verifyReducer(ready(ctx), { kind: 'terms', accepted: true })
@@ -60,6 +70,7 @@ describe('failureFor', () => {
     [410, 'InvoiceChanged', 'invoiceChanged'],
     [429, 'RateLimited', 'rateLimited'],
     [422, 'InvalidAnswer', 'invalid'],
+    [422, 'InvalidEvidence', 'proofRefused'],
     [422, 'TermsNotAccepted', 'termsChanged'],
     [404, 'NodeNotFound', 'invalid'],
   ])('maps %s %s to %s', (status, code, failure) => {
@@ -141,6 +152,8 @@ describe('verifyReducer', () => {
       phase: 'submitting',
       context: context(),
       answers: { transport: 'air', energy: 'grid' },
+      evidence: EMPTY_EVIDENCE,
+      today: TODAY,
     })
 
     const unticked = verifyReducer(accepted, { kind: 'terms', accepted: false })
@@ -157,12 +170,13 @@ describe('verifyReducer', () => {
     const sending = verifyReducer(state, { kind: 'submit' })
     const changed = verifyReducer(sending, { kind: 'failed', failure: 'termsChanged' })
     const previous = { transport: 'sea', energy: null }
-    expect(changed).toEqual({ phase: 'failed', failure: 'termsChanged', retry: { phase: 'loading', previous } })
+    const kept = { phase: 'loading', previous, evidence: EMPTY_EVIDENCE }
+    expect(changed).toEqual({ phase: 'failed', failure: 'termsChanged', retry: kept })
 
     const reloading = verifyReducer(changed, { kind: 'retry' })
-    expect(reloading).toEqual({ phase: 'loading', previous })
+    expect(reloading).toEqual(kept)
     // The supplier's answers, not the defaults (air, grid), and the box unticked for the new text.
-    expect(verifyReducer(reloading, { kind: 'contextLoaded', context: context() })).toMatchObject({
+    expect(verifyReducer(reloading, loaded())).toMatchObject({
       phase: 'ready',
       answers: previous,
       accepted: false,
@@ -171,7 +185,7 @@ describe('verifyReducer', () => {
 
   it('falls back to the pre-selection when the reloaded link no longer offers a kept answer', () => {
     const reloading: VerifyState = { phase: 'loading', previous: { transport: 'sea', energy: 'renewable' } }
-    const state = verifyReducer(reloading, { kind: 'contextLoaded', context: context({ modes: ['air'] }) })
+    const state = verifyReducer(reloading, loaded(context({ modes: ['air'] })))
     expect(state).toMatchObject({ answers: { transport: 'air', energy: 'renewable' } })
   })
 
@@ -213,8 +227,155 @@ describe('verifyReducer', () => {
 
   it('ignores a reply that arrives in the wrong state', () => {
     const state = ready()
-    expect(verifyReducer(state, { kind: 'contextLoaded', context: context() })).toBe(state)
+    expect(verifyReducer(state, loaded())).toBe(state)
     expect(verifyReducer(state, { kind: 'failed', failure: 'offline' })).toBe(state)
+  })
+})
+
+describe('proof (F7)', () => {
+  const proof = (state: VerifyState, ...inputs: VerifyInput[]) => inputs.reduce(verifyReducer, state)
+  const container = (docId: string): VerifyInput[] => [
+    { kind: 'transport', value: 'sea' },
+    { kind: 'evidence', field: 'docType', value: 'containerNumber' },
+    { kind: 'evidence', field: 'docId', value: docId },
+  ]
+
+  it('starts empty and leaves the two-tap answer as it was', () => {
+    const state = ticked()
+    expect(state).toMatchObject({ phase: 'ready', evidence: EMPTY_EVIDENCE, today: TODAY })
+    const sending = verifyReducer(state, { kind: 'submit' })
+    expect(sending).toMatchObject({ phase: 'submitting', evidence: EMPTY_EVIDENCE })
+    if (sending.phase !== 'submitting') throw new Error('expected submitting')
+    expect(submitBody('v1.token', sending.answers, verifyTerms.sha256, sending.evidence)).not.toHaveProperty('evidence')
+  })
+
+  it('holds the answers back while a filled field has a problem, and sends once it is fixed', () => {
+    const typo = proof(ticked(), ...container('CSQU3054384'))
+    if (typo.phase !== 'ready') throw new Error('expected ready')
+    expect(proofProblems(typo).docId).toBe('checkDigit')
+    expect(verifyReducer(typo, { kind: 'submit' })).toBe(typo)
+
+    const fixed = verifyReducer(typo, { kind: 'evidence', field: 'docId', value: 'CSQU3054383' })
+    const sending = verifyReducer(fixed, { kind: 'submit' })
+    if (sending.phase !== 'submitting') throw new Error('expected submitting')
+    expect(submitBody('v1.token', sending.answers, verifyTerms.sha256, sending.evidence)).toEqual({
+      t: 'v1.token',
+      transportMode: 'sea',
+      energySource: 'grid',
+      acceptedTerms: verifyTerms.sha256,
+      evidence: {
+        shippingDocType: 'containerNumber',
+        shippingDocId: 'CSQU3054383',
+        dispatchDate: null,
+        energyCertType: null,
+        energyCertId: null,
+      },
+    })
+  })
+
+  it('stops counting a document once the transport answer no longer fits it', () => {
+    const typo = proof(ticked(), ...container('nope'))
+    const air = verifyReducer(typo, { kind: 'transport', value: 'air' })
+    expect(verifyReducer(air, { kind: 'submit' })).toMatchObject({ phase: 'submitting' })
+  })
+
+  it('refuses a dispatch date after tomorrow', () => {
+    const future = verifyReducer(ticked(), { kind: 'evidence', field: 'dispatchDate', value: '2026-11-08' })
+    expect(verifyReducer(future, { kind: 'submit' })).toBe(future)
+  })
+
+  it('ignores a document type the answer does not fit, and any change while sending', () => {
+    const state = ticked()
+    expect(verifyReducer(state, { kind: 'evidence', field: 'docType', value: 'billOfLading' })).toBe(state)
+    const sending = verifyReducer(state, { kind: 'submit' })
+    expect(verifyReducer(sending, { kind: 'evidence', field: 'docId', value: 'X' })).toBe(sending)
+  })
+
+  it('goes back to the questions when the API refuses the proof, keeping everything, and sends again once it is fixed', () => {
+    // The page's own check passes (a well-formed CMR number); the API refuses it all the same.
+    const road = context({ modes: ['road'], defaultMode: 'road' })
+    const given = proof(
+      ticked(road),
+      { kind: 'evidence', field: 'docType', value: 'cmr' },
+      { kind: 'evidence', field: 'docId', value: 'RO-1234' },
+      { kind: 'evidence', field: 'dispatchDate', value: '2026-10-20' },
+    )
+    const refused = proof(given, { kind: 'submit' }, { kind: 'failed', failure: 'proofRefused' })
+    expect(refused).toEqual({
+      phase: 'ready',
+      context: road,
+      answers: { transport: 'road', energy: 'grid' },
+      evidence: { ...EMPTY_EVIDENCE, docType: 'cmr', docId: 'RO-1234', dispatchDate: '2026-10-20' },
+      today: TODAY,
+      accepted: true,
+      proofRefused: true,
+    })
+
+    const fixed = verifyReducer(refused, { kind: 'evidence', field: 'docId', value: 'RO-5678' })
+    expect(fixed).toMatchObject({ phase: 'ready', proofRefused: false, accepted: true })
+    const sending = verifyReducer(fixed, { kind: 'submit' })
+    if (sending.phase !== 'submitting') throw new Error('expected submitting')
+    expect(submitBody('v1.token', sending.answers, verifyTerms.sha256, sending.evidence).evidence).toMatchObject({
+      shippingDocType: 'cmr',
+      shippingDocId: 'RO-5678',
+    })
+    expect(
+      verifyReducer(sending, { kind: 'submitted', outcome: { nodeId: road.nodeId, status: 'VERIFIED', warnings: [] } }),
+    ).toEqual({ phase: 'done', status: 'VERIFIED', warnings: [] })
+  })
+
+  it('clears the refusal line when the supplier clears the proof or changes an answer', () => {
+    const refused = proof(ticked(), ...container('CSQU3054383'), { kind: 'submit' }, { kind: 'failed', failure: 'proofRefused' })
+    expect(refused).toMatchObject({ phase: 'ready', proofRefused: true })
+    const cleared = proof(refused, { kind: 'evidence', field: 'docId', value: '' })
+    expect(cleared).toMatchObject({ proofRefused: false })
+    const sending = verifyReducer(cleared, { kind: 'submit' })
+    if (sending.phase !== 'submitting') throw new Error('expected submitting')
+    expect(submitBody('v1.token', sending.answers, verifyTerms.sha256, sending.evidence)).not.toHaveProperty('evidence')
+    expect(verifyReducer(refused, { kind: 'energy', value: null })).toMatchObject({ proofRefused: false })
+  })
+
+  it('ends the link on a proof refusal when no proof was sent, or while loading', () => {
+    const sending = verifyReducer(ticked(), { kind: 'submit' })
+    expect(verifyReducer(sending, { kind: 'failed', failure: 'proofRefused' })).toEqual({
+      phase: 'failed',
+      failure: 'invalid',
+      retry: null,
+    })
+    expect(verifyReducer({ phase: 'loading' }, { kind: 'failed', failure: 'proofRefused' })).toEqual({
+      phase: 'failed',
+      failure: 'invalid',
+      retry: null,
+    })
+  })
+
+  it('types the number alone under the usual document, and drops it when the new mode cannot carry it', () => {
+    const typed = proof(
+      ticked(),
+      { kind: 'transport', value: 'sea' },
+      { kind: 'evidence', field: 'docId', value: 'CSQU3054383' },
+    )
+    expect(proofProblems(typed as Extract<VerifyState, { phase: 'ready' }>)).toEqual({
+      docId: null,
+      dispatchDate: null,
+      certId: null,
+    })
+    // Rail carries containers: the number stays a container number.
+    expect(verifyReducer(typed, { kind: 'transport', value: 'rail' })).toMatchObject({
+      evidence: { docType: 'containerNumber', docId: 'CSQU3054383' },
+    })
+    // Air does not: the number goes, so it is never sent as an air waybill.
+    expect(verifyReducer(typed, { kind: 'transport', value: 'air' })).toMatchObject({ evidence: { docType: null, docId: '' } })
+  })
+
+  it('keeps the proof when changed terms are read again', () => {
+    const given = proof(ticked(), ...container('CSQU3054383'))
+    const changed = proof(given, { kind: 'submit' }, { kind: 'failed', failure: 'termsChanged' }, { kind: 'retry' })
+    expect(verifyReducer(changed, loaded())).toMatchObject({
+      phase: 'ready',
+      accepted: false,
+      evidence: { docType: 'containerNumber', docId: 'CSQU3054383' },
+    })
   })
 })
 
@@ -223,6 +384,11 @@ describe('canSend', () => {
     expect(canSend({ transport: 'sea', energy: null }, true)).toBe(true)
     expect(canSend({ transport: 'sea', energy: null }, false)).toBe(false)
     expect(canSend({ transport: null, energy: null }, true)).toBe(false)
+  })
+
+  it('waits while the proof has a problem', () => {
+    const problems = { docId: 'shape', dispatchDate: null, certId: null } as const
+    expect(canSend({ transport: 'sea', energy: null }, true, problems)).toBe(false)
   })
 })
 
@@ -238,6 +404,21 @@ describe('submitBody', () => {
 })
 
 describe('reconfirmLines', () => {
+  it('has a line for every warning code in both languages', () => {
+    for (const lang of ['ro', 'en'] as const) {
+      const lines = reconfirmLines(
+        [
+          { code: 'AIR_HEAVY', detail: '' },
+          { code: 'SEA_TOO_FAST', detail: '' },
+          { code: 'MASS_BELOW_INVOICE', detail: '' },
+        ],
+        verifyCopy[lang].reconfirm.warnings,
+      )
+      expect(lines).toHaveLength(3)
+      for (const line of lines) expect(line.length).toBeGreaterThan(0)
+    }
+  })
+
   it('gives one line per warning code, in the language shown', () => {
     const warnings = [
       { code: 'AIR_HEAVY' as const, detail: 'a' },
@@ -258,5 +439,52 @@ describe('formatIssueDate', () => {
 
   it('shows anything unreadable as it came', () => {
     expect(formatIssueDate('not a date', 'en')).toBe('not a date')
+  })
+})
+
+describe('demo values (demo tools)', () => {
+  const proof = (state: VerifyState, ...inputs: VerifyInput[]) => inputs.reduce(verifyReducer, state)
+  const answers = { transport: 'sea', energy: 'renewable' } as const
+
+  it('types the shown document and certificate with their samples, and the invoice date as the dispatch date', () => {
+    expect(demoEvidenceInputs(EMPTY_EVIDENCE, answers, '2026-10-28', TODAY)).toEqual([
+      { field: 'docType', value: 'containerNumber' },
+      { field: 'docId', value: DEMO_CONTAINER },
+      { field: 'dispatchDate', value: '2026-10-28' },
+      { field: 'certType', value: 'guaranteeOfOrigin' },
+      { field: 'certId', value: DEMO_CERT_IDS.guaranteeOfOrigin },
+    ])
+  })
+
+  it('follows the type the presenter picked, keeps the date by today, and fills nothing the page hides', () => {
+    const picked = { ...EMPTY_EVIDENCE, docType: 'billOfLading' as const }
+    expect(demoEvidenceInputs(picked, { transport: 'sea', energy: 'grid' }, '2026-11-20', TODAY)).toEqual([
+      { field: 'docType', value: 'billOfLading' },
+      { field: 'docId', value: demoDocId('billOfLading') },
+      { field: 'dispatchDate', value: TODAY },
+    ])
+    expect(demoEvidenceInputs(EMPTY_EVIDENCE, { transport: null, energy: 'grid' }, '2026-10-28', TODAY)).toEqual([])
+  })
+
+  it('goes through the usual inputs and checks, and is tagged until someone types over it', () => {
+    let state = proof(ticked(), { kind: 'transport', value: 'sea' }, { kind: 'energy', value: 'renewable' })
+    if (state.phase !== 'ready') throw new Error('expected ready')
+    const inputs = demoEvidenceInputs(state.evidence, state.answers, state.context.issueDate, state.today)
+    state = proof(state, ...inputs.map((input): VerifyInput => ({ kind: 'evidence', ...input })))
+    if (state.phase !== 'ready') throw new Error('expected ready')
+    expect(proofProblems(state)).toEqual({ docId: null, dispatchDate: null, certId: null })
+    expect(demoTags(state.evidence, state.answers)).toEqual({ docId: true, certId: true })
+    const sending = verifyReducer(state, { kind: 'submit' })
+    if (sending.phase !== 'submitting') throw new Error('expected submitting')
+    expect(submitBody('v1.token', sending.answers, verifyTerms.sha256, sending.evidence).evidence).toEqual({
+      shippingDocType: 'containerNumber',
+      shippingDocId: DEMO_CONTAINER,
+      dispatchDate: '2026-10-28',
+      energyCertType: 'guaranteeOfOrigin',
+      energyCertId: DEMO_CERT_IDS.guaranteeOfOrigin,
+    })
+    const typedOver = verifyReducer(state, { kind: 'evidence', field: 'docId', value: 'CSQU3054383' })
+    if (typedOver.phase !== 'ready') throw new Error('expected ready')
+    expect(demoTags(typedOver.evidence, typedOver.answers)).toEqual({ docId: false, certId: true })
   })
 })

@@ -15,7 +15,7 @@ const fact = (overrides: Partial<ChatFactView>): ChatFactView => ({
 
 describe('factValue', () => {
   it('formats every kind the way the rest of the app does', () => {
-    expect(factValue(fact({}))).toBe('4.9 tCO₂e')
+    expect(factValue(fact({}))).toBe('4.88 tCO₂e')
     expect(factValue(fact({ kind: 'eur', field: 'spend', value: '22000.4' }))).toBe('€22,000')
     expect(factValue(fact({ kind: 'days', field: 'leadTime', value: '1' }))).toBe('1 day')
     expect(factValue(fact({ kind: 'share', field: 'confirmedShare', value: '0.3256' }))).toBe('33%')
@@ -27,7 +27,7 @@ describe('factValue', () => {
   })
 
   it('signs a scenario change', () => {
-    expect(factValue(fact({ field: 'carbonDelta', value: '-15074' }))).toBe('-15.1 t')
+    expect(factValue(fact({ field: 'carbonDelta', value: '-15074' }))).toBe('-15.07 t')
     expect(factValue(fact({ kind: 'eur', field: 'costDelta', value: '8350' }))).toBe('+€8,350')
   })
 

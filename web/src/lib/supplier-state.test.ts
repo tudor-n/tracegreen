@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { PortalItem, PortalView } from '@/api/client'
+import { DEMO_CERT_IDS, demoDocId } from './demo-samples'
+import { EMPTY_EVIDENCE } from './evidence'
 import {
   answerBody,
   answerSummary,
   confirmedCount,
   draftFor,
+  draftProblems,
   initialSupplierState,
   type SupplierInput,
   type SupplierState,
@@ -13,6 +16,7 @@ import {
   termsAccepted,
 } from './supplier-state'
 import { verifyTerms } from './test-fixtures'
+import { demoEvidenceInputs } from './verify-state'
 
 const item = (overrides: Partial<PortalItem> = {}): PortalItem => ({
   nodeId: '11111111-1111-4111-8111-000000000003',
@@ -31,6 +35,7 @@ const item = (overrides: Partial<PortalItem> = {}): PortalItem => ({
   ...overrides,
 })
 
+const TODAY = '2026-11-06'
 const N3 = '11111111-1111-4111-8111-000000000003'
 const SECOND = '22222222-2222-4222-8222-0000000000aa'
 
@@ -44,7 +49,7 @@ const view = (items: PortalItem[] = [item(), item({ nodeId: SECOND, invoiceNumbe
 
 const run = (state: SupplierState, ...inputs: SupplierInput[]) => inputs.reduce(supplierReducer, state)
 
-const ready = (v: PortalView = view()) => run({ phase: 'loading' }, { kind: 'loaded', view: v })
+const ready = (v: PortalView = view()) => run({ phase: 'loading' }, { kind: 'loaded', today: TODAY, view: v })
 
 const tick: SupplierInput = { kind: 'terms', accepted: true }
 
@@ -62,6 +67,7 @@ describe('supplierFailureFor', () => {
     [409, 'DeliveryChanged', 'changed'],
     [404, 'NodeNotFound', 'changed'],
     [422, 'InvalidAnswer', 'changed'],
+    [422, 'InvalidEvidence', 'proofRefused'],
     [422, 'TermsNotAccepted', 'termsChanged'],
     [429, 'RateLimited', 'rateLimited'],
   ] as const)('maps %i %s to %s', (status, code, failure) => {
@@ -138,7 +144,14 @@ describe('draftFor', () => {
 describe('one delivery at a time', () => {
   it('opens a delivery with its pre-selected answers', () => {
     const state = readyState(run(ready(), { kind: 'open', nodeId: N3 }))
-    expect(state.draft).toEqual({ nodeId: N3, answers: { transport: 'road', energy: 'grid' }, sending: false, failure: null })
+    expect(state.draft).toEqual({
+      nodeId: N3,
+      answers: { transport: 'road', energy: 'grid' },
+      evidence: EMPTY_EVIDENCE,
+      sending: false,
+      failure: null,
+      proofRefused: false,
+    })
   })
 
   it('opening another one replaces the first', () => {
@@ -242,7 +255,7 @@ describe('supplier terms', () => {
       }),
     )
     expect(answered.accepted).toBeNull()
-    const reloaded = readyState(run(ready(), tick, { kind: 'reload' }, { kind: 'loaded', view: changedTerms() }))
+    const reloaded = readyState(run(ready(), tick, { kind: 'reload' }, { kind: 'loaded', today: TODAY, view: changedTerms() }))
     expect(reloaded.accepted).toBeNull()
   })
 
@@ -257,7 +270,7 @@ describe('supplier terms', () => {
     )
     expect(failed).toMatchObject({ stale: true, accepted: null })
     expect(failed.draft).toMatchObject({ nodeId: N3, answers, sending: false, failure: 'termsChanged' })
-    const reloaded = readyState(supplierReducer(failed, { kind: 'loaded', view: changedTerms() }))
+    const reloaded = readyState(supplierReducer(failed, { kind: 'loaded', today: TODAY, view: changedTerms() }))
     expect(reloaded.draft).toMatchObject({ nodeId: N3, answers })
     expect(supplierReducer(reloaded, { kind: 'send' })).toBe(reloaded)
     const resent = readyState(run(reloaded, tick, { kind: 'send' }))
@@ -302,7 +315,7 @@ describe('after a send', () => {
 
   it('ignores a list nobody asked for', () => {
     const state = ready()
-    expect(supplierReducer(state, { kind: 'loaded', view: view([]) })).toBe(state)
+    expect(supplierReducer(state, { kind: 'loaded', today: TODAY, view: view([]) })).toBe(state)
   })
 
   it.each(['changed', 'rateLimited', 'offline'] as const)('shows %s on the delivery and lets it send again', (failure) => {
@@ -324,7 +337,7 @@ describe('after a send', () => {
     const reloading = readyState(supplierReducer(failed, { kind: 'reload' }))
     expect(reloading.draft).toBeNull()
     expect(reloading.stale).toBe(true)
-    const state = readyState(supplierReducer(reloading, { kind: 'loaded', view: confirmedList }))
+    const state = readyState(supplierReducer(reloading, { kind: 'loaded', today: TODAY, view: confirmedList }))
     expect(state.view).toBe(confirmedList)
     expect(state.stale).toBe(false)
   })
@@ -338,9 +351,9 @@ describe('after a send', () => {
 
   it('a fresh list keeps a delivery opened meanwhile, unless it is now confirmed', () => {
     const reloading = run(ready(), { kind: 'reload' }, { kind: 'open', nodeId: SECOND })
-    expect(readyState(supplierReducer(reloading, { kind: 'loaded', view: confirmedList })).draft?.nodeId).toBe(SECOND)
+    expect(readyState(supplierReducer(reloading, { kind: 'loaded', today: TODAY, view: confirmedList })).draft?.nodeId).toBe(SECOND)
     const openN3 = run(ready(), { kind: 'reload' }, { kind: 'open', nodeId: N3 })
-    expect(readyState(supplierReducer(openN3, { kind: 'loaded', view: confirmedList })).draft).toBeNull()
+    expect(readyState(supplierReducer(openN3, { kind: 'loaded', today: TODAY, view: confirmedList })).draft).toBeNull()
   })
 
   it("ignores another node's late reply", () => {
@@ -352,6 +365,167 @@ describe('after a send', () => {
         result: { outcome: { nodeId: SECOND, status: 'VERIFIED', warnings: [] }, view: confirmedList },
       }),
     ).toBe(state)
+  })
+})
+
+describe('proof (F7)', () => {
+  const open = () => run(ready(), { kind: 'open', nodeId: N3 })
+  const cmr = (docId: string): SupplierInput[] => [
+    { kind: 'evidence', field: 'docType', value: 'cmr' },
+    { kind: 'evidence', field: 'docId', value: docId },
+  ]
+
+  it('opens each delivery with no proof, and sends the answers as before when none is added', () => {
+    const sending = readyState(run(open(), tick, { kind: 'send' }))
+    expect(sending.draft).toMatchObject({ evidence: EMPTY_EVIDENCE, sending: true })
+    expect(answerBody('p1.abc', sending.draft!, verifyTerms.sha256)).not.toHaveProperty('evidence')
+  })
+
+  it("holds the delivery's answers back while a filled field has a problem", () => {
+    const short = readyState(run(open(), tick, ...cmr('AB')))
+    expect(draftProblems(short.draft!, item(), TODAY).docId).toBe('shape')
+    expect(supplierReducer(short, { kind: 'send' })).toBe(short)
+    const expired = readyState(run(open(), tick, { kind: 'evidence', field: 'dispatchDate', value: '2024-01-01' }))
+    expect(supplierReducer(expired, { kind: 'send' })).toBe(expired)
+  })
+
+  it("sends the proof with that delivery's answers", () => {
+    const sending = readyState(
+      run(
+        open(),
+        tick,
+        ...cmr('ro 1234/26'),
+        { kind: 'evidence', field: 'dispatchDate', value: '2026-10-03' },
+        { kind: 'energy', value: 'renewable' },
+        { kind: 'evidence', field: 'certType', value: 'guaranteeOfOrigin' },
+        { kind: 'evidence', field: 'certId', value: 'GO-RO-2026-0042' },
+        { kind: 'send' },
+      ),
+    )
+    expect(sending.draft?.sending).toBe(true)
+    expect(answerBody('p1.abc', sending.draft!, verifyTerms.sha256)).toEqual({
+      t: 'p1.abc',
+      nodeId: N3,
+      transportMode: 'road',
+      energySource: 'renewable',
+      acceptedTerms: verifyTerms.sha256,
+      evidence: {
+        shippingDocType: 'cmr',
+        shippingDocId: 'RO1234/26',
+        dispatchDate: '2026-10-03',
+        energyCertType: 'guaranteeOfOrigin',
+        energyCertId: 'GO-RO-2026-0042',
+      },
+    })
+  })
+
+  it('ignores a document the lane cannot carry, and any change while sending', () => {
+    const state = open()
+    expect(supplierReducer(state, { kind: 'evidence', field: 'docType', value: 'airWaybill' })).toBe(state)
+    const sending = run(state, tick, { kind: 'send' })
+    expect(supplierReducer(sending, { kind: 'evidence', field: 'docId', value: 'X' })).toBe(sending)
+    expect(supplierReducer(ready(), { kind: 'evidence', field: 'docId', value: 'X' })).toEqual(ready())
+  })
+
+  it("starts the next delivery without the last one's proof", () => {
+    const given = run(open(), tick, ...cmr('RO12345'), { kind: 'send' }, {
+      kind: 'answered',
+      nodeId: N3,
+      result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] }, view: view() },
+    })
+    expect(readyState(run(given, { kind: 'open', nodeId: SECOND })).draft?.evidence).toEqual(EMPTY_EVIDENCE)
+  })
+
+  it('keeps the delivery open with everything when the API refuses the proof, and sends again once it is fixed', () => {
+    const sent = run(open(), tick, ...cmr('RO-1234'), { kind: 'send' })
+    const refused = readyState(supplierReducer(sent, { kind: 'answerFailed', nodeId: N3, failure: 'proofRefused' }))
+    // Not a changed delivery: no reload, the tick kept, the answers and the proof on the card.
+    expect(refused).toMatchObject({ stale: false, accepted: verifyTerms.sha256 })
+    expect(refused.draft).toEqual({
+      nodeId: N3,
+      answers: { transport: 'road', energy: 'grid' },
+      evidence: { ...EMPTY_EVIDENCE, docType: 'cmr', docId: 'RO-1234' },
+      sending: false,
+      failure: null,
+      proofRefused: true,
+    })
+
+    const fixed = readyState(supplierReducer(refused, { kind: 'evidence', field: 'docId', value: 'RO-5678' }))
+    expect(fixed.draft).toMatchObject({ proofRefused: false })
+    const resent = readyState(supplierReducer(fixed, { kind: 'send' }))
+    expect(resent.draft).toMatchObject({ sending: true, proofRefused: false })
+    expect(answerBody('p1.abc', resent.draft!, verifyTerms.sha256).evidence).toMatchObject({ shippingDocId: 'RO-5678' })
+    const answered = readyState(
+      supplierReducer(resent, {
+        kind: 'answered',
+        nodeId: N3,
+        result: { outcome: { nodeId: N3, status: 'VERIFIED', warnings: [] }, view: view() },
+      }),
+    )
+    expect(answered.draft).toBeNull()
+  })
+
+  it('clears the refusal line on a change or a fresh send, and reads a refusal without proof as a changed delivery', () => {
+    const refused = run(open(), tick, ...cmr('RO-1234'), { kind: 'send' }, {
+      kind: 'answerFailed',
+      nodeId: N3,
+      failure: 'proofRefused',
+    })
+    expect(readyState(supplierReducer(refused, { kind: 'energy', value: null })).draft?.proofRefused).toBe(false)
+    expect(readyState(supplierReducer(refused, { kind: 'send' })).draft).toMatchObject({ sending: true, proofRefused: false })
+
+    const bare = run(open(), tick, { kind: 'send' }, { kind: 'answerFailed', nodeId: N3, failure: 'proofRefused' })
+    expect(readyState(bare).draft).toMatchObject({ sending: false, failure: 'changed', proofRefused: false })
+  })
+
+  it("fills a delivery's demo values through the usual inputs, sent with that delivery's answers", () => {
+    const opened = readyState(run(open(), tick, { kind: 'energy', value: 'renewable' }))
+    const { draft } = opened
+    const inputs = demoEvidenceInputs(draft!.evidence, draft!.answers, item().issueDate, TODAY)
+    const filled = readyState(run(opened, ...inputs.map((input): SupplierInput => ({ kind: 'evidence', ...input }))))
+    expect(draftProblems(filled.draft!, item(), TODAY)).toEqual({ docId: null, dispatchDate: null, certId: null })
+    const sending = readyState(supplierReducer(filled, { kind: 'send' }))
+    expect(answerBody('p1.abc', sending.draft!, verifyTerms.sha256).evidence).toEqual({
+      shippingDocType: 'cmr',
+      shippingDocId: demoDocId('cmr'),
+      dispatchDate: '2026-10-05',
+      energyCertType: 'guaranteeOfOrigin',
+      energyCertId: DEMO_CERT_IDS.guaranteeOfOrigin,
+    })
+  })
+
+  it('keeps a typed container number when the answer moves to another mode that carries containers', () => {
+    const twoModes = view([item({ modes: ['road', 'rail'] })])
+    const typed = run(
+      ready(twoModes),
+      { kind: 'open', nodeId: N3 },
+      { kind: 'evidence', field: 'docType', value: 'containerNumber' },
+      { kind: 'evidence', field: 'docId', value: 'CSQU3054383' },
+    )
+    expect(readyState(supplierReducer(typed, { kind: 'transport', value: 'rail' })).draft?.evidence).toMatchObject({
+      docType: 'containerNumber',
+      docId: 'CSQU3054383',
+    })
+    const cmrTyped = run(ready(twoModes), { kind: 'open', nodeId: N3 }, { kind: 'evidence', field: 'docId', value: 'RO-1234' })
+    expect(readyState(supplierReducer(cmrTyped, { kind: 'transport', value: 'rail' })).draft?.evidence).toMatchObject({
+      docType: null,
+      docId: '',
+    })
+  })
+
+  it('reads a proof refusal while loading the list as a link that no longer fits', () => {
+    expect(run({ phase: 'loading' }, { kind: 'loadFailed', failure: 'proofRefused' })).toEqual({
+      phase: 'failed',
+      failure: 'invalid',
+      retryable: false,
+    })
+  })
+
+  it('keeps the proof on the delivery when the terms changed on the server', () => {
+    const failed = readyState(
+      run(open(), tick, ...cmr('RO12345'), { kind: 'send' }, { kind: 'answerFailed', nodeId: N3, failure: 'termsChanged' }),
+    )
+    expect(failed.draft?.evidence).toMatchObject({ docType: 'cmr', docId: 'RO12345' })
   })
 })
 

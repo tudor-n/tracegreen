@@ -1,11 +1,12 @@
 import { RotateCcwIcon, UploadIcon } from 'lucide-react'
-import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, useRef, useState } from 'react'
 import type { PdfDraftView } from '@/api/client'
 import { PdfReview } from '@/components/import/PdfReview'
 import { Button } from '@/components/ui/button'
 import { toolbarCopy } from '@/copy/dashboard'
 import type { Connection } from '@/hooks/useGraphEvents'
-import { type ActionOutcome, extractPdf, fetchDemoTools, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
+import { useDemoTools } from '@/hooks/useDemoTools'
+import { type ActionOutcome, extractPdf, importInvoice, loadDemoInvoice, resetDemo } from '@/lib/dashboard-actions'
 import { isPdf } from '@/lib/pdf-form'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +18,8 @@ type Action = 'import' | 'demo' | 'reset'
 export function Toolbar({ connection }: { connection: Connection }) {
   const [busy, setBusy] = useState<Action | null>(null)
   const [outcome, setOutcome] = useState<ActionOutcome | null>(null)
-  const demoTools = useDemoTools(connection)
+  // Asked again whenever the API becomes reachable: it may have restarted with other settings.
+  const demoTools = useDemoTools(connection === 'live' || connection === 'polling')
   const fileInput = useRef<HTMLInputElement>(null)
   const [review, setReview] = useState<PdfDraftView | null>(null)
 
@@ -106,19 +108,4 @@ export function Toolbar({ connection }: { connection: Connection }) {
       )}
     </div>
   )
-}
-
-/** Health's `demoTools`, asked again whenever the API becomes reachable (it may have restarted with other settings). */
-function useDemoTools(connection: Connection): boolean {
-  const [enabled, setEnabled] = useState(false)
-  const reachable = connection === 'live' || connection === 'polling'
-  useEffect(() => {
-    if (!reachable) return
-    const aborts = new AbortController()
-    void fetchDemoTools(aborts.signal).then((on) => {
-      if (!aborts.signal.aborted) setEnabled(on)
-    })
-    return () => aborts.abort()
-  }, [reachable])
-  return enabled
 }

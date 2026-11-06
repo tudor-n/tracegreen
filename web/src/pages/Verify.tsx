@@ -4,17 +4,22 @@ import { Wordmark } from '@/components/brand/Wordmark'
 import { Button } from '@/components/ui/button'
 import { AnswerGroup } from '@/components/verify/AnswerGroup'
 import { LanguageHeader } from '@/components/verify/LanguageHeader'
+import { ProofSection } from '@/components/verify/ProofSection'
 import { ReconfirmBanner, ResultMessage } from '@/components/verify/ResultMessage'
 import { TermsConsent } from '@/components/verify/TermsConsent'
 import { verifyCopy } from '@/copy/verify'
+import { useDemoTools } from '@/hooks/useDemoTools'
+import { dispatchDateBounds, hasEvidenceProblem, NO_EVIDENCE_PROBLEMS, todayUtc } from '@/lib/evidence'
 import { verifyApi } from '@/lib/verify-api'
 import {
   canSend,
   canSubmit,
+  demoEvidenceInputs,
   formatIssueDate,
   initialVerifyState,
   offeredEnergy,
   offeredModes,
+  proofProblems,
   reconfirmLines,
   resolveLang,
   submitBody,
@@ -22,8 +27,9 @@ import {
 } from '@/lib/verify-state'
 
 // The supplier's phone page. It reads the token from ?t= and the language from ?lang=, loads the link's context,
-// offers both questions pre-selected, asks for the supplier terms with an unticked checkbox whose statement links to
-// the full text, and sends the answers with the terms' SHA-256 once the supplier ticked it. No cookies, storage, login, email, camera, clipboard or
+// offers both questions pre-selected, then an optional "Add proof" section, collapsed and empty (F7), asks for the
+// supplier terms with an unticked checkbox whose statement links to the full text, and sends the answers (with any proof)
+// with the terms' SHA-256 once the supplier ticked it. No cookies, storage, login, email, camera, clipboard or
 // personal data, and nothing here logs the URL or the token. Strings come from web/src/copy/verify.ts, the decisions
 // from web/src/lib/verify-state.ts and the requests from web/src/lib/verify-api.ts; this page performs and renders them.
 
@@ -33,6 +39,8 @@ export default function Verify() {
   const lang = resolveLang(params.get('lang'))
   const copy = verifyCopy[lang]
   const [state, dispatch] = useReducer(verifyReducer, token, initialVerifyState)
+  // "Fill demo values" in the proof section, only while the API runs with demo tools (/api/health).
+  const demoTools = useDemoTools()
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -44,7 +52,11 @@ export default function Verify() {
     let current = true
     void verifyApi.context(token).then((reply) => {
       if (!current) return
-      dispatch(reply.ok ? { kind: 'contextLoaded', context: reply.data } : { kind: 'failed', failure: reply.failure })
+      dispatch(
+        reply.ok
+          ? { kind: 'contextLoaded', context: reply.data, today: todayUtc(new Date()) }
+          : { kind: 'failed', failure: reply.failure },
+      )
     })
     return () => {
       current = false
@@ -55,7 +67,7 @@ export default function Verify() {
   useEffect(() => {
     if (state.phase !== 'submitting' || token === null) return
     let current = true
-    void verifyApi.submit(submitBody(token, state.answers, state.context.terms.sha256)).then((reply) => {
+    void verifyApi.submit(submitBody(token, state.answers, state.context.terms.sha256, state.evidence)).then((reply) => {
       if (!current) return
       dispatch(reply.ok ? { kind: 'submitted', outcome: reply.data } : { kind: 'failed', failure: reply.failure })
     })
@@ -71,6 +83,7 @@ export default function Verify() {
 
   // While sending, the box was ticked: the reducer sends nothing otherwise.
   const accepted = state.phase === 'submitting' || (state.phase === 'ready' && state.accepted)
+  const problems = state.phase === 'ready' || state.phase === 'submitting' ? proofProblems(state) : NO_EVIDENCE_PROBLEMS
 
   return (
     <main
@@ -125,6 +138,24 @@ export default function Verify() {
             onChange={(value) => dispatch({ kind: 'energy', value })}
           />
 
+          <ProofSection
+            copy={copy.proof}
+            evidence={state.evidence}
+            answers={state.answers}
+            problems={problems}
+            dateBounds={dispatchDateBounds(state.context.issueDate, state.today)}
+            disabled={state.phase === 'submitting'}
+            refused={state.phase === 'ready' && state.proofRefused ? copy.proof.refused : null}
+            demo={demoTools}
+            onDemo={() => {
+              for (const input of demoEvidenceInputs(state.evidence, state.answers, state.context.issueDate, state.today)) {
+                dispatch({ kind: 'evidence', ...input })
+              }
+            }}
+            testId="verify-proof"
+            onChange={(field, value) => dispatch({ kind: 'evidence', field, value })}
+          />
+
           <TermsConsent
             acceptance={state.context.terms[lang]}
             lang={lang}
@@ -139,17 +170,21 @@ export default function Verify() {
               <p role="status" className="text-center text-[15px] text-ink-2">
                 {copy.answerOne}
               </p>
+            ) : !accepted ? (
+              <p role="status" className="text-center text-[15px] text-ink-2">
+                {copy.terms.tickToSubmit}
+              </p>
             ) : (
-              !accepted && (
+              hasEvidenceProblem(problems) && (
                 <p role="status" className="text-center text-[15px] text-ink-2">
-                  {copy.terms.tickToSubmit}
+                  {copy.proof.fixToSend}
                 </p>
               )
             )}
             <Button
               data-testid="verify-submit"
               className="h-[52px] w-full text-[17px]"
-              disabled={state.phase === 'submitting' || !canSend(state.answers, accepted)}
+              disabled={state.phase === 'submitting' || !canSend(state.answers, accepted, problems)}
               onClick={() => dispatch({ kind: 'submit' })}
             >
               {state.phase === 'submitting' ? copy.submitting : copy.submit}

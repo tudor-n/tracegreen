@@ -25,7 +25,7 @@ import {
   formatEuros,
   formatEurosDelta,
   formatTonnesCo2e,
-  formatTonnesDelta,
+  formatTonnesChange,
   type ScenarioPreview,
   useGraphStore,
 } from '@/store'
@@ -275,7 +275,8 @@ function Figures({ result }: { result: ScenarioResult }) {
             <FactorInfo factors={result.inputs} />
           </span>
         }
-        delta={`${formatTonnesDelta(delta.carbonKg)} ${CO2E_UNIT}`}
+        // From the figures as shown: the node's figure (result minus the API's delta) and the result.
+        delta={`${formatTonnesChange(result.carbonKg, result.carbonKg - delta.carbonKg)} ${CO2E_UNIT}`}
         direction={deltaDirection(delta.carbonKg, DELTA_STEP.carbonKg)}
         testId="sim-delta-carbon"
       />
