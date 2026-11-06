@@ -47,11 +47,11 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 
 | Where | Hooks |
 |---|---|
-| Toolbar | `toolbar-reset`, `toolbar-demo`, `toolbar-audit` |
-| Graph | `node-<id>` with `data-status`; `ghost-<id>` with `data-badge`; `ghost-<id>-saved` |
-| Node drawer | `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate` |
-| Simulator | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
-| Audit panel | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
+| Sidebar (every screen) | `toolbar-reset`, `toolbar-demo`; `toolbar-audit` is the Audit log link |
+| Supplier tree (`/suppliers`) | `node-<id>` with `data-status` on each row; `ghost-<id>` with `data-badge` on the What if row; `ghost-<id>-saved` |
+| Side panel | `node-drawer`, `drawer-request`, `qr-url`; `drawer-simulate` is the What if tab |
+| Simulator (What if tab) | `sim-mode-<mode>`, `sim-alt-<alternativeId>` with `aria-pressed`, `sim-result` with `data-badge`, `sim-apply` with `data-saved` |
+| Audit log screen (`/audit`) | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
 | Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-submit` |
 
 ## Demo laptop (production images)
