@@ -30,6 +30,13 @@ public enum ProblemCode
     [JsonStringEnumMemberName("DeliveryChanged")] DeliveryChanged,
     [JsonStringEnumMemberName("TermsNotAccepted")] TermsNotAccepted,
     [JsonStringEnumMemberName("CategoryNotAllowed")] CategoryNotAllowed,
+    [JsonStringEnumMemberName("InvalidQuestion")] InvalidQuestion,
+    [JsonStringEnumMemberName("NotPdf")] NotPdf,
+    [JsonStringEnumMemberName("PdfNoText")] PdfNoText,
+    [JsonStringEnumMemberName("PdfUnreadable")] PdfUnreadable,
+    [JsonStringEnumMemberName("ExtractionUnavailable")] ExtractionUnavailable,
+    [JsonStringEnumMemberName("DraftExpired")] DraftExpired,
+    [JsonStringEnumMemberName("InvalidInvoiceFields")] InvalidInvoiceFields,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -67,6 +74,13 @@ public static class Problems
             ProblemCode.DeliveryChanged => (StatusCodes.Status409Conflict, "Delivery changed since the page read it"),
             ProblemCode.TermsNotAccepted => (StatusCodes.Status422UnprocessableEntity, "Supplier terms not accepted"),
             ProblemCode.CategoryNotAllowed => (StatusCodes.Status422UnprocessableEntity, "Category not allowed"),
+            ProblemCode.InvalidQuestion => (StatusCodes.Status422UnprocessableEntity, "Question not accepted"),
+            ProblemCode.NotPdf => (StatusCodes.Status415UnsupportedMediaType, "Not a PDF"),
+            ProblemCode.PdfNoText => (StatusCodes.Status422UnprocessableEntity, "The PDF has no text layer"),
+            ProblemCode.PdfUnreadable => (StatusCodes.Status422UnprocessableEntity, "The PDF could not be read"),
+            ProblemCode.ExtractionUnavailable => (StatusCodes.Status503ServiceUnavailable, "No model could read the invoice"),
+            ProblemCode.DraftExpired => (StatusCodes.Status410Gone, "Draft expired"),
+            ProblemCode.InvalidInvoiceFields => (StatusCodes.Status422UnprocessableEntity, "Invoice fields not accepted"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);
@@ -98,6 +112,25 @@ public static class Problems
     {
         ClassificationErrorCode.NodeNotFound => ProblemCode.NodeNotFound,
         ClassificationErrorCode.CategoryNotAllowed => ProblemCode.CategoryNotAllowed,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
+    };
+
+    public static ProblemCode From(ChatErrorCode code) => code switch
+    {
+        ChatErrorCode.InvalidQuestion => ProblemCode.InvalidQuestion,
+        _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
+    };
+
+    public static ProblemCode From(PdfImportErrorCode code) => code switch
+    {
+        PdfImportErrorCode.TooLarge => ProblemCode.TooLarge,
+        PdfImportErrorCode.NotPdf => ProblemCode.NotPdf,
+        PdfImportErrorCode.NoText => ProblemCode.PdfNoText,
+        PdfImportErrorCode.Unreadable => ProblemCode.PdfUnreadable,
+        PdfImportErrorCode.Unavailable => ProblemCode.ExtractionUnavailable,
+        PdfImportErrorCode.DraftExpired => ProblemCode.DraftExpired,
+        PdfImportErrorCode.InvalidFields => ProblemCode.InvalidInvoiceFields,
+        PdfImportErrorCode.Duplicate => ProblemCode.Duplicate,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

@@ -56,6 +56,7 @@ Frozen test hooks: the smoke and the CI job depend on these, so rename one only 
 | Audit log screen (`/audit`) | `audit-panel`, `audit-verify`, `audit-chain` with `data-valid` |
 | Supplier page | `verify-page` with `data-phase` and `data-result`; `verify-transport-<mode>`, `verify-energy-<source>`, `verify-terms` (the terms checkbox), `verify-terms-link` (its link to `/terms/supplier`), `verify-submit` |
 | Terms page | `terms-page` with `data-phase` and `data-version` |
+| Not frozen yet (no spec uses them): chat (F13) | `sidebar-chat` (with `aria-pressed`), `chat-panel`, `chat-input`, `chat-send`, `chat-turn-<n>` with `data-phase`, `chat-answer`, `chat-fact-<factId>`, `chat-suggest-<top|total|confirmed|estimated>`; PDF review (F9) `pdf-review`, `pdf-<field>`, `pdf-line-<n>`, `pdf-line-<n>-<field>`, `pdf-confirm`; side panel `drawer-category-change`, `drawer-category`, `drawer-category-select`, `drawer-category-save` (F6); simulator `sim-alt-<id>-suggested` (F11) |
 | Supplier page list (F12) | `supplier-page` with `data-phase` and `data-result`; `delivery-<nodeId>` with `data-status`; `delivery-<nodeId>-open`, `delivery-<nodeId>-transport-<mode>` and `delivery-<nodeId>-energy-<source>` with `aria-pressed`, `delivery-<nodeId>-confirm`; `supplier-terms` (the page's one terms checkbox, shown while a delivery is open for answers) and `supplier-terms-link` |
 
 ## Demo laptop (production images)

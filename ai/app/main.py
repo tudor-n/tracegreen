@@ -10,12 +10,25 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.config import API_TIMEOUT_S, Settings, settings
+from app.chat import build_chat
+from app.config import (
+    API_CHAT_TIMEOUT_S,
+    API_EXTRACT_TIMEOUT_S,
+    API_TIMEOUT_S,
+    Settings,
+    settings,
+)
+from app.extract import build_extractor
 from app.models import ModelFactory, chat_model_factory
+from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
 from app.schemas import (
+    ChatRequest,
+    ChatResponse,
     ClassifyRequest,
     ClassifyResponse,
+    ExtractRequest,
+    ExtractResponse,
     HealthResponse,
     ModelHealth,
     SuggestRequest,
@@ -37,12 +50,25 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
             config.ai_timeout_s,
             API_TIMEOUT_S,
         )
+    for name, budget, api in (
+        ("AI_CHAT_TIMEOUT_S", config.chat_timeout_s, API_CHAT_TIMEOUT_S),
+        ("AI_EXTRACT_TIMEOUT_S", config.extract_timeout_s, API_EXTRACT_TIMEOUT_S),
+    ):
+        if budget >= api:
+            log.warning(
+                "%s is %g s, not under the API's %g s default: the API may give up first.",
+                name,
+                budget,
+                api,
+            )
     entries = load_cache(config.seed_dir)
     chain = build_chain(config, entries, model_factory)
     # Every task builds its models lazily from the same factory, so no client exists before a
     # model is first called.
     factory = model_factory or chat_model_factory(config)
     suggester = build_suggester(config, factory)
+    chat_task = build_chat(config, factory)
+    extractor = build_extractor(config, factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
 
     @app.get("/health", response_model=HealthResponse)
@@ -81,9 +107,30 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         # figure; no model or no valid answer gives none, and the API shows the list as it is.
         return suggester.suggest(request)
 
-    @app.post("/extract-pdf")
-    def extract_pdf() -> None:
-        raise HTTPException(status_code=501, detail="PDF extraction is not implemented (F9).")
+    @app.post("/chat", response_model=ChatResponse)
+    def chat(request: ChatRequest) -> ChatResponse:
+        # F13: a sentence that cites the API's facts by id; the API checks it again and fills
+        # the values in. No model, or no valid answer, says the question was not answered.
+        return chat_task.answer(request)
+
+    @app.post("/extract-pdf", response_model=ExtractResponse)
+    def extract_pdf(request: ExtractRequest) -> ExtractResponse:
+        # F9: the PDF's text layer, then a model copies its fields into the draft. A refused
+        # PDF is 422 with a code; no model, or none that answered, is 503. Nothing is imported.
+        try:
+            data = decode(request.pdf_base64)
+            text, pages = text_of(data)
+        except PdfRefused as refused:
+            raise HTTPException(
+                status_code=422, detail={"code": refused.code, "message": str(refused)}
+            ) from None
+        draft = extractor.extract(text, pages=pages)
+        if draft is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "unavailable", "message": "No model could read the invoice."},
+            )
+        return draft
 
     return app
 

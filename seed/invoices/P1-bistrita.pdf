@@ -1,0 +1,32 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 664 >>
+stream
+BT /F1 9 Tf 40 800 Td 14 TL (FACTURA / INVOICE   ZT-2026-PDF1) Tj T* (Seller: Zincora Turnatorie SRL   CUI RO99999968   Str. Fabricii 12, Bistrita, RO) Tj T* (Buyer: Transilvania Electro-Assembly SRL   CUI RO99999992   Sibiu, RO) Tj T* (Issue date: 22.10.2026   Currency: EUR) Tj T* () Tj T* (No.  Description                              HS code   Qty        Net amount) Tj T* (1    Zinc die-cast sensor housings, type ZH-220   790700    1.200 pcs  9.840,00) Tj T* (2    Zamak covers for sensor housings            790700    1.200 pcs  2.160,00) Tj T* () Tj T* (Total without VAT: 12.000,00 EUR) Tj T* (VAT 21%: 2.520,00 EUR) Tj T* (Total: 14.520,00 EUR) Tj T* ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000338 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1053
+%%EOF

@@ -15,6 +15,13 @@ public enum IngestErrorCode { TooLarge, DoctypeForbidden, NotUblInvoice, Schema,
 /// <summary><see cref="ExistingNodeId"/> is set on <see cref="IngestErrorCode.Duplicate"/>.</summary>
 public sealed record IngestError(IngestErrorCode Code, string Message, Guid? ExistingNodeId = null);
 
+/// <summary>
+/// Where an extracted invoice came from: <see cref="Kind"/> "ubl" or "pdf", <see cref="RawHash"/> the hash that refuses
+/// the same document twice (the normalised XML's, or the PDF's bytes'), and <see cref="AuditExtras"/> what the import's
+/// audit entry records about it besides the usual fields (strings only).
+/// </summary>
+public sealed record DocumentSource(string Kind, string RawHash, IReadOnlyDictionary<string, string>? AuditExtras = null);
+
 /// <summary>Fixed ids and lane for the demo invoice, so every reset-and-import lands on the same node.</summary>
 public sealed record IngestPins(Guid NodeId, Guid InvoiceId, string LaneId);
 
@@ -62,14 +69,23 @@ public sealed class IngestService(
         {
             return Fail(From(parsed.Error.Code), parsed.Error.Message);
         }
-        var extracted = parsed.Value;
+        return await IngestExtractedAsync(ctx, parsed.Value, new DocumentSource("ubl", Hashing.RawXmlHash(xml)), pins, ct);
+    }
+
+    /// <summary>
+    /// The import after parsing, the same for every document kind: range checks, duplicates, currency, lane,
+    /// classification, the spend estimate, the insert with its audit entry and the events.
+    /// </summary>
+    public async Task<Result<IngestResult, IngestError>> IngestExtractedAsync(
+        Ctx ctx, ExtractedInvoice extracted, DocumentSource source, IngestPins? pins, CancellationToken ct)
+    {
         if (OutOfRange(extracted) is { } problem)
         {
             return Fail(IngestErrorCode.Schema, problem);
         }
 
         // A cheap early answer before any AI wait; the repository repeats the check under its lock.
-        if (await repo.GetInvoiceByRawHashAsync(ctx, Hashing.RawXmlHash(xml), ct) is { } existing)
+        if (await repo.GetInvoiceByRawHashAsync(ctx, source.RawHash, ct) is { } existing)
         {
             var nodes = await repo.ListNodesAsync(ctx, ct);
             var existingNode = nodes.FirstOrDefault(n => n.InvoiceId == existing.Id);
@@ -97,7 +113,7 @@ public sealed class IngestService(
             picked.CategoryId, picked.Source == ClassificationSource.Stub ? null : picked.Confidence, picked.Source, picked.Rationale);
 
         var now = clock.GetUtcNow();
-        var invoice = NodeFactory.NewInvoice(pins?.InvoiceId ?? Ids.NewId(), ctx.WorkspaceId, extracted, xml, now);
+        var invoice = NodeFactory.NewInvoiceFrom(pins?.InvoiceId ?? Ids.NewId(), ctx.WorkspaceId, extracted, source.RawHash, now, source.Kind);
         var node = NodeFactory.NewNode(
             pins?.NodeId ?? Ids.NewId(), invoice, classification, lane, NodeStatus.Estimated, null, null, seed, mapper.Factors, now);
 
@@ -111,6 +127,15 @@ public sealed class IngestService(
             ["categoryId"] = node.CategoryId,
             ["classificationSource"] = node.ClassificationSource.ToString().ToLowerInvariant(),
         };
+        // The UBL path keeps its payload as it was; another kind says what it was and adds what its source records.
+        if (source.Kind != "ubl")
+        {
+            payload["documentKind"] = source.Kind;
+        }
+        foreach (var (key, value) in source.AuditExtras ?? new Dictionary<string, string>())
+        {
+            payload[key] = value;
+        }
         var inserted = await repo.InsertInvoiceWithNodeAsync(
             ctx, invoice, node, prev => AuditChain.Build(prev, ctx.WorkspaceId, now, ctx.Actor, "invoice.imported", payload), ct);
         if (inserted.Status == InsertInvoiceStatus.Duplicate || inserted.Entry is not { } entry)

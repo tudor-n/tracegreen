@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { savedScenario, scenarioResult } from '@/store/testFixtures'
 import {
+  askChat,
+  confirmPdf,
   correctCategory,
+  extractPdf,
   failureMessage,
   fetchCategories,
   fetchSuggestions,
@@ -254,5 +257,53 @@ describe('fetchSuggestions', () => {
   it('reports an unreachable API instead of throwing', async () => {
     vi.spyOn(api, 'GET').mockRejectedValue(new TypeError('Failed to fetch'))
     expect((await fetchSuggestions(nodeId)).ok).toBe(false)
+  })
+})
+
+describe('askChat', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the question with the earlier questions and returns the checked answer', async () => {
+    const answer = { status: 'answered', segments: [{ text: null, factId: 'S1.name' }], facts: [], provider: 'openai:model-a' }
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: answer, response: new Response(null, { status: 200 }) } as never)
+    expect(await askChat('Who emits most?', ['Before?'])).toEqual({ ok: true, data: answer })
+    expect(post).toHaveBeenCalledWith('/api/chat', { body: { question: 'Who emits most?', history: ['Before?'] }, signal: undefined })
+  })
+
+  it('shows the rate limit as its headline', async () => {
+    vi.spyOn(api, 'POST').mockResolvedValue({
+      error: problem(429, 'RateLimited', 'Too many attempts from this address; wait a minute.'),
+      response: new Response(null, { status: 429 }),
+    } as never)
+    const result = await askChat('Q', [])
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('extractPdf and confirmPdf', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('sends the PDF itself in the multipart field file', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: { draftId: 'd' }, response: new Response(null, { status: 200 }) } as never)
+    const file = new File(['%PDF-1.4'], 'invoice.pdf', { type: 'application/pdf' })
+
+    await extractPdf(file)
+
+    const [path, options] = post.mock.calls[0] as unknown as [string, { body: unknown; bodySerializer: () => FormData }]
+    expect(path).toBe('/api/ingest/pdf/extract')
+    expect(options.body).toBe(file)
+    expect(options.bodySerializer().get('file')).toBe(file)
+  })
+
+  it('confirms the draft with the checked fields', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: { node: { label: 'X' } }, response: new Response(null, { status: 201 }) } as never)
+    const invoice = { supplierName: 'A', supplierTaxId: 'RO1', supplierCountry: 'RO', invoiceNumber: 'N', issueDate: '2026-10-22', currency: 'EUR', totalNet: '1', lines: [] }
+
+    expect((await confirmPdf('d', invoice)).ok).toBe(true)
+    expect(post).toHaveBeenCalledWith('/api/ingest/pdf/confirm', { body: { draftId: 'd', invoice } })
   })
 })

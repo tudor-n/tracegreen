@@ -109,3 +109,30 @@ def test_bind_models_can_give_a_task_its_own_cap() -> None:
 
     assert bound[0].spec.timeout_s == 4.0
     assert longer[0].spec.timeout_s == 12.0
+
+
+def test_the_longer_budgets_and_the_chat_models_come_from_the_environment() -> None:
+    from pathlib import Path
+
+    from app.config import Settings
+
+    seed = str(Path(__file__).resolve().parents[2] / "seed")
+    defaults = Settings.from_env({"SEED_DIR": seed, "AI_MODELS": "ollama:local:3b"})
+    assert (defaults.chat_timeout_s, defaults.extract_timeout_s, defaults.long_model_timeout_s) == (
+        15,
+        20,
+        12,
+    )
+    assert [s.id for s in defaults.chat_specs] == ["ollama:local:3b"]
+
+    chosen = Settings.from_env(
+        {
+            "SEED_DIR": seed,
+            "AI_MODELS": "openai:model-a,ollama:local:3b",
+            "OPENAI_API_KEY": "k",
+            "AI_CHAT_MODELS": "ollama:local:3b",
+            "AI_CHAT_TIMEOUT_S": "9",
+        }
+    )
+    assert [s.id for s in chosen.chat_specs] == ["ollama:local:3b"]
+    assert chosen.chat_timeout_s == 9

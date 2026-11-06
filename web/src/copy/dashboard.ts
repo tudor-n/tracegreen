@@ -219,7 +219,9 @@ export const connectionCopy = {
 export const toolbarCopy = {
   import: 'Import invoice',
   importing: 'Importing…',
-  fileInput: 'UBL invoice (XML file)',
+  fileInput: 'Invoice: UBL XML, or a PDF to check before importing',
+  /** After a PDF upload: the review form opens. */
+  pdfReady: 'Check the fields read from the PDF.',
   demo: 'Load demo invoice',
   demoLoading: 'Loading…',
   reset: 'Reset demo',
@@ -261,6 +263,13 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
   CategoryNotAllowed: 'That category is not one of the allowed categories.',
+  InvalidQuestion: 'That question could not be asked.',
+  NotPdf: 'Not a PDF.',
+  PdfNoText: 'This PDF has no text to read.',
+  PdfUnreadable: 'This PDF could not be read.',
+  ExtractionUnavailable: 'No AI model could read the PDF right now.',
+  DraftExpired: 'This check has run out of time.',
+  InvalidInvoiceFields: 'A field needs fixing.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */

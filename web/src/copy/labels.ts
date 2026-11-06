@@ -32,6 +32,10 @@ export const uncertaintyLabel = {
 export const AI_MAPPED = 'AI-mapped'
 /** The label on a category the buyer set (F6); it replaces "AI-mapped" on that node. */
 export const BUYER_CORRECTED = 'Buyer-corrected'
+/** The label on a chat answer the AI wrote (F13): the sentence is the AI's, every value in it is the data's. */
+export const AI_WRITTEN = 'AI-written · values from your data'
+/** The label on a chat answer given with a fixed sentence, without the AI. */
+export const FROM_YOUR_DATA = 'From your data'
 /** CLAUDE.md: the label on every alternative the AI suggested. */
 export const AI_SUGGESTED = 'AI-suggested · illustrative'
 /** CLAUDE.md: the label on every field the AI read from a PDF. */

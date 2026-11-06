@@ -34,12 +34,12 @@ internal static class Mapping
     {
         Id = i.Id, WorkspaceId = i.WorkspaceId, VendorName = i.VendorName, VendorCui = i.VendorCui, BuyerCui = i.BuyerCui,
         IssueDate = i.IssueDate, Currency = i.Currency, TotalAmount = i.TotalAmount, RawXmlHash = i.RawXmlHash,
-        InvoiceHash = i.InvoiceHash, ExtractedJson = Ser(i.Extracted), CreatedAt = Utc(i.CreatedAt),
+        InvoiceHash = i.InvoiceHash, ExtractedJson = Ser(i.Extracted), CreatedAt = Utc(i.CreatedAt), DocumentKind = i.DocumentKind,
     };
 
     public static Invoice ToDomain(InvoiceRow r) => new(
         r.Id, r.WorkspaceId, r.VendorName, r.VendorCui, r.BuyerCui, r.IssueDate, r.Currency, r.TotalAmount,
-        r.RawXmlHash, r.InvoiceHash, De<ExtractedInvoice>(r.ExtractedJson), r.CreatedAt);
+        r.RawXmlHash, r.InvoiceHash, De<ExtractedInvoice>(r.ExtractedJson), r.CreatedAt, r.DocumentKind);
 
     public static NodeRow ToRow(SupplierNode n) => new()
     {
