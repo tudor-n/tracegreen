@@ -120,6 +120,10 @@ export const simulatorCopy = {
   /** An alternative's country and the mode its lane ships by, which the swap uses. */
   alternativeVia: (country: string, mode: string) => `${country} · ${mode}`,
   noAlternatives: 'No other supplier of this category in the alternatives list.',
+  /** Under an alternative the AI picked (F11): its reason, in the AI's words. */
+  why: (reason: string) => `Why: ${reason}`,
+  suggestedHelp:
+    'An AI picked this supplier from the list as a fit for this part. The figures come from the simulator, not from the AI.',
   pick: 'Pick a mode or a supplier to see the change in emissions, cost and lead time.',
   nothingToTry: 'This lane has a leg for one mode only and no other supplier makes this item, so there is nothing to try.',
   simulating: 'Simulating…',

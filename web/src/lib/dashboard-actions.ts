@@ -8,6 +8,7 @@ import {
   type Scenario,
   type ScenarioChange,
   type ScenarioResult,
+  type SuggestionsView,
 } from '@/api/client'
 import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
@@ -159,6 +160,15 @@ export function fetchCategories(): Promise<Answer<CategoryOption[]>> {
  */
 export function correctCategory(nodeId: string, categoryId: string): Promise<Answer<NodeView>> {
   return fetchBody(() => api.PUT('/api/nodes/{nodeId}/classification', { params: { path: { nodeId } }, body: { categoryId } }))
+}
+
+/**
+ * GET /api/nodes/{id}/suggestions (F11): which of the node's curated alternatives the AI picks, each with a short reason.
+ * Never a figure and never a new supplier. Asked when the What if tab opens and aborted when it closes; a failure only
+ * means no suggestion, so it never blocks the simulator.
+ */
+export function fetchSuggestions(nodeId: string, signal?: AbortSignal): Promise<Answer<SuggestionsView>> {
+  return fetchBody(() => api.GET('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

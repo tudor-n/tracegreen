@@ -57,7 +57,7 @@ public class SuggestionEndpointTests(SuggestingWebAppFactory factory) : IClassFi
     {
         factory.Ai.Answer = (_, _) => Task.FromResult(new SuggestOutcome(
             [
-                new Suggestion("N2-alt", "Same printed circuit boards, made in Romania.", "An invented label"),
+                new Suggestion("N2-alt", "Supplies printed circuit boards from Timisoara, RO by road.", "An invented label"),
                 new Suggestion("N1-alt", "Another category's alternative.", "x"),
                 new Suggestion("made-up", "A supplier the model invented.", "Invented SRL"),
                 new Suggestion("N2-alt", "A second pick of the same one.", "x"),
@@ -69,7 +69,7 @@ public class SuggestionEndpointTests(SuggestingWebAppFactory factory) : IClassFi
         Assert.Equal("openai:model-a", body.GetProperty("provider").GetString());
         var suggestion = Assert.Single(body.GetProperty("suggestions").EnumerateArray());
         Assert.Equal("N2-alt", suggestion.GetProperty("alternativeId").GetString());
-        Assert.Equal("Same printed circuit boards, made in Romania.", suggestion.GetProperty("rationale").GetString());
+        Assert.Equal("Supplies printed circuit boards from Timisoara, RO by road.", suggestion.GetProperty("rationale").GetString());
         Assert.False(suggestion.TryGetProperty("label", out _));
     }
 
@@ -92,6 +92,19 @@ public class SuggestionEndpointTests(SuggestingWebAppFactory factory) : IClassFi
     public async Task AReasonWithADigitIsDroppedButThePickStays()
     {
         factory.Ai.Answer = (_, _) => Task.FromResult(new SuggestOutcome([new Suggestion("N2-alt", "Cuts 40% of emissions.", "x")], "openai:model-a"));
+
+        var suggestion = Assert.Single((await Suggestions(N2)).GetProperty("suggestions").EnumerateArray());
+
+        Assert.Equal(JsonValueKind.Null, suggestion.GetProperty("rationale").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("Its origin is close to the buyer.")]
+    [InlineData("Road is lower carbon than sea.")]
+    [InlineData("A cheaper source of the same boards.")]
+    public async Task AReasonThatMakesAClaimIsDropped(string claim)
+    {
+        factory.Ai.Answer = (_, _) => Task.FromResult(new SuggestOutcome([new Suggestion("N2-alt", claim, "x")], "openai:model-a"));
 
         var suggestion = Assert.Single((await Suggestions(N2)).GetProperty("suggestions").EnumerateArray());
 

@@ -141,6 +141,12 @@ The "Fixed agreements" of the F6 plan (`docs/plan/ai-f6.md`), built in `ai/app`.
 - **A correction is not AI-derived, so it drops the "AI-mapped" label and shows "Buyer-corrected" in its place** — confidence 1, rationale "Set by the buyer for this line" — cost if wrong: copy only.
 - **The reason is shown only when the AI chose the category, and filtered by the copy rules before it is stored (`BannedTerms`, the C# copy of `scripts/lib/banned-terms.mjs`, kept equal by a test that reads the script)** — a model's words reach the reader; a reason that breaks the copy rules is dropped, not reworded — cost if wrong: none.
 
+## AI-suggested alternatives (F11, 2026-11-06)
+
+- **The AI picks; it never proposes.** Candidates are the node's curated alternatives (`seed/alternatives.json`, the ones the simulator already offers); the model sees short ids of our own, any other id is dropped on both sides, and the label shown is the seed's. The simulator computes every figure — cost if wrong: none, the data rules forbid an invented supplier anyway.
+- **A reason only restates the data.** It is dropped when it holds a digit or a claim word (lower, closer, cheaper, carbon, distance, …), in `ai/app/suggest.py` and again in `SuggestionService` — a small model wrote false claims ("Timisoara is close to Taoyuan", "road is lower carbon than sea") that nothing checks, and the UI must not show them. The pick stays without a reason — cost if wrong: fewer reasons on screen.
+- **Asked on demand, not on import.** The What if tab asks once when it opens, under the classification timeout; a failure shows the list as before — cost if wrong: none.
+
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.

@@ -25,7 +25,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | F8 | Optional mass confirmation | **partial** | `POST /api/verify` accepts `massT` and a confirmed mass replaces the invoice's; the supplier page does not ask for it yet |
 | F9 | PDF invoice drop | **open** | Hackathon, if time |
 | F10 | Scenario export | **open** | Only if everything else is done |
-| F11 | AI alternative suggester | **open** | The alternatives come from the curated `seed/alternatives.json` |
+| F11 | AI alternative suggester | **built** | `GET /api/nodes/{id}/suggestions` (`SuggestionService`) and the AI service's `/suggest` (`ai/app/suggest.py`): the AI picks among the node's curated alternatives from `seed/alternatives.json` only, under short ids, and never sends a figure; the simulator shows "AI-suggested · illustrative" and the AI's reason under the alternative it picked. A reason with a digit or a claim word (lower, closer, cheaper, carbon, …) is dropped on both sides. The seed has one alternative for `zinc_diecast` and one for `pcb`, so the AI can endorse at most one per node (`NEXT.md`) |
 | F12 | Supplier page: one link per supplier, every delivery confirmed from one list | **built** | `PortalService`, `POST /api/portal-link`, `/api/portal/{view,answer}`, `/supplier`, the drawer's "Supplier page link"; the Supplier Terms ticked once per page visit and recorded with each answer; `web/e2e/supplier-portal.spec.ts` passes in both data modes, on the Vite dev stack and in CI on the demo image; not yet run on a real phone (`NEXT.md`) |
 
 ## Controls

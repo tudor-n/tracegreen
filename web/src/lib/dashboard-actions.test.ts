@@ -5,6 +5,7 @@ import {
   correctCategory,
   failureMessage,
   fetchCategories,
+  fetchSuggestions,
   requestLink,
   requestPortalLink,
   saveScenario,
@@ -232,5 +233,26 @@ describe('correctCategory', () => {
       ok: false,
       message: 'That category is not one of the allowed categories. Category bogus is not one of the allowed categories.',
     })
+  })
+})
+
+describe('fetchSuggestions', () => {
+  const nodeId = '11111111-1111-4111-8111-000000000002'
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("asks for the node's suggestions with the caller's abort signal", async () => {
+    const view = { suggestions: [{ alternativeId: 'N2-alt', rationale: 'Fits.' }], provider: 'openai:model-a' }
+    const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: view, response: new Response(null, { status: 200 }) } as never)
+    const signal = new AbortController().signal
+    expect(await fetchSuggestions(nodeId, signal)).toEqual({ ok: true, data: view })
+    expect(get).toHaveBeenCalledWith('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal })
+  })
+
+  it('reports an unreachable API instead of throwing', async () => {
+    vi.spyOn(api, 'GET').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect((await fetchSuggestions(nodeId)).ok).toBe(false)
   })
 })

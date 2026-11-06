@@ -176,3 +176,22 @@ def test_a_malformed_answer_from_every_model_suggests_nothing() -> None:
     body = suggest(TaskFakes({"openai:model-a": {"nope": 1}, "google_genai:model-b": "text"}))
 
     assert body == {"suggestions": [], "provider": "stub"}
+
+
+def test_a_reason_that_makes_a_claim_is_dropped() -> None:
+    claims = [
+        "Its origin is close to the buyer.",
+        "Road is lower carbon than sea.",
+        "A cheaper supplier of the same boards.",
+    ]
+    for claim in claims:
+        answer = {"suggestions": [{"candidateId": "A1", "rationale": claim}]}
+        body = suggest(TaskFakes({"openai:model-a": answer}))
+        assert body["suggestions"][0]["rationale"] == "", claim
+
+
+def test_a_reason_that_restates_the_data_is_kept() -> None:
+    reason = "Supplies die-cast parts from Cluj, RO by road."
+    answer = {"suggestions": [{"candidateId": "A1", "rationale": reason}]}
+
+    assert suggest(TaskFakes({"openai:model-a": answer}))["suggestions"][0]["rationale"] == reason

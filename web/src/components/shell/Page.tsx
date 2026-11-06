@@ -91,6 +91,20 @@ export function ExplainedChip({ tone, help, children }: { tone?: ChipTone; help:
   )
 }
 
+/** A quiet tag that says what it means on hover or focus, such as "AI-suggested · illustrative". */
+export function ExplainedTag({ help, children }: { help: string; children: ReactNode }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${String(children)}. ${help}`}>
+        <Tag>{children}</Tag>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-xs text-left">
+        {help}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 export type ChipTone = 'neutral' | 'estimated' | 'verified' | 'hotspot'
 
 const chipTone: Record<ChipTone, string> = {

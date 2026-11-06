@@ -59,9 +59,32 @@ public sealed class SuggestionService(IRepository repo, IAiClient ai, GraphServi
         return new SuggestionsView(picked, outcome.Provider);
     }
 
-    /// <summary>A model's reason as a reader may see it: no digit (so no figure), one line, capped, within the copy rules.</summary>
-    public static string? Reason(string? rationale) =>
-        rationale is null || rationale.Any(char.IsDigit) ? null : NodeFactory.Reason(rationale);
+    /// <summary>
+    /// Words that make a claim or a comparison nothing checks (emissions, cost, speed, distance): a reason holding one is
+    /// dropped. The same list is in <c>ai/app/suggest.py</c>, which drops such a reason first.
+    /// </summary>
+    public static readonly IReadOnlySet<string> ClaimWords = new HashSet<string>(
+        """
+        carbon co2 co₂ emission emissions emit emits footprint greener green cleaner cheaper cheap
+        cost costs price prices faster fast quicker slower distance distances km near nearer nearby
+        close closer closest far farther further lower less more fewer higher better best worse
+        reduce reduces reduced cut cuts saves save saving
+        """.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries),
+        StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A model's reason as a reader may see it: no digit (so no figure), no claim word, one line, capped, within the copy
+    /// rules; else null, and the pick shows without a reason.
+    /// </summary>
+    public static string? Reason(string? rationale)
+    {
+        if (rationale is null || rationale.Any(char.IsDigit))
+        {
+            return null;
+        }
+        var words = rationale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(w => w.Trim('.', ',', ';', ':', '!', '?', '(', ')', '"', '\''));
+        return words.Any(ClaimWords.Contains) ? null : NodeFactory.Reason(rationale);
+    }
 
     private static string Name(TransportMode mode) => mode.ToString().ToLowerInvariant();
 }
