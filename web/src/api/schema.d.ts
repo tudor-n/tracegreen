@@ -54,6 +54,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm or change a node's category; recomputes its figures, appends classification.reviewed and publishes node.updated */
+        post: operations["ReviewClassification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingest/ubl": {
         parameters: {
             query?: never;
@@ -355,7 +372,13 @@ export interface components {
             brokenAt: null | number;
         };
         /** @enum {unknown} */
-        ClassificationSource: "invoice" | "cache" | "model" | "stub";
+        ClassificationReview: "notNeeded" | "pending" | "confirmed" | "corrected";
+        ClassificationReviewRequest: {
+            categoryId: string;
+            expectedCategoryId: string;
+        };
+        /** @enum {unknown} */
+        ClassificationSource: "invoice" | "cache" | "model" | "stub" | "buyer";
         ClassificationView: {
             categoryId: string;
             categoryLabel: string;
@@ -364,6 +387,9 @@ export interface components {
             confidence: null | number;
             aiMapped: boolean;
             lineDescription: string;
+            review: components["schemas"]["ClassificationReview"];
+            /** Format: date-time */
+            reviewedAt: null | string;
         };
         DomainEvent: components["schemas"]["DomainEventNodeCreated"] | components["schemas"]["DomainEventNodeUpdated"] | components["schemas"]["DomainEventNodeVerified"] | components["schemas"]["DomainEventAuditAppended"] | components["schemas"]["DomainEventScenarioSaved"] | components["schemas"]["DomainEventGraphReset"];
         DomainEventAuditAppended: {
@@ -600,7 +626,7 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -820,6 +846,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphSnapshot"];
+                };
+            };
+        };
+    };
+    ReviewClassification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassificationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
                 };
             };
         };

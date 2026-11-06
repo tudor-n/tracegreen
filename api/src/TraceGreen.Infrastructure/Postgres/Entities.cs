@@ -40,6 +40,8 @@ public class NodeRow
     public string? TransportMode { get; set; }
     public string? EnergySource { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string Review { get; set; } = "";
+    public DateTimeOffset? ReviewedAt { get; set; }
 }
 
 public class VerificationRow
@@ -114,6 +116,15 @@ public class AlternativeRow
     public string LaneId { get; set; } = "";
     public decimal CostEur { get; set; }
     public decimal MassT { get; set; }
+}
+
+/// <summary>A category the buyer chose for a line description, keyed by the description's <c>CacheKey</c> (F6).</summary>
+public class BuyerClassificationRow
+{
+    public Guid WorkspaceId { get; set; }
+    public string LineKey { get; set; } = "";
+    public string CategoryId { get; set; } = "";
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public class BuyerRow

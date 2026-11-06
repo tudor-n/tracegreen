@@ -89,11 +89,14 @@ public sealed class IngestService(
             return Fail(IngestErrorCode.NoLane, $"No freight lane for supplier country {country}.");
         }
 
-        var classifications = await LineClassification.ClassifyLinesAsync(extracted.Lines, ai, seed, options.AiTimeout, ct);
+        // A category the buyer chose for the same description comes before the cache and the AI (F6).
+        var lineKeys = extracted.Lines.Select(l => CacheKey.Compute(l.Description)).Distinct(StringComparer.Ordinal).ToList();
+        var buyerCategories = await repo.ListBuyerClassificationsAsync(ctx, lineKeys, ct);
+        var classifications = await LineClassification.ClassifyLinesAsync(extracted.Lines, ai, seed, options.AiTimeout, ct, buyerCategories);
         var dominant = InvoiceFacts.DominantLine(extracted.Lines);
         var picked = classifications.First(c => c.LineId == dominant.Id);
         var classification = new NodeClassification(
-            picked.CategoryId, picked.Source == ClassificationSource.Stub ? null : picked.Confidence, picked.Source);
+            picked.CategoryId, picked.Source is ClassificationSource.Stub or ClassificationSource.Buyer ? null : picked.Confidence, picked.Source);
 
         var now = clock.GetUtcNow();
         var invoice = NodeFactory.NewInvoice(pins?.InvoiceId ?? Ids.NewId(), ctx.WorkspaceId, extracted, xml, now);
