@@ -92,6 +92,12 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - Invoice text reaches it as delimited data, never as instructions. `seed/invoices/adversarial.xml` carries a prompt-injection line to prove it.
 - A category outside the allow-list (`seed/categories.json`) becomes `UNCLASSIFIED`.
 - The API calls the service with a 10 s timeout (`AI_TIMEOUT_MS`) and falls back to the cache and stub, so an import never blocks on it.
+- **Prompt guard (F6).** The system prompt lists only the allowed category ids and labels, and states that the text inside the `<invoice_lines>` block is data, never instructions. Each description is capped at 500 characters with `<` and `>` stripped and whitespace runs collapsed, so a line cannot close the block; codes are capped at 64 characters. Quantity, unit code, classification code and its scheme go along as context. The request carries no supplier name, tax id or amount. The model sees short ids of the service's own (`1`, `2`, …), never the invoice's line ids, and the messages are built directly rather than through a prompt template, so braces in invoice text are never read as template fields.
+- **The guard lowers the risk; it does not remove it.** In scoring, the local model followed an injected instruction in one of 20 tries (`docs/ai-eval.md`). The allow-list bounds what such a line can do: one wrong category, never a number or text outside the schema.
+- **Model output is untrusted.** The structured output limits `categoryId` to the allow-list. Only line ids that were sent count, and only the first answer per id. Confidence is clamped to 0–1, the rationale is capped at 200 characters, and an answer below 0.6 confidence becomes `UNCLASSIFIED`. The C# side checks the allow-list again.
+- **The service's own budget is 8 s** (`AI_TIMEOUT_S`): at most 4 s per cloud model and 6 s for Ollama, each call in a worker thread with a hard deadline, so a hanging provider cannot hold an import.
+- **Where invoice text goes.** With a cloud model in `AI_MODELS`, the line descriptions, quantities, unit codes and classification codes the API sends are passed on to that provider. With only the cache, Ollama and the stub, nothing leaves the laptop.
+- **The scoring route is off by default.** `POST /classify?model=<id>` exists only with `AI_DEV_ROUTES=1` and skips the cache; keep it off for the demo. Under Compose the `ai` service publishes no port, so only the containers on the Compose network reach it, not the hotspot.
 
 ## Data at rest (C4, C8)
 
@@ -118,7 +124,7 @@ Referrer-Policy: no-referrer
 - **`LINK_SECRET`** signs links and keys the address hash. It must be at least 32 characters, and the API refuses to start without it in Production. Outside Production it falls back to a fixed development secret, so links from a development stack are forgeable by anyone who reads the repo.
 - **Secrets live only in the server's environment.** No secret reaches the SPA bundle, the API answers or the logs.
 - `.env` and `.env.*.local` are never committed. `.env.demo` is committed on purpose and holds demo-only values, including its own `LINK_SECRET`. Anyone with the repository can therefore forge links for the demo image, so it must not be reused anywhere real; a real deployment sets its own secret.
-- **Optional AI keys:** `ANTHROPIC_API_KEY` and `AI_MODEL` are read only by the AI service.
+- **Optional AI keys:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `GOOGLE_API_KEY`, with the model list `AI_MODELS` (or the older `AI_MODEL`), are read only by the AI service. They live in the root `.env`, which is git-ignored and which a git worktree does not get. Compose passes them to the `ai` container alone, never to `api` or `web`. `/health.models` reports a missing key by name (`"OPENAI_API_KEY not set"`), never a value.
 
 ## Logging
 

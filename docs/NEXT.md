@@ -1,6 +1,6 @@
 # Status and next steps
 
-Last updated: 2026-11-06 (the v2 layout on `b/v2-layout`, now with the supplier page, its terms and the supplier page link in the v2 style: see "v2 layout (2026-11-06)" below; the supplier page, F12, a thin slice built on hackathon day, merged with the Supplier Terms: see "Supplier page (F12)" below; and the Supplier Terms on the verify page, F3: see "Supplier terms (F3)" below); before that, 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-06 (the AI classifier F6: the HS rules, the Romanian invoices R1–R3, the model variables in Compose and the docs, Terminal C of `docs/plan/ai-f6.md`; the v2 layout on `b/v2-layout`, now with the supplier page, its terms and the supplier page link in the v2 style: see "v2 layout (2026-11-06)" below; the supplier page, F12, a thin slice built on hackathon day, merged with the Supplier Terms: see "Supplier page (F12)" below; and the Supplier Terms on the verify page, F3: see "Supplier terms (F3)" below); before that, 2026-11-05 (the demo tooling, task B7 of `docs/plan/dev-b.md`; slice 6, the Playwright smoke, task B6; slice 5, the simulator panel, task B5; the hand-over docs, task A10 of `docs/plan/dev-a.md`; CI, task A9; and slice 5, the simulator backend, task A7; before that, 2026-10-29, the M1 acceptance run in both data modes and its recording, task C4 of `docs/plan/dev-c.md`; 2026-10-27, slice 3, the verify loop's backend, tasks A5–A6 of `docs/plan/dev-a.md`; 2026-10-24, the M1 integration run in both data modes, task B3 of `docs/plan/dev-b.md`; 2026-10-23, slice 2, the seed invoices validated at ANAF, task C2 of `docs/plan/dev-c.md`; and 2026-10-22, the slice-1 backend and client transport, tasks A1–A3 of `docs/plan/dev-a.md`). Order of work: "What remains (in order)" below and `docs/plan/`. Decisions: `docs/DECISIONS.md`.
 
 ## What exists
 
@@ -11,11 +11,11 @@ Monorepo with three services behind one browser origin, brought up by `docker co
 | `api/` .NET 10 host | Config from env (fails fast), OpenAPI at `/openapi/v1.json`, `GET /api/health` (mode, db, seed nodes, `ai`, `baseUrl`), `GET /api/graph`, `POST /api/dev/reset`, `POST /api/ingest/{ubl,demo}`, `GET /api/events` (Server-Sent Events with `id:`/`Last-Event-ID` replay, `resync`, `ping`), `POST /api/request-link`, `GET /api/verify/context`, `POST /api/verify` (rate limited), `POST /api/audit/verify`, `POST /api/simulate`, `POST /api/scenarios`, `POST /api/dev/simulate-answer`, startup flags `--migrate --seed --reset --exit` | integration tests via `TestWebAppFactory` (memory mode) |
 | `api/` Domain (pure) | Model records; carbon math (`Carbon/`: factor table with provenance, spend and activity estimates, KPIs, MAC + badge, simulator); UBL 2.1 parser (namespace-agnostic, DTD rejected, 2 MB cap); canonical JSON + hashes; HMAC link tokens (`v1.` layout, hash-bound, constant-time); hash-chained audit log; `IRepository`, `IEventBus`, `IAiClient` ports; `LineClassification` (invoice code → cache → AI with timeout → stub); `DemoState` builder | unit tests, hand-computed expectations |
 | `api/` Infrastructure | `MemoryRepository` (lock-atomic); `EfRepository` on Postgres (advisory lock per workspace, unique nonce, unique `(workspace_id, prev_hash)`, TRUNCATE-based reset); migrations `Init` + `Rls` (row-level security + append-only trigger on `audit_log`); `InMemoryEventBus` (ring buffer 500); `HttpAiClient` / `StubAiClient` | repository contract runs against memory always and against Postgres when `DATABASE_URL` is set |
-| `ai/` FastAPI | The C7 contract and stub: `POST /classify` (cache, then stub; categories outside `seed/categories.json` become `UNCLASSIFIED`), `POST /suggest` (empty), `POST /extract-pdf` (501), `GET /health` (`provider: cache,stub`, cache size, `modelConfigured`); camelCase schemas matching `HttpAiClient`; `anthropic` installed but no client is built | 14 pytest tests (cache hit, stub fallback, allow-list, cache-key parity with C#, adversarial line, no Anthropic client, routes); ruff clean |
+| `ai/` FastAPI | The C7 contract with the F6 chain: `POST /classify` answers one batch through the cache, then the models in `AI_MODELS` in order (LangChain chat models for Anthropic, OpenAI, Google GenAI and Ollama), then the stub, within 8 s; categories outside `seed/categories.json` become `UNCLASSIFIED`, and so do answers below 0.6 confidence; model answers are kept in a runtime cache; `POST /classify?model=<id>` only with `AI_DEV_ROUTES=1`; `POST /suggest` (empty), `POST /extract-pdf` (501), `GET /health` (provider, cache size, `modelConfigured`, and `models` with `ready` and `reason`); camelCase schemas matching `HttpAiClient` | the 14 C7 pytest tests (cache hit, stub fallback, allow-list, cache-key parity with C#, adversarial line, no client without a model, routes) plus `tests/test_models.py` (fake models, no network or keys); ruff clean |
 | `web/` Vite SPA | Since 2026-11-06 the v2 layout ("v2 layout" below) replaces the canvas dashboard described here; the store, actions, simulator and supplier pages are unchanged in behaviour. Dashboard at `/`: Zustand graph store (`hydrate`, `applyEvent`, `select`) with memoised React Flow selectors and dagre layout (B1); supplier nodes (status tone, hotspot ring, "i" factor tooltip, "AI-mapped" label), the KPI bar from API values and the toolbar (Import, Load demo invoice, Reset demo) (B2), kept live by `useGraphEvents` (A3). The node drawer with the QR card, the audit panel and the connection badge (B4). The simulator in the drawer (B5): mode buttons with the lane's missing legs disabled, the node's `alternatives` as swap buttons, the API's result with deltas (tonnes, euros, days; cost, lead time and the MAC labelled illustrative) and the MAC badge, a ghost node left of the supplier, and "Apply" (`POST /api/scenarios`); the base node never changes (see "Simulator panel (B5)" below). The supplier page `/verify/:nodeId` (C5): RO by default and EN through `?lang=`, the link's context, two pre-selected answer groups with skip (→ PARTIAL), the Supplier Terms with an unticked checkbox that the submit needs, and every result state (thanks with the non-blocking reconfirm banner, already used, expired, invoice changed, not valid, terms updated, too many attempts, no connection with retry); the printable terms at `/terms/supplier`; its rules live in the pure `web/src/lib/verify-state.ts` and its requests in `verify-api.ts` (a request hanging past 10 s counts as no connection). In development, React's StrictMode sends the context request twice on load, so each page load counts twice against the verify rate limit; the production build sends it once. Tailwind v4, shadcn (button, card, badge, sheet, select, tooltip, separator), Vite proxy `/api` → API with `X-Forwarded-Host`, oxlint with `react/no-danger` as error | vitest (store, selectors, formatting, sync, toolbar and simulator requests, scenario display, verify page states and requests), typecheck, lint, build; the Playwright smoke `web/e2e/demo-path.spec.ts` against Compose (B6) |
 | CI | `.github/workflows/ci.yml` on every pull request and on pushes to `main`: **api** (`dotnet build` with warnings as errors, then `dotnet test` with a Postgres 17 service, so the contract tests run against `tracegreen_test`), **ai** (`uv sync --locked`, pytest, `ruff check`, `ruff format --check`), **web** (`pnpm typecheck`, `lint`, `test`, `build`), **types drift** (API in memory mode, `pnpm gen:api`, `git diff --exit-code web/src/api/schema.d.ts`). Every action is pinned to a release commit. **e2e** (the demo image built and started, `pnpm e2e` against it on Postgres, then again with the API recreated in memory mode; container logs printed on failure) | all five jobs green on GitHub; the e2e job first on its own pull request (#33, 2 min 27 s for both modes) |
-| `seed/` | Fixed-UUID demo data: 5 UBL invoices + adversarial file, factors (placeholders flagged `PLACEHOLDER`), lanes (illustrative), alternatives, categories (= AI allow-list), classification map, ai-cache, demo-state | validated by `SeedLoader` tests |
-| Compose | `db`, `ai` (reload), `api` (`dotnet run`, migrates + seeds on boot), `web` (Vite); `compose.demo.yml` with one-shot `migrate`, runtime images and nginx | brought up and checked by hand |
+| `seed/` | Fixed-UUID demo data: 5 UBL invoices + adversarial file, and the Romanian invoices R1–R3 for the AI and HS-rule paths (not in the demo state), factors (placeholders flagged `PLACEHOLDER`), lanes (illustrative), alternatives, categories (= AI allow-list), classification map (CPV and HS prefixes), ai-cache, demo-state | validated by `SeedLoader` tests |
+| Compose | `db`, `ai` (reload; the model variables and keys come from the root `.env`, and `host.docker.internal` reaches Ollama on the host), `api` (`dotnet run`, migrates + seeds on boot), `web` (Vite); `compose.demo.yml` with one-shot `migrate`, runtime images and nginx | brought up and checked by hand |
 
 Test counts at hand-off: 125 .NET tests (109 before Task 8 plus the event bus, AI client, classification and SSE tests), 1 Python test, web typecheck/lint/build.
 
@@ -36,6 +36,8 @@ Test counts after B5: 266 .NET tests, 252 in memory mode (run with `dotnet test`
 Test counts after B6: the same, plus one Playwright smoke (`pnpm e2e`, seven steps).
 
 Test counts after B7: the same, the smoke with an eighth step (no CSP violation), and 22 script tests (`node --test scripts/lib/*.test.mjs`, 10 of them for demo-check).
+
+Test counts after the F6 seed data (Terminal C): 266 .NET tests, 252 in memory mode, all passing (run with `dotnet test` inside the `tracegreen-api` dev image on the worktree); `AllSeedInvoicesParse` now reads R1–R3 as well.
 
 Test counts after F12 and the supplier terms (2026-11-06): 326 .NET tests, 309 in memory mode (the 17 Postgres contract tests skipped), 326 with `DATABASE_URL` on `tracegreen_test`; 253 web unit tests; 28 script tests, which CI runs in the web job; two Playwright specs: the demo-path smoke with nine steps (the terms tick and link in step 3, the printable terms in step 6) and `supplier-portal.spec.ts`.
 
@@ -156,6 +158,93 @@ On stage: Reset demo → Import `seed/invoices/adversarial.xml` (a second invoic
 
 Checked on 2026-11-06 against this branch's API on the host (memory mode, and Postgres mode on `tracegreen_test`) behind its Vite dev server: both Playwright specs pass in both modes, before and after the merge with the Supplier Terms; before it, CI also ran both on the demo image (nginx, CSP) in both modes. Screenshots at 412 px (Pixel 7) in RO and EN looked right: the terms box above the list, one card open at a time, the status as a colour and a word on its own row. **Not yet checked:** a real phone on the hotspot. The Romanian strings in `web/src/copy/supplier.ts` need a native read.
 
+## AI classifier data and config (F6, 2026-11-06)
+
+Terminal C's part of the F6 plan (`docs/plan/ai-f6.md`). The chain itself (Terminal A) and the scoring set and script (Terminal B) come in their own pull requests. The decisions are in `DECISIONS.md`, "AI classifier chain (F6)".
+
+**HS rules.** Nine rows with `"listId": "HS"` in `seed/classification-map.json`, covering the six real categories. Each code was checked on 2026-11-06 against the World Customs Organization's HS Nomenclature 2022 edition (index page `https://www.wcoomd.org/en/topics/nomenclature/instrument-and-tools/hs-nomenclature-2022-edition/hs-nomenclature-2022-edition.aspx`; chapter files `https://www.wcoomd.org/-/media/wco/public/global/pdf/topics/nomenclature/instruments-and-tools/hs-nomenclature-2022/2022/` + `0739_2022e.pdf` for chapter 39, `1048_2022e.pdf` for 48, `1579_2022e.pdf` for 79 and `1685_2022e.pdf` for 85). The text below is quoted from those files:
+
+| Prefix | HS 2022 text | Category |
+|---|---|---|
+| `7907` | 79.07, 7907.00 "Other articles of zinc." | `zinc_diecast` |
+| `8534` | 85.34, 8534.00 "Printed circuits." | `pcb` |
+| `854430` | 8544.30 "Ignition wiring sets and other wiring sets of a kind used in vehicles, aircraft or ships" | `wire_harness` |
+| `854442` | 8544.42 "Fitted with connectors", under "Other electric conductors, for a voltage not exceeding 1,000 V" | `wire_harness` |
+| `481910` | 4819.10 "Cartons, boxes and cases, of corrugated paper or paperboard" | `packaging_paper` |
+| `481920` | 4819.20 "Folding cartons, boxes and cases, of non-corrugated paper or paperboard" | `packaging_paper` |
+| `853669` | 8536.69 "Other", under "Lamp-holders, plugs and sockets" (8536.61 is the lamp-holders) | `connectors` |
+| `853670` | 8536.70 "Connectors for optical fibres, optical fibre bundles or cables" | `connectors` |
+| `392690` | 3926.90 "Other", under 39.26 "Other articles of plastics and articles of other materials of headings 39.01 to 39.14" | `plastics` |
+
+**Romanian invoices.** Three new files in `seed/invoices/`, not added to `demo-state.json` or `ai-cache.json`:
+
+| File | Supplier (fictional) | CUI | Lines | Path |
+|---|---|---|---|---|
+| `R1-bistrita.xml` | Zincora Turnătorie SRL, Bistrița | RO99999968 | 2, Romanian with diacritics, no classification code (zinc die-cast sensor housings, zamak covers) | AI: no code and no cache entry |
+| `R2-brasov.xml` | Tâmpa Circuite SRL, Brașov | RO99999950 | 3, each with an HS code (`853400`, `853669`, `481910`) | HS rule: `pcb` from the invoice, no AI call |
+| `R3-tarnaveni.xml` | Târnăveni Fascicule SRL, Târnăveni | RO99999941 | 4, abbreviated and without diacritics, four categories, one line in pieces (`H87`) | AI |
+
+All three are in EUR, with the RON VAT total (BR-RO-030, BR-53) at the BNR rate of the issue date: 2026-10-19 5.3272, 2026-10-20 5.3285, 2026-10-21 5.3297 (`https://curs.bnr.ro/files/xml/years/nbrfxrates2026.xml`). The CUIs have a valid check digit, computed with the same weights that reproduce the existing seed CUIs, and are not registered at ANAF: `POST https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva` returned all three under `notFound` on 2026-11-06. The supplier names were made up for the seed. A web search for each exact name on 2026-11-06 found no company using it; the trade register itself was not searched. Amounts and quantities are invented, as on the other seed invoices; no factor, lane or mass changed.
+
+`node scripts/validate-seed-anaf.mjs` on 2026-11-06:
+
+```
+OK    N1-shenzhen.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N2-taiwan.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    N3-oradea.xml
+OK    N4-sibiu.xml
+OK    N5-hamburg.xml  (expected: seller has no Romanian CUI)
+      tipAssert=E; codEroare=ERRIdentif; textEroare=Nu a fost identificat cui vanzator
+OK    R1-bistrita.xml
+OK    R2-brasov.xml
+OK    R3-tarnaveni.xml
+OK    adversarial.xml
+
+9/9 passed (3 with the expected seller-identification error)
+```
+
+Imported through `POST /api/ingest/ubl` into a throwaway API in memory mode with no AI service (2026-11-06): R2 became `pcb` from its invoice code (source `invoice`, confidence 1). R1 and R3 fell through to the stub (`UNCLASSIFIED`); these are the lines the model chain will answer. All three took the lane `RO-SB-SB`.
+
+**Config.** `compose.yml` passes every variable of the plan's agreements to the `ai` service, with the agreed defaults: `AI_MODELS`, `AI_MODEL`, the three cloud keys, `OLLAMA_BASE_URL`, `AI_TIMEOUT_S` 8, `AI_MODEL_TIMEOUT_S` 4, `OLLAMA_TIMEOUT_S` 6 and `AI_DEV_ROUTES` 0. It also maps `host.docker.internal` to the host gateway, so the name resolves on Linux as well. `.env.example` documents each of them.
+
+**The demo image.** `compose.demo.yml` replaces the `ai` service's environment (`environment: !override`), so it gets the same variables, read from the root `.env`, with `AI_DEV_ROUTES` fixed at 0. Before, it passed only `AI_MODEL`, `ANTHROPIC_API_KEY` and `AI_TIMEOUT_S` "10", a budget equal to the API's own timeout. `extra_hosts` comes from `compose.yml`.
+
+**Checked against Terminal A's branch (`f6/ai-core` at `70d8b5b`, 2026-11-06).** A throwaway container ran that branch's `ai/` with this branch's `seed/`:
+
+| Check | Result |
+|---|---|
+| `/health` with `AI_MODELS=openai:<placeholder>,ollama:qwen3.5:4b` and no key | `provider` `cache,ollama:qwen3.5:4b,stub`; the OpenAI model `ready: false`, `reason` "OPENAI_API_KEY not set"; the Ollama model `ready: true` and `modelConfigured: true`, although that model was not pulled. An Ollama model is ready by configuration, not by a reachable server. |
+| `/classify` with no model reachable | 200 in 0.18 s: the cached line from the cache, the other from the stub ("AI unavailable") |
+| Dev route with `AI_DEV_ROUTES=1` | 400 "Model not ready: openai:<placeholder> (OPENAI_API_KEY not set)"; 400 "Unknown model: nope:x" |
+| The container reaching Ollama on the Windows host | `http://host.docker.internal:11434/api/tags` answers with Ollama's default settings |
+| The local model, `ollama:ministral-3:3b` (the one chosen in Phase 2), through a throwaway service on Ollama 0.21.1 (updated to 0.23.4 before the rehearsal below) | Warm: one line in 1.2–1.4 s, R1's two and R3's first and last lines in 3.4 s (R1 both `zinc_diecast`, 0.95 and 0.90; the connector line `connectors`, 0.90; the harness line `UNCLASSIFIED`, 0.60). Cold, after unloading the model: 4.7 s for one line. The first two calls after the service started gave no answer within 8 s and fell to the stub. The same prompt and schema sent straight to Ollama, and through the service's own model factory without a deadline, answered in 1–2 s, so the misses were start-up and model load, not the prompt. Hence the warm-up step in `RUNBOOK.md`. |
+
+**Phase 2 for C, the AI demo steps,** are in `RUNBOOK.md`, "AI demo steps (F6)". Two of the plan's steps say less on screen than the plan expected:
+
+- **Step 1:** the node shows the category and "AI-mapped · <confidence>", but not the model's reason; `NodeView` carries no rationale. The script shows the reason with a `curl` to the AI service.
+- **Step 3:** `adversarial.xml` is answered from `seed/ai-cache.json` by the API, so no live model sees its injected line on stage. The live models' handling of injection is in the scoring table (`docs/ai-eval.md`, Terminal B's Phase 2).
+
+**Rehearsal on the merged branches (2026-11-06).** A throwaway worktree merged A (`bc98c47`), then C, then B, with no conflict. It ran the demo image under its own Compose project, with `AI_MODELS=ollama:ministral-3:3b` only (Ollama 0.23.4 after its update from 0.21.1; no API keys on this machine), and the stack was removed afterwards:
+
+| Step | Result |
+|---|---|
+| Before: `/health`, and `api/tags` from the container | the model `ready`; the container lists `ministral-3:3b` |
+| 1. R1, model warm (after `ollama run ministral-3:3b "ok"`), AI service freshly restarted | 201 in 2.5 s: "RO · Zinc die-cast parts", "AI-mapped · 0.95", source `model` |
+| 1. R1, model unloaded | 201 in 6.0 s, the answer just inside the 6 s cap; an earlier cold try missed it and showed "RO · Unclassified" from the stub |
+| 1. The reason command | rationale "Zinc die-cast casing with pressure-turned sensor alloy (CZ-40)", source `model` |
+| 2. R2 | 201 in 12 ms: "RO · Printed circuit boards", no tag, source `invoice` |
+| 3. `adversarial.xml` | 201 in 11 ms: "RO · Wire harnesses", "AI-mapped · 0.86", source `cache` |
+| R3 (step 4's invoice), model warm | 201 in 2.7 s: "RO · Wire harnesses", "AI-mapped · 0.90" |
+| "Reset demo", then R1 and R3 again without restarting the AI service | 62 ms and 7 ms, from the service's memory, as the RUNBOOK warns |
+| The same imports in memory mode (API recreated) | the same categories and sources |
+| `pnpm e2e` | passes on Postgres and in memory mode |
+
+Not rehearsed: steps 4 and 5 with cloud models, which need API keys, and step 5's offline timing. While Terminal B's scoring run used the same Ollama (12:19–12:26), the chain's calls waited behind its 25 s calls and fell to the stub; hence the RUNBOOK's rule that nothing else uses Ollama during the demo. B's calls after the overlap took the same 23–25 s as before, so its times look unaffected.
+
+**B's scores (`docs/ai-eval.md`)** for `ministral-3:3b`: 80% over 10 runs of the 30 lines, connectors 0% (they come back `UNCLASSIFIED`), and one of the two injection lines (ro-30) followed in one call. The demo does not lean on either weakness: R1's node comes from its zinc lines (100%), R3's from its harness line (100%), and `adversarial.xml` is answered from the cache. No demo step changes (D5).
+
 ## Seed XML validation (2026-10-23)
 
 `node scripts/validate-seed-anaf.mjs` (Node 24 or later, no dependencies) posts every file in `seed/invoices/` to ANAF's public validator (`POST https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1`, the XML as `text/plain`, no authentication). For each file it prints OK, or ANAF's exact messages and raw answer, and it exits 1 if any file fails. Pass file paths to check single files. Final output:
@@ -240,7 +329,7 @@ Current order, from the 2026-10-22 review's slice order (vertical slices toward 
 1. **Slice 4 check (M2, A8 with B and C):** the API-level part passed on 2026-11-05 in both modes ("M2 pre-check" above). Left: the timed two-device run-through over the hotspot (T16), where the phone flips the node green in under 2 s. Measure import → node and submit → flip, and log failures in `docs/run-log.md` (people write it).
 2. **Slice 5 SPA:** the simulator panel in the node drawer, calling `POST /api/simulate` and `POST /api/scenarios` with `NodeView.alternatives`. Done when N1 air → sea shows `win-win` and N1 → N1-alt shows `premium` or `below-ets`, with both MAC badge states rendered.
 3. **Slice 6, Playwright smoke (B6):** done; `pnpm e2e` passes against Compose and the demo image, and CI runs it on the demo image in both data modes (A9).
-4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout).
+4. **Slice 7, Python AI service (C7):** the contract, cache and stub are done (2026-11-05). Left: the live model provider in hackathon hours H1–H4 (D4), in its own PR, with A reviewing the prompt handling (invoice text in a delimited block, instructions in it ignored, output validated against the schema and the allow-list, length capped, 10 s timeout). F6 (`docs/plan/ai-f6.md`) builds it in three parallel branches: the chain cache → two cloud models → local Qwen 3.5 → stub (Terminal A), the Romanian test set and scoring script (Terminal B), and the HS rules, R1–R3, the Compose variables and the docs (Terminal C, done 2026-11-06, "AI classifier data and config (F6)" above). Phase 2 is done for the local model: A chose `ministral-3:3b` (Ollama 0.23.4 cannot pull `qwen3.5:4b`), B scored it in `docs/ai-eval.md`, and C wrote the AI demo steps and rehearsed them with it on the merged branches ("Rehearsal on the merged branches" above). Left: scoring the two cloud models and rehearsing steps 4 and 5 once API keys are on the demo laptop, then Phase 3, which merges A, then C right after it (A's `compose.demo.yml` relies on the `extra_hosts` that C adds to `compose.yml`), then B, runs the full check and rehearses on the demo laptop.
 5. **Supplier page (F12):** the stage path above on a real phone over the hotspot, with the terms tick; a native read of the Romanian strings. Merge before the H12 scope freeze, or show it as what comes next.
 6. **Data (T4) and the tag (T22):** a person replaces the PLACEHOLDER factor rows and gives `ETS_PRICE_EUR_PER_T` a source and date (`docs/factor-sources.md`), and fills in the operator details in `seed/supplier-terms.json` (a new `version`, see `docs/legal/README.md`); then `node scripts/preflight.mjs` passes and `v0.9-prehack` can be tagged. If the real rows move a demo badge, report it here (D5).
 
