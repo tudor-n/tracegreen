@@ -78,7 +78,7 @@ public sealed class VerifyService(
             DefaultEnergy: EnergySource.Grid,
             MassT: link.Node.MassT,
             ExpiresAt: link.ExpiresAt,
-            Terms: seed.SupplierTerms));
+            Terms: VerifyTerms.From(seed.SupplierTerms)));
     }
 
     /// <param name="clientAddress">Hashed with <see cref="ServiceOptions.IpHashKey"/> before it is stored; never stored as is.</param>
@@ -135,6 +135,11 @@ public sealed class VerifyService(
             ["termsVersion"] = terms.Version,
             ["termsSha256"] = terms.Sha256,
         };
+        if (answer.Simulated)
+        {
+            // The terms were accepted by the demo tool, not by a person at the supplier; the log must not pass it off as one.
+            payload["simulated"] = true;
+        }
         var recorded = await repo.RecordVerificationAsync(
             link.Ctx, verification, patch, prev => AuditChain.Build(prev, link.Ctx.WorkspaceId, now, Actor, "verification.submitted", payload), ct);
         if (recorded.Status == RecordVerificationStatus.AlreadyUsed || recorded is not { Node: { } patched, Entry: { } entry })

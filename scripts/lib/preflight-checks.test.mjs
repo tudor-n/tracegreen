@@ -133,3 +133,10 @@ test('supplier terms without a placeholder pass, and a bare PLACEHOLDER is still
     { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still contain a placeholder' },
   ]);
 });
+
+test('a bare PLACEHOLDER next to a bracketed one is reported too', () => {
+  assert.deepEqual(placeholderTerms('"Operated by [PLACEHOLDER: name], courts at PLACEHOLDER."', 'seed/supplier-terms.json'), [
+    { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still say "name"' },
+    { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still contain a placeholder' },
+  ]);
+});

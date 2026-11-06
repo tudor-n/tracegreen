@@ -17,6 +17,9 @@ public static class SeedLoader
 {
     public const string TermsFile = "supplier-terms.json";
 
+    /// <summary>Every published version of the terms with its SHA-256, so an edited text cannot keep an old version.</summary>
+    public const string TermsVersionsFile = "supplier-terms-versions.json";
+
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -40,12 +43,13 @@ public static class SeedLoader
         var demoState = Read<DemoStateSpec>(directory, "demo-state.json");
         var spendConversion = Read<SpendConversionSpec>(directory, "spend-conversion.json");
         var supplierTerms = ReadTerms(directory, TermsFile);
+        var termsVersions = Read<Dictionary<string, string>>(directory, TermsVersionsFile);
 
         var bundle = new SeedBundle(
             Path.GetFullPath(directory), buyer, categories, factors, lanes, alternatives, classificationMap, aiCache, demoState, spendConversion,
             supplierTerms);
 
-        var violations = Validate(bundle);
+        var violations = Validate(bundle, termsVersions);
         if (violations.Count > 0)
         {
             throw new SeedValidationException(violations);
@@ -76,7 +80,7 @@ public static class SeedLoader
         throw new DirectoryNotFoundException("No seed/ directory found above the binary or the working directory; set SEED_DIR.");
     }
 
-    private static List<string> Validate(SeedBundle b)
+    private static List<string> Validate(SeedBundle b, IReadOnlyDictionary<string, string> termsVersions)
     {
         var v = new List<string>();
         var categoryIds = b.Categories.Select(c => c.Id).ToHashSet(StringComparer.Ordinal);
@@ -140,7 +144,25 @@ public static class SeedLoader
         if (ids.Contains(Guid.Empty)) v.Add("demo-state: empty GUID");
         if (ids.Distinct().Count() != ids.Count) v.Add("demo-state: duplicate ids");
         ValidateTerms(b.SupplierTerms, v);
+        ValidateTermsVersion(b.SupplierTerms, termsVersions, v);
         return v;
+    }
+
+    /// <summary>A published version keeps its text: the version must be pinned, and to the SHA-256 the text has now.</summary>
+    private static void ValidateTermsVersion(SupplierTerms t, IReadOnlyDictionary<string, string> published, List<string> v)
+    {
+        if (string.IsNullOrWhiteSpace(t.Version))
+        {
+            return;
+        }
+        if (!published.TryGetValue(t.Version, out var pinned))
+        {
+            v.Add($"{TermsVersionsFile} has no entry for version {t.Version}; once the text is final, add \"{t.Version}\": \"{t.Sha256}\" (node scripts/terms-hash.mjs prints it)");
+        }
+        else if (!string.Equals(pinned, t.Sha256, StringComparison.Ordinal))
+        {
+            v.Add($"{TermsFile}: version {t.Version} was published with SHA-256 {pinned}, but the text now hashes to {t.Sha256}; give the changed text a new version");
+        }
     }
 
     /// <summary>Both languages complete, with the same numbered sections in the same order, so neither page can drop a clause.</summary>
@@ -167,11 +189,18 @@ public static class SeedLoader
             }
             foreach (var section in text.Sections)
             {
+                if (section is null)
+                {
+                    v.Add($"{TermsFile} {lang}: an empty section");
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(section.Heading)) v.Add($"{TermsFile} {lang} section {section.Number}: no heading");
                 if (section.Paragraphs is not { Count: > 0 } || section.Paragraphs.Any(string.IsNullOrWhiteSpace)) v.Add($"{TermsFile} {lang} section {section.Number}: paragraphs missing or empty");
             }
+            var numbers = text.Sections.Where(s => s is not null).Select(s => s.Number).ToList();
+            if (numbers.Distinct().Count() != numbers.Count) v.Add($"{TermsFile} {lang}: two sections share a number");
         }
-        if (t.Ro?.Sections is { } ro && t.En?.Sections is { } en && !ro.Select(s => s.Number).SequenceEqual(en.Select(s => s.Number)))
+        if (t.Ro?.Sections is { } ro && t.En?.Sections is { } en && !ro.Select(s => s?.Number).SequenceEqual(en.Select(s => s?.Number)))
         {
             v.Add($"{TermsFile}: the ro and en sections are not numbered alike");
         }

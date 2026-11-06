@@ -67,14 +67,12 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
 
     private SupplierTerms Terms => _factory.Services.GetRequiredService<SeedBundle>().SupplierTerms;
 
-    /// <summary>Stands for the current terms' SHA-256, which is known at run time.</summary>
-    private const string CurrentTerms = "<current>";
-
+    /// <summary>Sends the current terms' SHA-256 unless <paramref name="acceptTerms"/> is false; <paramref name="terms"/> sends another value.</summary>
     private Task<HttpResponseMessage> Submit(
-        string token, string? mode = "road", string? energy = "grid", decimal? massT = null, string? terms = CurrentTerms) =>
+        string token, string? mode = "road", string? energy = "grid", decimal? massT = null, bool acceptTerms = true, string? terms = null) =>
         _client.PostAsJsonAsync(
             "/api/verify",
-            new { t = token, transportMode = mode, energySource = energy, massT, acceptedTerms = terms == CurrentTerms ? Terms.Sha256 : terms },
+            new { t = token, transportMode = mode, energySource = energy, massT, acceptedTerms = terms ?? (acceptTerms ? Terms.Sha256 : null) },
             Ct);
 
     [Fact]
@@ -208,7 +206,7 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
     }
 
     [Fact]
-    public async Task TheContextCarriesTheSupplierTermsTheTermsRouteServes()
+    public async Task TheContextCarriesTheCheckboxStatementOfTheTermsTheTermsRouteServes()
     {
         await Reset();
         var token = await Token(N3);
@@ -221,14 +219,15 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         Assert.Equal(Terms.Version, terms.GetProperty("version").GetString());
         Assert.Equal(Terms.Sha256, terms.GetProperty("sha256").GetString());
         Assert.Equal(64, Terms.Sha256.Length);
-        Assert.Equal(terms.GetRawText(), page.GetRawText());
+        Assert.Equal(page.GetProperty("sha256").GetString(), terms.GetProperty("sha256").GetString());
         foreach (var lang in new[] { "ro", "en" })
         {
-            var text = terms.GetProperty(lang);
-            Assert.False(string.IsNullOrWhiteSpace(text.GetProperty("acceptance").GetProperty("link").GetString()));
-            Assert.NotEmpty(text.GetProperty("keyPoints").EnumerateArray());
-            Assert.NotEmpty(text.GetProperty("sections").EnumerateArray());
+            // The page asks with the statement alone; the full text is the terms route's, behind the statement's link.
+            Assert.Equal(page.GetProperty(lang).GetProperty("acceptance").GetRawText(), terms.GetProperty(lang).GetRawText());
+            Assert.False(string.IsNullOrWhiteSpace(terms.GetProperty(lang).GetProperty("link").GetString()));
+            Assert.NotEmpty(page.GetProperty(lang).GetProperty("sections").EnumerateArray());
         }
+        Assert.False(terms.GetProperty("en").TryGetProperty("sections", out _));
     }
 
     [Fact]
@@ -238,7 +237,7 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         var token = await Token(N3);
         var seq = Bus.LastSeq(Ids.DemoWorkspace);
 
-        await AssertProblem(await Submit(token, terms: null), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
+        await AssertProblem(await Submit(token, acceptTerms: false), HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
         await AssertProblem(
             await _client.PostAsJsonAsync("/api/verify", new { t = token, transportMode = "road" }, Ct),
             HttpStatusCode.UnprocessableEntity, "TermsNotAccepted");
@@ -268,7 +267,7 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         var token = await Token(N3);
         Assert.Equal(HttpStatusCode.OK, (await Submit(token)).StatusCode);
 
-        await AssertProblem(await Submit(token, terms: null), HttpStatusCode.Conflict, "AlreadyUsed");
+        await AssertProblem(await Submit(token, acceptTerms: false), HttpStatusCode.Conflict, "AlreadyUsed");
     }
 
     [Fact]
@@ -286,6 +285,7 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         Assert.Equal("verification.submitted", entry.Action);
         Assert.Equal(Terms.Version, entry.Payload["termsVersion"]!.GetValue<string>());
         Assert.Equal(Terms.Sha256, entry.Payload["termsSha256"]!.GetValue<string>());
+        Assert.Null(entry.Payload["simulated"]);
         Assert.True(AuditChain.Verify(await Repo.ListAuditAsync(Ctx, 0, 1000, Ct)).Valid);
     }
 
@@ -492,8 +492,10 @@ public class VerifyEndpointTests : IClassFixture<VerifyWebAppFactory>
         Assert.Equal("VERIFIED", (await Json(response)).GetProperty("status").GetString());
         var audit = await Repo.ListAuditAsync(Ctx, 0, 1000, Ct);
         Assert.Equal(["link.requested", "verification.submitted"], audit.Skip(before).Select(a => a.Action));
-        // The demo tool accepts the current terms on the simulated supplier's behalf.
+        // The demo tool accepts the current terms on the simulated supplier's behalf, and its entry says it was simulated.
         Assert.Equal(Terms.Sha256, audit[^1].Payload["termsSha256"]!.GetValue<string>());
+        Assert.True(audit[^1].Payload["simulated"]!.GetValue<bool>());
+        Assert.True(AuditChain.Verify(audit).Valid);
     }
 
     [Fact]

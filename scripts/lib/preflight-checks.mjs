@@ -32,11 +32,13 @@ export function placeholderFactors(factorsText, file) {
  */
 export function placeholderTerms(termsText, file) {
   const findings = [];
+  const bracketed = /\[PLACEHOLDER:\s*([^\]]*)\]/g;
   termsText.split('\n').forEach((line, i) => {
-    for (const match of line.matchAll(/\[PLACEHOLDER:\s*([^\]]*)\]/g)) {
+    for (const match of line.matchAll(bracketed)) {
       findings.push({ file, line: i + 1, message: `the supplier terms still say "${match[1].trim()}"` });
     }
-    if (line.includes(PLACEHOLDER) && !/\[PLACEHOLDER:/.test(line)) {
+    // Whatever is left once the bracketed ones are taken out, such as a bare PLACEHOLDER on the same line.
+    if (line.replace(bracketed, '').includes(PLACEHOLDER)) {
       findings.push({ file, line: i + 1, message: 'the supplier terms still contain a placeholder' });
     }
   });

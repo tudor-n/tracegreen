@@ -106,8 +106,8 @@ public sealed record LinkGrant(Guid NodeId, string Url, DateTimeOffset ExpiresAt
 
 /// <summary>
 /// What the supplier's phone page needs to ask its two questions, and nothing personal: company names, the invoiced item,
-/// the lane's modes with the default pre-selected, the energy answers with grid pre-selected, and the
-/// <see cref="Terms"/> the supplier must accept before submitting (both languages, so the page switches without a request).
+/// the lane's modes with the default pre-selected, the energy answers with grid pre-selected, and the checkbox statement of
+/// the <see cref="Terms"/> the supplier must accept before submitting (both languages, so the page switches without a request).
 /// <see cref="ItemDescription"/> is invoice text: render it as text.
 /// </summary>
 public sealed record VerifyContext(
@@ -125,13 +125,15 @@ public sealed record VerifyContext(
     EnergySource DefaultEnergy,
     decimal? MassT,
     DateTimeOffset ExpiresAt,
-    SupplierTerms Terms);
+    VerifyTerms Terms);
 
 /// <summary>
 /// The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.
 /// <see cref="AcceptedTerms"/> is the <see cref="SupplierTerms.Sha256"/> of the terms the supplier ticked; anything else is refused.
+/// <see cref="Simulated"/> marks an answer the demo tool gave for a supplier, so its audit entry says so.
 /// </summary>
-public sealed record VerifyAnswer(string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT, string? AcceptedTerms);
+public sealed record VerifyAnswer(
+    string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT, string? AcceptedTerms, bool Simulated = false);
 
 /// <summary>What the phone page shows after a submit: the node's new status and any plausibility warnings.</summary>
 public sealed record VerifyOutcome(Guid NodeId, NodeStatus Status, IReadOnlyList<PlausibilityWarning> Warnings);

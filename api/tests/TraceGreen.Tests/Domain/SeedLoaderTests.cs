@@ -108,7 +108,16 @@ public class SeedLoaderTests
     }
 
     [Fact]
-    public void ReformattingTheTermsFileKeepsItsHashAndAChangedWordChangesIt()
+    public void TheCurrentTermsVersionIsPinnedToItsHash()
+    {
+        var terms = Load().SupplierTerms;
+        var published = JsonNode.Parse(File.ReadAllText(Path.Combine(TestPaths.SeedDir, SeedLoader.TermsVersionsFile)))!.AsObject();
+
+        Assert.Equal(terms.Sha256, published[terms.Version]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ReformattingTheTermsFileKeepsItsHashAndAChangedWordWithoutANewVersionIsRefused()
     {
         var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-" + Guid.NewGuid().ToString("N"));
         CopyDirectory(TestPaths.SeedDir, dir);
@@ -120,7 +129,51 @@ public class SeedLoaderTests
             Assert.Equal(original, SeedLoader.Load(dir).SupplierTerms.Sha256);
 
             File.WriteAllText(path, File.ReadAllText(path).Replace("Romanian law", "Romanian laws", StringComparison.Ordinal));
-            Assert.NotEqual(original, SeedLoader.Load(dir).SupplierTerms.Sha256);
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains($"was published with SHA-256 {original}", StringComparison.Ordinal)
+                && v.Contains("give the changed text a new version", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ANewTermsVersionNeedsItsEntryInTheVersionsFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-new-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, dir);
+        var path = Path.Combine(dir, SeedLoader.TermsFile);
+        var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        doc["version"] = "2099-01-01";
+        File.WriteAllText(path, doc.ToJsonString());
+        try
+        {
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains("has no entry for version 2099-01-01", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RejectsAnEmptyTermsSectionAndRepeatedSectionNumbers()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tracegreen-seed-terms-sections-" + Guid.NewGuid().ToString("N"));
+        CopyDirectory(TestPaths.SeedDir, dir);
+        var path = Path.Combine(dir, SeedLoader.TermsFile);
+        var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        doc["ro"]!["sections"]!.AsArray().Add(null);
+        doc["en"]!["sections"]![1]!["number"] = 1;
+        File.WriteAllText(path, doc.ToJsonString());
+        try
+        {
+            var ex = Assert.Throws<SeedValidationException>(() => SeedLoader.Load(dir));
+            Assert.Contains(ex.Violations, v => v.Contains("ro: an empty section", StringComparison.Ordinal));
+            Assert.Contains(ex.Violations, v => v.Contains("en: two sections share a number", StringComparison.Ordinal));
         }
         finally
         {
