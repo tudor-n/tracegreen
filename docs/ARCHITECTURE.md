@@ -72,7 +72,7 @@ All live in `Domain/Services`. Each takes the ports, `TimeProvider`, the `SeedBu
 
 ## Inside the AI service
 
-The API sends only the lines its own rules could not classify (no invoice code, no entry in `seed/ai-cache.json`). The AI service answers them in one batch within `AI_TIMEOUT_S` (8 s), so it replies before the API's 10 s timeout:
+The API sends only the lines its own rules could not classify (no code that `seed/classification-map.json` matches, no entry in `seed/ai-cache.json`). The AI service answers them in one batch within `AI_TIMEOUT_S` (8 s), so it replies before the API's 10 s timeout:
 
 ```mermaid
 flowchart LR
