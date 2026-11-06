@@ -1,5 +1,6 @@
-"""TraceGreen's AI service. It classifies invoice lines into the allow-listed categories and,
-later, suggests alternatives; it never produces a carbon number. The C# API calls it with a
+"""TraceGreen's AI service. It classifies invoice lines into the allow-listed categories and
+picks, among the curated alternatives it is sent, the ones that fit; it never produces a
+carbon number. The C# API calls it with a
 10 s timeout and falls back on its own stub, so an import never waits on this service."""
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
 from app.config import API_TIMEOUT_S, Settings, settings
-from app.models import ModelFactory
+from app.models import ModelFactory, chat_model_factory
 from app.providers import build_chain
 from app.schemas import (
     ClassifyRequest,
@@ -20,6 +21,7 @@ from app.schemas import (
     SuggestRequest,
     SuggestResponse,
 )
+from app.suggest import build_suggester
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +39,10 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         )
     entries = load_cache(config.seed_dir)
     chain = build_chain(config, entries, model_factory)
+    # Every task builds its models lazily from the same factory, so no client exists before a
+    # model is first called.
+    factory = model_factory or chat_model_factory(config)
+    suggester = build_suggester(config, factory)
     app = FastAPI(title="TraceGreen AI", version="0.1.0")
 
     @app.get("/health", response_model=HealthResponse)
@@ -71,8 +77,9 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
 
     @app.post("/suggest", response_model=SuggestResponse)
     def suggest(request: SuggestRequest) -> SuggestResponse:
-        # No provider suggests yet (roadmap F11); the API shows the curated seed alternatives.
-        return SuggestResponse(suggestions=[])
+        # F11: a pick among the curated candidates the API sends, never a new supplier or a
+        # figure; no model or no valid answer gives none, and the API shows the list as it is.
+        return suggester.suggest(request)
 
     @app.post("/extract-pdf")
     def extract_pdf() -> None:

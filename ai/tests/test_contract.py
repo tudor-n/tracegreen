@@ -166,14 +166,29 @@ def test_health_reports_the_provider_chain_and_the_cache_size() -> None:
     }
 
 
-def test_suggest_accepts_the_api_request_and_returns_no_suggestions_yet() -> None:
+def test_suggest_without_a_model_suggests_nothing() -> None:
     request = {
-        "node": {"id": "11111111-1111-4111-8111-000000000001", "categoryId": "zinc_diecast"},
-        "candidates": [{"id": "N1-alt", "label": "Alternative", "nodeCategory": "zinc_diecast"}],
+        "node": {
+            "categoryLabel": "Zinc die-cast parts",
+            "lineDescription": "Zinc die-cast sensor housings",
+            "country": "CN",
+            "origin": "Shenzhen, CN",
+            "mode": "air",
+            "status": "ESTIMATED",
+        },
+        "candidates": [
+            {
+                "alternativeId": "N1-alt",
+                "label": "Alternative",
+                "country": "RO",
+                "origin": "Bistrita, RO",
+                "mode": "road",
+            }
+        ],
     }
     response = client().post("/suggest", json=request)
     assert response.status_code == 200
-    assert response.json() == {"suggestions": []}
+    assert response.json() == {"suggestions": [], "provider": "stub"}
 
 
 def test_extract_pdf_is_not_implemented() -> None:

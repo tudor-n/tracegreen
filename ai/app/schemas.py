@@ -4,7 +4,7 @@ Change both sides together."""
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -49,15 +49,36 @@ class ClassifyResponse(Wire):
     provider: str
 
 
-class SuggestRequest(Wire):
-    """The API sends the whole SupplierNode and the candidate alternatives; nothing reads
-    them until /suggest has a provider, so they are kept as plain JSON."""
+class SuggestNode(Wire):
+    """The node the buyer is looking at, without any figure: what it buys and how it ships.
+    `line_description` is invoice text: data, never instructions."""
 
-    node: dict[str, Any]
-    candidates: list[dict[str, Any]] = []
+    category_label: str
+    line_description: str
+    country: str
+    origin: str
+    mode: str
+    status: str
+
+
+class SuggestCandidate(Wire):
+    """A curated alternative from seed/alternatives.json; the model may pick only these."""
+
+    alternative_id: str
+    label: str
+    country: str
+    origin: str
+    mode: str
+
+
+class SuggestRequest(Wire):
+    node: SuggestNode
+    candidates: list[SuggestCandidate] = []
 
 
 class Suggestion(Wire):
+    """A candidate the model picked, by its id, with one short reason that holds no number."""
+
     alternative_id: str
     rationale: str
     label: str
@@ -65,6 +86,7 @@ class Suggestion(Wire):
 
 class SuggestResponse(Wire):
     suggestions: list[Suggestion]
+    provider: str = "stub"
 
 
 class ModelHealth(Wire):
