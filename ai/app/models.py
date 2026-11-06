@@ -73,7 +73,11 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
                 reasoning=False,
                 client_kwargs={"timeout": spec.timeout_s},
             )
-            return model.with_structured_output(schema, method="json_schema")
+            # stream=False: ChatOllama streams by default, so its timeout would bound each chunk,
+            # not the call, and a call the chain gave up on would keep Ollama generating. Not
+            # streamed, the timeout ends the wait and closes the connection, which stops it.
+            structured = model.with_structured_output(schema, method="json_schema")
+            return structured.bind(stream=False)
         raise ValueError(f"no factory for provider {spec.provider!r}")
 
     return build

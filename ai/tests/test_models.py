@@ -2,7 +2,8 @@
 the runtime cache, the dev route and /health.models. Every model in the chain tests is a fake
 (RunnableLambda): no network and no real keys. The production-factory tests build the real
 clients offline and inspect the request each would send; they name real Claude model ids
-because those differ in what they accept, and placeholders for the rest."""
+because those differ in what they accept, and placeholders for the rest. The Ollama client
+tests talk to a fake server on 127.0.0.1 only."""
 
 from __future__ import annotations
 
@@ -11,12 +12,13 @@ import threading
 import time
 import warnings
 from collections.abc import Callable, Iterator, Sequence
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import Runnable, RunnableBinding, RunnableLambda
 
 from app.config import ModelSpec, Settings
@@ -609,5 +611,112 @@ def test_the_ollama_request_turns_thinking_off_and_passes_the_schema() -> None:
     model, kwargs = production(LOCAL)
     params = model._chat_params(request_messages(), **kwargs)
     assert params["think"] is False
+    assert params["stream"] is False
     assert params["format"]["properties"]["answers"]["type"] == "array"
     assert params["options"]["temperature"] == 0
+
+
+# --- The real Ollama client against a fake server on the loopback address -----------------
+
+
+class FakeOllamaServer(ThreadingHTTPServer):
+    """Answers POST /api/chat as Ollama does: streamed, one chunk every 0.2 s until `delay`
+    has passed; not streamed, nothing until `delay`, then the whole answer."""
+
+    daemon_threads = True
+
+    def __init__(self, delay: float) -> None:
+        super().__init__(("127.0.0.1", 0), _FakeOllamaHandler)
+        self.delay = delay
+        self.requests: list[dict[str, Any]] = []
+        self.stop = threading.Event()
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self.server_address[1]}"
+
+
+class _FakeOllamaHandler(BaseHTTPRequestHandler):
+    server: FakeOllamaServer
+
+    def do_POST(self) -> None:
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self.server.requests.append(body)
+        rows = prompt_lines([HumanMessage(content=body["messages"][-1]["content"])])
+        content = json.dumps({"answers": [answer("pcb", 0.9)(row) for row in rows]})
+        try:
+            if body.get("stream", True):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/x-ndjson")
+                self.end_headers()
+                end = time.monotonic() + self.server.delay
+                while time.monotonic() < end and not self.server.stop.is_set():
+                    self.wfile.write(_chunk(" ", done=False))
+                    self.wfile.flush()
+                    time.sleep(0.2)
+                self.wfile.write(_chunk(content, done=True))
+            else:
+                self.server.stop.wait(self.server.delay)
+                data = _chunk(content, done=True)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the client gave up and closed the connection
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+def _chunk(content: str, *, done: bool) -> bytes:
+    reply = {"model": "local-model:4b", "message": {"role": "assistant", "content": content}}
+    return (json.dumps({**reply, "done": done}) + "\n").encode()
+
+
+@pytest.fixture
+def fake_ollama(request: pytest.FixtureRequest) -> Iterator[FakeOllamaServer]:
+    server = FakeOllamaServer(delay=request.param)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server
+    server.stop.set()
+    server.shutdown()
+    server.server_close()
+
+
+def ollama_client(server: FakeOllamaServer, **env: str) -> TestClient:
+    config = settings(AI_MODELS=LOCAL, OLLAMA_BASE_URL=server.url, **env)
+    return TestClient(create_app(config))
+
+
+@pytest.mark.parametrize("fake_ollama", [0.0], indirect=True)
+def test_the_real_ollama_client_answers_through_the_chain_unstreamed(
+    fake_ollama: FakeOllamaServer,
+) -> None:
+    body = classify(ollama_client(fake_ollama), line("L1", "Placi PCB 4 straturi"))
+    (result,) = body["classifications"]
+    assert (result["categoryId"], result["source"]) == ("pcb", "model")
+    (sent,) = fake_ollama.requests
+    assert sent["stream"] is False and sent["think"] is False
+    assert sent["format"]["properties"]["answers"]["type"] == "array"
+
+
+@pytest.mark.parametrize("fake_ollama", [3.0], indirect=True)
+def test_an_ollama_call_the_chain_gave_up_on_ends_at_its_timeout(
+    fake_ollama: FakeOllamaServer,
+) -> None:
+    """Streamed, the 0.5 s timeout would bound each 0.2 s chunk, and the abandoned call would
+    run for the server's full 3 s."""
+
+    def calls() -> set[threading.Thread]:
+        return {t for t in threading.enumerate() if t.name == "ai-model-call"}
+
+    before = calls()
+    c = ollama_client(fake_ollama, OLLAMA_TIMEOUT_S="0.5", AI_TIMEOUT_S="0.5")
+    started = time.monotonic()
+    (result,) = classify(c, line("L1", "Placi PCB 4 straturi"))["classifications"]
+    assert result["source"] == "stub"
+    for thread in calls() - before:
+        thread.join(timeout=max(0.0, started + 1.5 - time.monotonic()))
+        assert not thread.is_alive(), "the abandoned Ollama call is still running"
