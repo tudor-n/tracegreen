@@ -37,7 +37,9 @@ export function SupplierTree({ nodes, hotspots, buyer, total, selectedId, previe
   const height = lines.at(-1)?.bottom ?? 0
   return (
     <section aria-label={suppliersCopy.title} className="@container rounded-[18px] bg-card px-3 pt-3 pb-4 shadow-card">
-      <div className="flex items-stretch">
+      {/* Rows and lines are both centred on the taller of the two (the rows, or the buyer card with one or two suppliers),
+          so each line starts level with its row: the drawing is exactly as tall as the rows. */}
+      <div className="flex items-center">
         <ul className="flex min-w-0 flex-1 flex-col">
           {nodes.map((node) => (
             <Fragment key={node.id}>

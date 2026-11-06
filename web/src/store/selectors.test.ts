@@ -129,7 +129,7 @@ describe('graph view selector', () => {
   it('returns the same object while nothing it reads has changed', () => {
     const { store, select } = setup()
     const first = select(store.getState())
-    store.getState().setPanel('audit', true)
+    store.getState().setPanel('simulator', true)
     expect(select(store.getState())).toBe(first)
   })
 

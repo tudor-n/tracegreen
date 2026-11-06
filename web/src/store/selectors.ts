@@ -28,13 +28,19 @@ export function sortedNodes(nodes: Record<string, NodeView>): NodeView[] {
 }
 
 /**
+ * Largest `carbonKg` first, ties by id: the one order behind the hotspot ring, the supplier tree and the Overview's
+ * next step, so the three always agree.
+ */
+export function byCarbonDesc(a: NodeView, b: NodeView): number {
+  return b.carbonKg - a.carbonKg || a.id.localeCompare(b.id)
+}
+
+/**
  * The ids of the `count` largest emitters by `carbonKg`, ties broken by id. A node without carbon is never a
  * hotspot. This is an overlay for the ring, never a status.
  */
 export function hotspotIds(nodes: readonly NodeView[], count: number = HOTSPOT_COUNT): Set<string> {
-  const ranked = nodes
-    .filter((n) => n.carbonKg > 0)
-    .sort((a, b) => b.carbonKg - a.carbonKg || a.id.localeCompare(b.id))
+  const ranked = nodes.filter((n) => n.carbonKg > 0).sort(byCarbonDesc)
   return new Set(ranked.slice(0, Math.max(0, count)).map((n) => n.id))
 }
 

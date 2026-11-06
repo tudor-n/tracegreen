@@ -4,7 +4,7 @@ import { PageHeader, PageMessage } from '@/components/shell/Page'
 import { SupplierPanel } from '@/components/suppliers/SupplierPanel'
 import { SupplierTree } from '@/components/suppliers/SupplierTree'
 import { canvasCopy, suppliersCopy } from '@/copy/dashboard'
-import { formatTonnes, hotspotIds, selectLoaded, selectSelectedNode, useGraphStore } from '@/store'
+import { byCarbonDesc, formatTonnes, hotspotIds, selectLoaded, selectSelectedNode, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
 // "Who?": the supplier tree, and beside it the side panel for the selected supplier. Rows are ordered by the API's
@@ -12,7 +12,7 @@ import { useShell } from '@/hooks/useShell'
 
 /** Largest emitter at the top; ties keep a stable order by id. */
 function byEmissions(nodes: Record<string, NodeView>): NodeView[] {
-  return Object.values(nodes).sort((a, b) => b.carbonKg - a.carbonKg || a.id.localeCompare(b.id))
+  return Object.values(nodes).sort(byCarbonDesc)
 }
 
 export default function Suppliers() {
