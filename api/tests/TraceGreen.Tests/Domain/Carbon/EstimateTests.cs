@@ -37,9 +37,9 @@ public class EstimateTests
     {
         var result = Estimate.ActivityBasedKg(N1Air, Table);
 
-        Assert.Equal(13800m, result.TransportKg);
-        Assert.Equal(6900m, result.MaterialKg);
-        Assert.Equal(20700m, result.TotalKg);
+        Assert.Equal(9164.925m, result.TransportKg); // 2.3 t × 7500 km × 0.5313 kgCO2e/t.km
+        Assert.Equal(7983.095622m, result.MaterialKg); // 2.3 t × 3470.91114 kgCO2e/t
+        Assert.Equal(17148.020622m, result.TotalKg);
         Assert.False(result.MassUnknown);
         Assert.Equal(2, result.Inputs.Count);
     }
@@ -51,7 +51,7 @@ public class EstimateTests
         var renewable = Estimate.ActivityBasedKg(N1Air with { Energy = EnergySource.Renewable }, Table);
 
         Assert.True(renewable.TotalKg < grid.TotalKg);
-        Assert.Equal(13800m + 6900m * (1 - 0.8m * 0.5m), renewable.TotalKg);
+        Assert.Equal(9164.925m + 7983.095622m * (1 - 0.8m * 0.5m), renewable.TotalKg);
     }
 
     [Fact]

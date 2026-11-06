@@ -16,7 +16,7 @@ public class SimulatorTests
     {
         var result = Simulator.ModeChange(TestNodes.N1(), CnRo, "zinc_diecast", TransportMode.Sea, Table, EtsPrice);
 
-        Assert.Equal(7488.8m, result.CarbonKg);
+        Assert.Equal(8576.311622m, result.CarbonKg); // 2.3 t × 16000 km × 0.01612 + 2.3 t × 3470.91114
         Assert.Equal(48690m, result.CostEur);
         Assert.Equal(40, result.LeadDays);
         Assert.Equal(-3910m, result.Delta.CostEur);
@@ -33,7 +33,7 @@ public class SimulatorTests
 
         var result = Simulator.SupplierSwap(TestNodes.N1(), alt, altLane, "zinc_diecast", Table, EtsPrice);
 
-        Assert.Equal(6941.4m, result.CarbonKg);
+        Assert.Equal(8015.909262m, result.CarbonKg); // 2.3 t × 180 km × 0.07926 + 2.3 t × 3470.91114
         Assert.Equal(57040m, result.CostEur);
         Assert.Equal(2, result.LeadDays);
         Assert.Equal(-5, result.Delta.LeadDays);
@@ -61,7 +61,7 @@ public class SimulatorTests
 
         var result = Simulator.ModeChange(estimated, CnRo, "zinc_diecast", TransportMode.Sea, Table, EtsPrice);
 
-        Assert.Equal(7488.8m - 21600m, result.Delta.CarbonKg);
+        Assert.Equal(8576.311622m - 21600m, result.Delta.CarbonKg);
     }
 
     [Fact]
