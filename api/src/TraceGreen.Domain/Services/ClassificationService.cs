@@ -56,10 +56,10 @@ public sealed class ClassificationService(
         {
             var rebuilt = NodeFactory.NewNode(
                 current.Id, invoice, new NodeClassification(categoryId, null, ClassificationSource.Buyer), lane, current.Status,
-                current.TransportMode, current.EnergySource, seed, mapper.Factors, current.CreatedAt, current.MassT);
+                current.TransportMode, current.EnergySource, seed, mapper.Factors, current.CreatedAt, current.MassT, current.Trust);
             var review = Outcome(current, categoryId);
             var patch = new ClassificationPatch(
-                categoryId, rebuilt.SectorId, ClassificationSource.Buyer, null, review, now, rebuilt.SpendKg, rebuilt.ActivityKg);
+                categoryId, rebuilt.SectorId, ClassificationSource.Buyer, null, review, now, rebuilt.SpendKg, rebuilt.ActivityKg, rebuilt.CountedKg);
             // Strings only (see IngestService): jsonb may re-render numbers and break the chain hash. The entry's ts is the
             // review time; no token, address or person.
             var payload = new JsonObject

@@ -1,6 +1,7 @@
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Seed;
 using TraceGreen.Domain.Services;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Api.Endpoints;
 
@@ -10,10 +11,12 @@ public sealed record PortalViewRequest(string? T);
 /// <summary>
 /// Leave a question's field out (or null) to skip it; skipping one makes the delivery PARTIAL. <see cref="AcceptedTerms"/>
 /// is <c>terms.sha256</c> from the view, sent once the supplier ticked the terms; without it, or with another value, the
-/// answer is refused with 422 <c>TermsNotAccepted</c> and nothing is recorded.
+/// answer is refused with 422 <c>TermsNotAccepted</c> and nothing is recorded. <see cref="Evidence"/> is optional and
+/// checked as on the phone page (F7).
 /// </summary>
 public sealed record PortalAnswerRequest(
-    string? T, Guid NodeId, TransportMode? TransportMode = null, EnergySource? EnergySource = null, string? AcceptedTerms = null);
+    string? T, Guid NodeId, TransportMode? TransportMode = null, EnergySource? EnergySource = null, string? AcceptedTerms = null,
+    AnswerEvidence? Evidence = null);
 
 /// <summary>
 /// The supplier page (F12): one signed link per supplier, reusable until it expires, listing that supplier's deliveries
@@ -41,7 +44,7 @@ public static class PortalEndpoints
         app.MapPost("/api/portal-link", async (RequestLinkRequest body, HttpRequest request, AppConfig config, PortalService portal, SeedBundle seed, CancellationToken ct) =>
             {
                 var baseUrl = BaseUrlResolver.Resolve(request, config.PublicBaseUrl);
-                var result = await portal.RequestAsync(Workspace.Buyer(seed), body.NodeId, baseUrl.Url, ct);
+                var result = await portal.RequestAsync(Workspace.Buyer(seed), body.NodeId, baseUrl.Url, VerifyEndpoints.ClientAddress(request.HttpContext), ct);
                 return result.Match(
                     grant => TypedResults.Created((string?)null, new RequestLinkResponse(grant.NodeId, grant.Url, grant.ExpiresAt, baseUrl.Loopback)),
                     error => Problems.Result(ProblemCode.NodeNotFound, error.Message, body.NodeId));
@@ -66,7 +69,8 @@ public static class PortalEndpoints
 
         app.MapPost("/api/portal/answer", async (PortalAnswerRequest body, HttpContext http, PortalService portal, CancellationToken ct) =>
                 (await portal.AnswerAsync(
-                    body.T, body.NodeId, body.TransportMode, body.EnergySource, body.AcceptedTerms, VerifyEndpoints.ClientAddress(http), ct))
+                    body.T, body.NodeId, body.TransportMode, body.EnergySource, body.AcceptedTerms, VerifyEndpoints.ClientAddress(http),
+                    body.Evidence, ct))
                     .Match(TypedResults.Ok, ToProblem))
             .RequireRateLimiting(RateLimitPolicy)
             .WithName("SubmitPortalAnswer")
@@ -94,6 +98,7 @@ public static class PortalEndpoints
             PortalErrorCode.DeliveryChanged => ProblemCode.DeliveryChanged,
             PortalErrorCode.InvalidAnswer => ProblemCode.InvalidAnswer,
             PortalErrorCode.TermsNotAccepted => ProblemCode.TermsNotAccepted,
+            PortalErrorCode.InvalidEvidence => ProblemCode.InvalidEvidence,
             _ => throw new ArgumentOutOfRangeException(nameof(error), error.Code, null),
         },
         error.Message);

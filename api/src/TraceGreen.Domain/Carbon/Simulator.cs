@@ -1,4 +1,5 @@
 using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Domain.Carbon;
 
@@ -8,11 +9,18 @@ namespace TraceGreen.Domain.Carbon;
 /// </summary>
 public static class Simulator
 {
+    /// <param name="counted">
+    /// The answers the node's counted figure rests on (F7: each one nothing backs yet replaced by its fallback). The scenario
+    /// keeps them and changes the mode alone, so its delta compares like with like; null uses the node's answers as given.
+    /// </param>
     public static ScenarioResult ModeChange(
-        SupplierNode node, Lane lane, string materialKey, TransportMode mode, FactorTable table, decimal etsPriceEurPerT)
+        SupplierNode node, Lane lane, string materialKey, TransportMode mode, FactorTable table, decimal etsPriceEurPerT,
+        ActivityState? counted = null)
     {
         var (distanceKm, leadDays, costPerKg) = Leg(lane, mode);
-        var activity = Estimate.ActivityBasedKg(new ActivityInput(node.MassT, distanceKm, mode, materialKey, node.EnergySource), table);
+        var energy = counted is null ? node.EnergySource : counted.Energy;
+        var massT = counted is null ? node.MassT : counted.MassT;
+        var activity = Estimate.ActivityBasedKg(new ActivityInput(massT, distanceKm, mode, materialKey, energy), table);
         var costEur = node.SpendEur + (node.MassT ?? 0m) * 1000m * costPerKg;
         return Build(node, activity, costEur, leadDays, etsPriceEurPerT);
     }

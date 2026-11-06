@@ -44,6 +44,8 @@ export const ILLUSTRATIVE = 'illustrative'
 export const CHECK_CATEGORY = 'Check category'
 /** F6: the provenance note once a person confirmed or chose the node's category (source `buyer`). */
 export const CATEGORY_SET_BY_BUYER = 'Category set by buyer'
+/** F7: the flag on a node whose supplier answers wait for a person (a reduction not backed yet, a contradiction, a weak score). */
+export const CHECK_ANSWERS = 'Check answers'
 
 /** The simulator's MAC badge, by the generated badge value. */
 export const macBadgeLabel = {

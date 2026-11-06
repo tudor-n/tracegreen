@@ -371,6 +371,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("cost_eur");
 
+                    b.Property<decimal?>("CountedKg")
+                        .HasColumnType("numeric")
+                        .HasColumnName("counted_kg");
+
                     b.Property<string>("Country")
                         .IsRequired()
                         .HasColumnType("text")
@@ -433,9 +437,17 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("TargetJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("target_json");
+
                     b.Property<string>("TransportMode")
                         .HasColumnType("text")
                         .HasColumnName("transport_mode");
+
+                    b.Property<string>("TrustJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("trust_json");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
@@ -511,6 +523,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.Property<string>("EnergySource")
                         .HasColumnType("text")
                         .HasColumnName("energy_source");
+
+                    b.Property<string>("EvidenceJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("evidence_json");
 
                     b.Property<string>("IpHash")
                         .IsRequired()

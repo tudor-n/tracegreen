@@ -11,10 +11,26 @@ import type {
 } from '@/api/client'
 import { DEFAULT_LANG, type Lang, type VerifyResult } from '@/copy/verify'
 import type { Result } from './api-reply'
+import { DEMO_CERT_IDS, demoDocId } from './demo-samples'
+import {
+  EMPTY_EVIDENCE,
+  type EvidenceAnswers,
+  type EvidenceDraft,
+  type EvidenceField,
+  type EvidenceProblems,
+  evidenceBody,
+  evidenceForMode,
+  evidenceProblems,
+  hasEvidenceProblem,
+  NO_EVIDENCE_PROBLEMS,
+  setEvidence,
+  shownCertType,
+  shownDocType,
+} from './evidence'
 
 // Pure decision logic behind the supplier page /verify/:nodeId: the language, which answers to offer and pre-select,
-// the supplier terms the supplier must tick before sending (never ticked for them), what each API answer means for the
-// page, and the page's states. The page performs the two requests the states ask for
+// the optional proof under them (F7, rules in ./evidence.ts), the supplier terms the supplier must tick before sending
+// (never ticked for them), what each API answer means for the page, and the page's states. The page performs the two requests the states ask for
 // (the context while loading, the answers while submitting) and renders the rest, so every rule here is unit-tested
 // without a browser.
 
@@ -26,8 +42,14 @@ export function resolveLang(param: string | null): Lang {
 /** The error states a request can end in. */
 export type Failure = Exclude<VerifyResult, 'thanks'>
 
+/**
+ * What a failed request means: one of the error states, or `proofRefused` when the API took the answers but not the
+ * proof that came with them (F7). The link was not used, so that one goes back to the questions with everything kept.
+ */
+export type RequestFailure = Failure | 'proofRefused'
+
 /** A request's result for the page: its body, or what went wrong. */
-export type Reply<T> = Result<T, Failure>
+export type Reply<T> = Result<T, RequestFailure>
 
 /** The two requests the page makes. */
 export interface VerifyApi {
@@ -51,7 +73,7 @@ const RETRYABLE: Record<Failure, boolean> = {
  * titles), else by the HTTP status. `status` is null when no answer arrived. Anything else, such as a 5xx or a proxy's
  * 502 while the API restarts, counts as no connection, which offers a retry.
  */
-export function failureFor(status: number | null, code: ProblemCode | null): Failure {
+export function failureFor(status: number | null, code: ProblemCode | null): RequestFailure {
   switch (code) {
     case 'InvalidToken':
       return 'invalid'
@@ -66,6 +88,9 @@ export function failureFor(status: number | null, code: ProblemCode | null): Fai
     // The page sends the terms it showed, so this means they changed on the server since the page loaded.
     case 'TermsNotAccepted':
       return 'termsChanged'
+    // The answers were fine but the proof cannot be right (a number the page's own check let through): fix or clear it.
+    case 'InvalidEvidence':
+      return 'proofRefused'
     // The page offers the lane's modes alone and never sends two skips, so these mean the link no longer fits.
     case 'InvalidAnswer':
     case 'NodeNotFound':
@@ -115,43 +140,119 @@ export function canSubmit(answers: Answers): boolean {
   return answers.transport !== null || answers.energy !== null
 }
 
-/** Sendable: at least one answer, and the supplier ticked the terms themselves (the API refuses a submit without them). */
-export function canSend(answers: Answers, accepted: boolean): boolean {
-  return accepted && canSubmit(answers)
+/**
+ * Sendable: at least one answer, the supplier ticked the terms themselves (the API refuses a submit without them), and
+ * no proof field the supplier filled in has a problem. Untouched proof has none, so the two taps stay two taps.
+ */
+export function canSend(answers: Answers, accepted: boolean, problems: EvidenceProblems = NO_EVIDENCE_PROBLEMS): boolean {
+  return accepted && canSubmit(answers) && !hasEvidenceProblem(problems)
+}
+
+/** The proof's problems on the page: the invoice's issue date and the day the link loaded bound the dispatch date. */
+export function proofProblems(state: {
+  context: Pick<VerifyContext, 'issueDate'>
+  answers: Answers
+  evidence: EvidenceDraft
+  today: string
+}): EvidenceProblems {
+  return evidenceProblems(state.evidence, state.answers, state.context.issueDate, state.today)
+}
+
+/**
+ * What "Fill demo values" types, field by field, for the page to send through its `evidence` inputs so the usual checks
+ * run (demo tools only, F7): the shown document with its sample number, the invoice's issue date as the dispatch date
+ * (today at the latest), and for a renewable answer the shown certificate with its sample id. Both pages use it.
+ */
+export function demoEvidenceInputs(
+  evidence: EvidenceDraft,
+  answers: EvidenceAnswers,
+  issueDate: string,
+  today: string,
+): { field: EvidenceField; value: string }[] {
+  const inputs: { field: EvidenceField; value: string }[] = []
+  const docType = shownDocType(evidence.docType, answers.transport)
+  if (docType !== null) {
+    inputs.push({ field: 'docType', value: docType }, { field: 'docId', value: demoDocId(docType) })
+    if (/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) {
+      inputs.push({ field: 'dispatchDate', value: issueDate <= today ? issueDate : today })
+    }
+  }
+  const certType = shownCertType(evidence.certType, answers.energy)
+  if (certType !== null) {
+    inputs.push({ field: 'certType', value: certType }, { field: 'certId', value: DEMO_CERT_IDS[certType] })
+  }
+  return inputs
+}
+
+/** Which shown numbers are the demo samples, so the page tags them "demo values" and nobody takes them for real ones. */
+export function demoTags(evidence: EvidenceDraft, answers: EvidenceAnswers): { docId: boolean; certId: boolean } {
+  const docType = shownDocType(evidence.docType, answers.transport)
+  const certType = shownCertType(evidence.certType, answers.energy)
+  return {
+    docId: docType !== null && evidence.docId.trim() === demoDocId(docType),
+    certId: certType !== null && evidence.certId.trim() === DEMO_CERT_IDS[certType],
+  }
 }
 
 /**
  * The body of `POST /api/verify`. A skipped answer is sent as null; the mass is left to the invoice. `acceptedTerms` is
  * the SHA-256 of the terms the page showed, from the context, so the server records exactly what was accepted.
+ * `evidence` is there only when the supplier added proof the answers carry, so an untouched section sends the same body
+ * as before F7.
  */
-export function submitBody(token: string, answers: Answers, termsSha256: string): VerifyRequest {
-  return { t: token, transportMode: answers.transport, energySource: answers.energy, acceptedTerms: termsSha256 }
+export function submitBody(
+  token: string,
+  answers: Answers,
+  termsSha256: string,
+  evidence: EvidenceDraft = EMPTY_EVIDENCE,
+): VerifyRequest {
+  const body: VerifyRequest = {
+    t: token,
+    transportMode: answers.transport,
+    energySource: answers.energy,
+    acceptedTerms: termsSha256,
+  }
+  const proof = evidenceBody(evidence, answers)
+  return proof === null ? body : { ...body, evidence: proof }
 }
 
-/** Where a retry goes: the context request again (keeping the answers given, if any), or the same answers sent again. */
+/** Where a retry goes: the context request again (keeping the answers and proof given, if any), or the same answers sent again. */
 type RetryTarget =
-  | { phase: 'loading'; previous?: Answers }
-  | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+  | { phase: 'loading'; previous?: Answers; evidence?: EvidenceDraft }
+  | { phase: 'submitting'; context: VerifyContext; answers: Answers; evidence: EvidenceDraft; today: string }
 
 /**
  * `accepted` is the supplier's tick on the terms checkbox; a submission is sent with it ticked, so 'submitting' needs no
- * flag. `previous` holds the answers across a reload of the context, so a retry never swaps them for the defaults.
+ * flag. `previous` and `evidence` hold the answers and the proof across a reload of the context, so a retry never swaps
+ * them for the defaults. `evidence` is the optional proof (empty until the supplier adds some) and `today` the UTC date
+ * the context arrived on, which bounds the dispatch date. `proofRefused` is true after the API refused the proof sent,
+ * until the supplier changes the answers or the proof, or sends again.
  */
 export type VerifyState =
-  | { phase: 'loading'; previous?: Answers }
-  | { phase: 'ready'; context: VerifyContext; answers: Answers; accepted: boolean }
-  | { phase: 'submitting'; context: VerifyContext; answers: Answers }
+  | { phase: 'loading'; previous?: Answers; evidence?: EvidenceDraft }
+  | {
+      phase: 'ready'
+      context: VerifyContext
+      answers: Answers
+      evidence: EvidenceDraft
+      today: string
+      accepted: boolean
+      proofRefused: boolean
+    }
+  | { phase: 'submitting'; context: VerifyContext; answers: Answers; evidence: EvidenceDraft; today: string }
   | { phase: 'done'; status: NodeStatus; warnings: PlausibilityWarning[] }
   | { phase: 'failed'; failure: Failure; retry: RetryTarget | null }
 
 export type VerifyInput =
-  | { kind: 'contextLoaded'; context: VerifyContext }
+  /** `today` is the page's date (todayUtc) when the context arrived; the reducer reads no clock. */
+  | { kind: 'contextLoaded'; context: VerifyContext; today: string }
   | { kind: 'transport'; value: TransportMode | null }
   | { kind: 'energy'; value: EnergySource | null }
+  | { kind: 'evidence'; field: EvidenceField; value: string }
   | { kind: 'terms'; accepted: boolean }
   | { kind: 'submit' }
   | { kind: 'submitted'; outcome: VerifyOutcome }
-  | { kind: 'failed'; failure: Failure }
+  | { kind: 'failed'; failure: RequestFailure }
   | { kind: 'retry' }
 
 /** A page opened without a token cannot load anything, so it starts on "link not valid" and sends no request. */
@@ -161,7 +262,7 @@ export function initialVerifyState(token: string | null): VerifyState {
     : { phase: 'loading' }
 }
 
-function failed(failure: Failure, target: RetryTarget): VerifyState {
+function failed(failure: Failure, target: RetryTarget | null): VerifyState {
   return { phase: 'failed', failure, retry: RETRYABLE[failure] ? target : null }
 }
 
@@ -175,35 +276,59 @@ export function verifyReducer(state: VerifyState, input: VerifyInput): VerifySta
         transport: keepOrPreselect(offeredModes(context), context.defaultMode, state.previous?.transport),
         energy: keepOrPreselect(offeredEnergy(context), context.defaultEnergy, state.previous?.energy),
       }
-      // The terms always start unticked: acceptance has to be the supplier's own act (Civil Code art. 1203).
-      return { phase: 'ready', context, answers, accepted: false }
+      // The terms always start unticked: acceptance has to be the supplier's own act (Civil Code art. 1203). The proof
+      // starts empty, or as the supplier left it before a reload (its document kept only while it fits the answer).
+      const evidence =
+        state.evidence === undefined
+          ? EMPTY_EVIDENCE
+          : evidenceForMode(state.evidence, state.previous?.transport ?? null, answers.transport)
+      return { phase: 'ready', context, answers, evidence, today: input.today, accepted: false, proofRefused: false }
     }
     case 'transport':
       if (state.phase !== 'ready') return state
       if (input.value !== null && !offeredModes(state.context).includes(input.value)) return state
-      return { ...state, answers: { ...state.answers, transport: input.value } }
+      return {
+        ...state,
+        answers: { ...state.answers, transport: input.value },
+        evidence: evidenceForMode(state.evidence, state.answers.transport, input.value),
+        proofRefused: false,
+      }
     case 'energy':
       if (state.phase !== 'ready') return state
       if (input.value !== null && !offeredEnergy(state.context).includes(input.value)) return state
-      return { ...state, answers: { ...state.answers, energy: input.value } }
+      return { ...state, answers: { ...state.answers, energy: input.value }, proofRefused: false }
+    case 'evidence': {
+      if (state.phase !== 'ready') return state
+      const evidence = setEvidence(state.evidence, input.field, input.value, state.answers)
+      return evidence === state.evidence ? state : { ...state, evidence, proofRefused: false }
+    }
     case 'terms':
       return state.phase === 'ready' ? { ...state, accepted: input.accepted } : state
     case 'submit':
-      return state.phase === 'ready' && canSend(state.answers, state.accepted)
-        ? { phase: 'submitting', context: state.context, answers: state.answers }
+      return state.phase === 'ready' && canSend(state.answers, state.accepted, proofProblems(state))
+        ? { phase: 'submitting', context: state.context, answers: state.answers, evidence: state.evidence, today: state.today }
         : state
     case 'submitted':
       return state.phase === 'submitting'
         ? { phase: 'done', status: input.outcome.status, warnings: input.outcome.warnings }
         : state
     case 'failed':
-      // A lost reload retries the same reload, answers kept.
-      if (state.phase === 'loading') return failed(input.failure, state)
+      // A lost reload retries the same reload, answers kept. Reading the context never refuses proof, so a refusal
+      // there means the link no longer fits.
+      if (state.phase === 'loading') return failed(input.failure === 'proofRefused' ? 'invalid' : input.failure, state)
       if (state.phase === 'submitting') {
+        if (input.failure === 'proofRefused') {
+          // The link was not used: back to the questions with the answers, the proof and the tick as they were, for the
+          // supplier to fix or clear the proof. A refusal without proof sent cannot be fixed here, so it ends the link.
+          if (evidenceBody(state.evidence, state.answers) === null) return failed('invalid', null)
+          return { ...state, phase: 'ready', accepted: true, proofRefused: true }
+        }
         // Changed terms are read again before anything is sent: the retry reloads the context with the box unticked,
-        // keeping the supplier's answers.
-        if (input.failure === 'termsChanged') return failed(input.failure, { phase: 'loading', previous: state.answers })
-        return failed(input.failure, { phase: 'submitting', context: state.context, answers: state.answers })
+        // keeping the supplier's answers and proof.
+        if (input.failure === 'termsChanged') {
+          return failed(input.failure, { phase: 'loading', previous: state.answers, evidence: state.evidence })
+        }
+        return failed(input.failure, state)
       }
       return state
     case 'retry':
