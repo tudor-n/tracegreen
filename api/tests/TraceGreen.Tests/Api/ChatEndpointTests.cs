@@ -9,9 +9,19 @@ using TraceGreen.Domain.Ports;
 
 namespace TraceGreen.Tests.Api;
 
-/// <summary>A chat model whose answer the test sets, recording what it was sent.</summary>
+/// <summary>An AI service for the longer tasks whose answers the test sets (chat and PDF extraction), recording what it was sent.</summary>
 public sealed class ScriptedChatAi : IAiAssist
 {
+    public Func<byte[], Task<ExtractOutcome>> Extract { get; set; } = _ => Task.FromResult(ExtractOutcome.Failed(ExtractFailure.Unavailable));
+
+    public List<byte[]> PdfsSent { get; } = [];
+
+    public Task<ExtractOutcome> ExtractPdfAsync(byte[] pdf, CancellationToken ct)
+    {
+        PdfsSent.Add(pdf);
+        return Extract(pdf);
+    }
+
     public Func<ChatInput, Task<ChatOutcome>> Answer { get; set; } = _ => Task.FromResult(new ChatOutcome(false, "", [], "stub"));
 
     public List<ChatInput> Sent { get; } = [];

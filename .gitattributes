@@ -3,3 +3,4 @@ seed/**/*.xml -text
 *.png binary
 *.jpg binary
 *.ico binary
+*.pdf binary

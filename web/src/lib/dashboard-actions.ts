@@ -2,6 +2,9 @@ import {
   api,
   type CategoryOption,
   type ChatAnswer,
+  type DraftInvoice,
+  type IngestResult,
+  type PdfDraftView,
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
@@ -92,6 +95,29 @@ export function importInvoice(file: File): Promise<ActionOutcome> {
       }),
     (data) => toolbarCopy.imported(data?.node.label ?? file.name),
   )
+}
+
+/**
+ * POST /api/ingest/pdf/extract (F9): an AI copies the PDF's fields into a draft for a person to check. Nothing is
+ * imported until the draft is confirmed.
+ */
+export function extractPdf(file: File): Promise<Answer<PdfDraftView>> {
+  return fetchBody(() =>
+    api.POST('/api/ingest/pdf/extract', {
+      // openapi-fetch sends no body unless one is given; the serializer below sends the File itself.
+      body: file as never,
+      bodySerializer: () => {
+        const form = new FormData()
+        form.append('file', file)
+        return form
+      },
+    }),
+  )
+}
+
+/** POST /api/ingest/pdf/confirm: import the fields as the person checked them; the node arrives through node.created. */
+export function confirmPdf(draftId: string, invoice: DraftInvoice): Promise<Answer<IngestResult>> {
+  return fetchBody(() => api.POST('/api/ingest/pdf/confirm', { body: { draftId, invoice } }))
 }
 
 /** POST /api/ingest/demo: seed N1 with its fixed ids. */

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -191,5 +192,9 @@ def test_suggest_without_a_model_suggests_nothing() -> None:
     assert response.json() == {"suggestions": [], "provider": "stub"}
 
 
-def test_extract_pdf_is_not_implemented() -> None:
-    assert client().post("/extract-pdf").status_code == 501
+def test_extract_pdf_without_a_model_is_unavailable() -> None:
+    from tests.pdf_fixture import make_pdf
+
+    pdf = base64.b64encode(make_pdf(["Invoice 1"])).decode()
+    response = client().post("/extract-pdf", json={"pdfBase64": pdf})
+    assert response.status_code == 503

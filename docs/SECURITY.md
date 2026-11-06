@@ -118,6 +118,20 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - **New data flow.** The chat sends supplier names, emissions, spend and statuses to the models in `AI_MODELS`, which `/classify` never does. Set `AI_CHAT_MODELS` to the local model to keep them on the laptop.
 - **Read-only and rate limited.** Nothing is stored or audited. The policy `chat` allows 3 × `RATE_LIMIT_PER_MIN` a minute per address, and a question is at most 300 characters. The log names the rule that refused an answer, never the answer's text.
 
+## PDF invoices (F9)
+
+- **A PDF is hostile input.** The API refuses anything over 3 MB or without the `%PDF-` header before the AI service sees it. The AI service reads the text layer with pypdf:
+  - at most 10 pages and 20,000 characters;
+  - encrypted files refused;
+  - parsing in a worker with a 5 s deadline, so a crafted file cannot hold it;
+  - a parse error is a 422, never a crash.
+
+  There is no OCR: a scan is refused with "no text layer".
+- **The model copies; a person decides.** The model fills a fixed schema with strings: unit codes and code schemes from fixed lists, the text in an `<invoice_text>` block through `clean()`. The draft is held on the server, in memory, under a random id: 30 minutes, at most 32, gone on a restart. The person sees every field labelled "AI-extracted · check fields", with the fields the PDF's text does not show marked, and nothing is imported until they confirm.
+- **The confirm is validated like any invoice.** The fields are checked (country, ISO date, currency, positive amounts, units, a code only with its scheme). The customer is the workspace's buyer, never the PDF's. Then the UBL import's own checks run (range, EUR only, lane, duplicates by the PDF's SHA-256). The audit entry records `documentKind: pdf`, the PDF's SHA-256, the model that extracted it, and the fields the person changed, compared on the server with the draft it holds.
+- **Known gap.** The check for "same seller tax id and number already imported" (the same invoice as UBL and as PDF) scans outside the repository's lock, so two confirms at the same instant could both pass it.
+- **Where the text goes.** With a cloud model in `AI_MODELS`, the PDF's whole text goes to that provider, including the buyer's name and any personal data printed on the invoice. Keep `AI_MODELS` local to keep it on the laptop.
+
 ## Data at rest (C4, C8)
 
 - **Row-level security** is enabled on `invoices`, `nodes`, `verifications`, `scenarios` and `audit_log` (migration `Rls`). The application connects as the table owner and bypasses it. Any other role, such as a hosted anon role, sees nothing until policies exist.

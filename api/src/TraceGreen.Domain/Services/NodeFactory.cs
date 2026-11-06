@@ -21,9 +21,13 @@ public sealed record NodeClassification(string CategoryId, double? Confidence, C
 /// </summary>
 public static class NodeFactory
 {
-    public static Invoice NewInvoice(Guid id, Guid workspaceId, ExtractedInvoice extracted, string xml, DateTimeOffset createdAt) => new(
+    public static Invoice NewInvoice(Guid id, Guid workspaceId, ExtractedInvoice extracted, string xml, DateTimeOffset createdAt) =>
+        NewInvoiceFrom(id, workspaceId, extracted, Hashing.RawXmlHash(xml), createdAt, "ubl");
+
+    /// <summary>An invoice from any document: <paramref name="rawHash"/> refuses the same document twice, <paramref name="kind"/> says what it was.</summary>
+    public static Invoice NewInvoiceFrom(Guid id, Guid workspaceId, ExtractedInvoice extracted, string rawHash, DateTimeOffset createdAt, string kind) => new(
         id, workspaceId, extracted.Supplier.Name, extracted.Supplier.TaxId, extracted.Customer.TaxId,
-        extracted.IssueDate, extracted.Currency, extracted.Total, Hashing.RawXmlHash(xml), Hashing.InvoiceHash(extracted), extracted, createdAt);
+        extracted.IssueDate, extracted.Currency, extracted.Total, rawHash, Hashing.InvoiceHash(extracted), extracted, createdAt, kind);
 
     public static SupplierNode NewNode(
         Guid id,
