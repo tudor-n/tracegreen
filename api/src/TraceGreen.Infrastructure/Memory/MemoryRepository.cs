@@ -121,35 +121,6 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
-    public Task<RecordCorrectionResult> RecordCorrectionAsync(Ctx ctx, Guid nodeId, CorrectionWrite write, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            var ws = Get(ctx.WorkspaceId);
-            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
-            {
-                return Task.FromResult(new RecordCorrectionResult(RecordCorrectionStatus.NodeNotFound, null, null, null));
-            }
-            if (write(node) is not { } plan)
-            {
-                return Task.FromResult(new RecordCorrectionResult(RecordCorrectionStatus.Unchanged, node, node, null));
-            }
-            ws.Nodes[node.Id] = plan.Rebuilt;
-            ws.Corrections[plan.Correction.CacheKey] = plan.Correction;
-            var entry = ws.Append(plan.Audit);
-            return Task.FromResult(new RecordCorrectionResult(RecordCorrectionStatus.Ok, node, plan.Rebuilt, entry));
-        }
-    }
-
-    public Task<IReadOnlyList<ClassificationCorrection>> ListCorrectionsAsync(Ctx ctx, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            return Task.FromResult<IReadOnlyList<ClassificationCorrection>>(
-                Get(ctx.WorkspaceId).Corrections.Values.OrderBy(c => c.CreatedAt).ToList());
-        }
-    }
-
     public Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
     {
         lock (_gate)
@@ -252,7 +223,6 @@ public sealed class MemoryRepository : IRepository
         public readonly HashSet<string> Nonces = new(StringComparer.Ordinal);
         public readonly List<AuditEntry> Audit = new();
         public readonly Dictionary<Guid, Scenario> Scenarios = new();
-        public readonly Dictionary<string, ClassificationCorrection> Corrections = new(StringComparer.Ordinal);
         public long LastAuditId;
 
         public AuditEntry Append(AuditBuilder build)
@@ -270,7 +240,6 @@ public sealed class MemoryRepository : IRepository
             Nonces.Clear();
             Audit.Clear();
             Scenarios.Clear();
-            Corrections.Clear();
             LastAuditId = 0;
         }
     }

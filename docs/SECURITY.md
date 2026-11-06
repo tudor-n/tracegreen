@@ -174,5 +174,4 @@ What is never logged:
 - **The Vite dev server prints a token on proxy errors.** It writes the full URL (`/api/verify/context?t=…`) when the API is down. The demo image uses nginx instead.
 - **Links work only on the hotspot (ruling R6).** A phone that is not on the laptop's hotspot cannot open one. The link card warns when the base URL is a loopback address.
 - **The supplier page groups deliveries by the seller tax id on the invoices.** Two sellers whose invoices carried the same tax id would share one page. The tax id comes from the e-invoice, which ANAF validates for Romanian sellers.
-- **A supplier answer that lands while a correction is being written can carry the old category's material figure.** The answer's figures are computed before its write takes the lock, so if the buyer corrects the category in between, the answer's activity figure still uses the old material factor until the next change. Both actions on the same node within milliseconds are needed; the audit log shows both.
 - **Row-level security has no policies yet.** It blocks other roles entirely, but it does not separate workspaces for the application itself.

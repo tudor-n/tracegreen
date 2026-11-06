@@ -69,7 +69,6 @@ All live in `Domain/Services`. Each takes the ports, `TimeProvider`, the `SeedBu
 | `ScenarioService` | `POST /api/simulate`, `POST /api/scenarios` | a scenario (save only) | `scenario.saved` |
 | `ChatService` (F13) | `POST /api/chat` | — | — |
 | `SuggestionService` (F11) | `GET /api/nodes/{id}/suggestions` | — | — |
-| `ClassificationService` (F6) | `GET /api/categories`, `PUT /api/nodes/{id}/classification` | the node rebuilt with the buyer's category, the correction (per description key), audit `classification.corrected` | `node.updated`, `audit.appended` |
 | `PortalService` (F12) | `POST /api/portal-link`, `POST /api/portal/view`, `POST /api/portal/answer` (needs the Supplier Terms' SHA-256) | audit `portal.requested`; an answer goes through `LinkService` and `VerifyService` | `audit.appended`; an answer publishes what a verification publishes |
 
 `NodeFactory` builds a node from an invoice and, after an answer, from the answers, for the seed and for imports alike. `NodeViewMapper` turns a stored node into the read model.

@@ -1,6 +1,5 @@
 import type { CarbonFigure, ClassificationView, FactorLookup, NodeStatus, NodeView } from '@/api/client'
-import { classificationCopy } from '@/copy/dashboard'
-import { AI_MAPPED, BUYER_CORRECTED, provenance } from '@/copy/labels'
+import { AI_MAPPED, provenance } from '@/copy/labels'
 
 // What a supplier node shows, decided from the read model alone. Nothing here computes carbon.
 
@@ -48,16 +47,6 @@ export function aiReason(classification: ClassificationView): string | null {
   if (!classification.aiMapped) return null
   const reason = classification.rationale?.trim()
   return reason ? reason : null
-}
-
-/**
- * The chip naming who chose the category, with what it means: "AI-mapped · 0.92" for an AI classification, "Buyer-corrected"
- * once the buyer set it, nothing when the invoice's own code decided.
- */
-export function classificationChip(classification: ClassificationView): { label: string; help: string } | null {
-  if (classification.source === 'correction') return { label: BUYER_CORRECTED, help: classificationCopy.correctedHelp }
-  const ai = aiMappedLabel(classification)
-  return ai === null ? null : { label: ai, help: classificationCopy.aiMappedHelp }
 }
 
 /** "AI-mapped · 0.92" when an AI classification (cache or model) chose the category, null when the invoice did. */

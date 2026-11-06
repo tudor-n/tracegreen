@@ -68,33 +68,6 @@ internal static class Mapping
         r.SpendKg, r.ActivityKg, r.SpendEur, r.CostEur, r.LeadDays,
         ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt, r.ClassificationRationale);
 
-    /// <summary>Copies every column of a rebuilt node onto its tracked row (a correction changes the whole estimate).</summary>
-    public static void Replace(NodeRow row, SupplierNode node)
-    {
-        var fresh = ToRow(node);
-        row.CategoryId = fresh.CategoryId;
-        row.SectorId = fresh.SectorId;
-        row.AiConfidence = fresh.AiConfidence;
-        row.ClassificationSource = fresh.ClassificationSource;
-        row.ClassificationRationale = fresh.ClassificationRationale;
-        row.MassT = fresh.MassT;
-        row.Status = fresh.Status;
-        row.SpendKg = fresh.SpendKg;
-        row.ActivityKg = fresh.ActivityKg;
-        row.CostEur = fresh.CostEur;
-        row.LeadDays = fresh.LeadDays;
-        row.TransportMode = fresh.TransportMode;
-        row.EnergySource = fresh.EnergySource;
-    }
-
-    public static CorrectionRow ToRow(ClassificationCorrection c) => new()
-    {
-        WorkspaceId = c.WorkspaceId, CacheKey = c.CacheKey, CategoryId = c.CategoryId, NodeId = c.NodeId, Actor = c.Actor,
-        CreatedAt = Utc(c.CreatedAt),
-    };
-
-    public static ClassificationCorrection ToDomain(CorrectionRow r) => new(r.WorkspaceId, r.CacheKey, r.CategoryId, r.NodeId, r.Actor, r.CreatedAt);
-
     public static VerificationRow ToRow(Verification v) => new()
     {
         Id = v.Id, WorkspaceId = v.WorkspaceId, NodeId = v.NodeId, TokenNonce = v.TokenNonce,

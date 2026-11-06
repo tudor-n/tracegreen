@@ -77,20 +77,6 @@ export function Chip({ tone = 'neutral', children }: { tone?: ChipTone; children
   )
 }
 
-/** A chip that says what it means on hover or focus: for labels a reader may not know, such as "AI-mapped · 0.86". */
-export function ExplainedChip({ tone, help, children }: { tone?: ChipTone; help: string; children: ReactNode }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${String(children)}. ${help}`}>
-        <Chip tone={tone}>{children}</Chip>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" className="max-w-xs text-left">
-        {help}
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
 /** A quiet tag that says what it means on hover or focus, such as "AI-suggested · illustrative". */
 export function ExplainedTag({ help, children }: { help: string; children: ReactNode }) {
   return (

@@ -4,10 +4,8 @@ import { savedScenario, scenarioResult } from '@/store/testFixtures'
 import {
   askChat,
   confirmPdf,
-  correctCategory,
   extractPdf,
   failureMessage,
-  fetchCategories,
   fetchSuggestions,
   requestLink,
   requestPortalLink,
@@ -191,50 +189,6 @@ describe('saveScenario', () => {
     expect(await saveScenario(nodeId, { mode: 'sea', alternativeId: null })).toEqual({
       ok: false,
       message: 'Supplier not on the graph. No node on the graph.',
-    })
-  })
-})
-
-describe('fetchCategories', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('returns the categories the API allows', async () => {
-    const categories = [
-      { id: 'pcb', label: 'Printed circuit boards' },
-      { id: 'UNCLASSIFIED', label: 'Unclassified' },
-    ]
-    const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: categories, response: new Response(null, { status: 200 }) } as never)
-    expect(await fetchCategories()).toEqual({ ok: true, data: categories })
-    expect(get).toHaveBeenCalledWith('/api/categories')
-  })
-})
-
-describe('correctCategory', () => {
-  const nodeId = '11111111-1111-4111-8111-000000000002'
-  const answer = (status: number, body: { data?: unknown; error?: unknown }) =>
-    vi.spyOn(api, 'PUT').mockResolvedValue({ ...body, response: new Response(null, { status }) } as never)
-
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('puts the category on the node and returns the node as the API recomputed it', async () => {
-    const recomputed = { id: nodeId }
-    const put = answer(200, { data: recomputed })
-    expect(await correctCategory(nodeId, 'connectors')).toEqual({ ok: true, data: recomputed })
-    expect(put).toHaveBeenCalledWith('/api/nodes/{nodeId}/classification', {
-      params: { path: { nodeId } },
-      body: { categoryId: 'connectors' },
-    })
-  })
-
-  it("shows the API's problem for a category outside the allow-list", async () => {
-    answer(422, { error: problem(422, 'CategoryNotAllowed', 'Category bogus is not one of the allowed categories.') })
-    expect(await correctCategory(nodeId, 'bogus')).toEqual({
-      ok: false,
-      message: 'That category is not one of the allowed categories. Category bogus is not one of the allowed categories.',
     })
   })
 })

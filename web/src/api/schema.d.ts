@@ -453,10 +453,6 @@ export interface components {
             kg: number;
             factors: components["schemas"]["FactorLookup"][];
         };
-        CategoryOption: {
-            id: string;
-            label: string;
-        };
         ChainVerification: {
             valid: boolean;
             /** Format: int32 */
@@ -491,7 +487,7 @@ export interface components {
             categoryId: string;
         };
         /** @enum {unknown} */
-        ClassificationSource: "invoice" | "cache" | "model" | "stub" | "correction";
+        ClassificationSource: "invoice" | "cache" | "model" | "stub";
         ClassificationView: {
             categoryId: string;
             categoryLabel: string;

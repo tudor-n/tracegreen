@@ -147,40 +147,6 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.ToTable("buyers", (string)null);
                 });
 
-            modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.CorrectionRow", b =>
-                {
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("workspace_id");
-
-                    b.Property<string>("CacheKey")
-                        .HasColumnType("text")
-                        .HasColumnName("cache_key");
-
-                    b.Property<string>("Actor")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("actor");
-
-                    b.Property<string>("CategoryId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("category_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("NodeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("node_id");
-
-                    b.HasKey("WorkspaceId", "CacheKey")
-                        .HasName("pk_classification_corrections");
-
-                    b.ToTable("classification_corrections", (string)null);
-                });
-
             modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.FactorRow", b =>
                 {
                     b.Property<string>("Id")
