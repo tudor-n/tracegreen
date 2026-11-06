@@ -40,6 +40,13 @@ builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
     client.BaseAddress = aiOptions.BaseUrl;
     client.Timeout = aiOptions.Timeout;
 });
+// The longer calls (chat, PDF extraction) get their own client, so the 10 s classification client stays as it is; each
+// call is cut at its own budget by the service, the client timeout is only the backstop.
+builder.Services.AddHttpClient<IAiAssist, HttpAiAssist>(client =>
+{
+    client.BaseAddress = aiOptions.BaseUrl;
+    client.Timeout = TimeSpan.FromMilliseconds(Math.Max(config.AiChatTimeoutMs, config.AiExtractTimeoutMs) + 1000);
+});
 
 // Use-case services live in the Domain and get configuration through ServiceOptions, built here from AppConfig.
 // The address hash gets its own key, derived from the link secret, so one HMAC key never serves two purposes.
@@ -47,7 +54,9 @@ builder.Services.AddSingleton(new ServiceOptions(
     AiTimeout: TimeSpan.FromMilliseconds(config.AiTimeoutMs),
     LinkTtl: TimeSpan.FromSeconds(config.LinkTtlSeconds),
     IpHashKey: "ip-hash:" + config.LinkSecret,
-    EtsPriceEurPerT: config.EtsPriceEurPerT));
+    EtsPriceEurPerT: config.EtsPriceEurPerT,
+    AiChatTimeout: TimeSpan.FromMilliseconds(config.AiChatTimeoutMs),
+    AiExtractTimeout: TimeSpan.FromMilliseconds(config.AiExtractTimeoutMs)));
 builder.Services.AddSingleton<ILinkSigner>(new HmacLinkSigner(config.LinkSecret));
 // The supplier page link (F12) gets its own key the same way, so neither signer accepts the other's tokens.
 builder.Services.AddSingleton(new PortalLinkSigner("portal:" + config.LinkSecret));

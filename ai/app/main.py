@@ -10,7 +10,13 @@ import logging
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.config import API_TIMEOUT_S, Settings, settings
+from app.config import (
+    API_CHAT_TIMEOUT_S,
+    API_EXTRACT_TIMEOUT_S,
+    API_TIMEOUT_S,
+    Settings,
+    settings,
+)
 from app.models import ModelFactory, chat_model_factory
 from app.providers import build_chain
 from app.schemas import (
@@ -37,6 +43,17 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
             config.ai_timeout_s,
             API_TIMEOUT_S,
         )
+    for name, budget, api in (
+        ("AI_CHAT_TIMEOUT_S", config.chat_timeout_s, API_CHAT_TIMEOUT_S),
+        ("AI_EXTRACT_TIMEOUT_S", config.extract_timeout_s, API_EXTRACT_TIMEOUT_S),
+    ):
+        if budget >= api:
+            log.warning(
+                "%s is %g s, not under the API's %g s default: the API may give up first.",
+                name,
+                budget,
+                api,
+            )
     entries = load_cache(config.seed_dir)
     chain = build_chain(config, entries, model_factory)
     # Every task builds its models lazily from the same factory, so no client exists before a
