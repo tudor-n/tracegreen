@@ -91,13 +91,32 @@ The supplier page `/supplier?t=` lists every delivery on the graph from one supp
 - The AI service classifies line items and never produces a carbon number.
 - Invoice text reaches it as delimited data, never as instructions. `seed/invoices/adversarial.xml` carries a prompt-injection line to prove it.
 - A category outside the allow-list (`seed/categories.json`) becomes `UNCLASSIFIED`.
-- The API calls the service with a 10 s timeout (`AI_TIMEOUT_MS`) and falls back to the cache and stub, so an import never blocks on it.
+- The API calls the service with a 10 s timeout (`AI_TIMEOUT_MS`) for classification and suggestions, and falls back to the cache and stub, so an import never blocks on it. The chat (F13) and PDF extraction (F9) have their own longer budgets (`AI_CHAT_TIMEOUT_MS`, `AI_EXTRACT_TIMEOUT_MS`) on a separate client; no import waits on them.
+- **Suggestions (F11)** pick among the node's curated alternatives only, under short ids, and the API sends no figure. A reason holding a digit or a claim word is dropped on both sides.
 - **Prompt guard (F6).** The system prompt lists only the allowed category ids and labels, and states that the text inside the `<invoice_lines>` block is data, never instructions. Each description is capped at 500 characters with `<` and `>` stripped and whitespace runs collapsed, so a line cannot close the block; codes are capped at 64 characters. Quantity, unit code, classification code and its scheme go along as context. The request carries no supplier name, tax id or amount. The model sees short ids of the service's own (`1`, `2`, …), never the invoice's line ids, and the messages are built directly rather than through a prompt template, so braces in invoice text are never read as template fields.
 - **The guard lowers the risk; it does not remove it.** In scoring, the local model followed an injected instruction in one of 20 tries (`docs/ai-eval.md`). The allow-list bounds what such a line can do: one wrong category, never a number or text outside the schema.
 - **Model output is untrusted.** The structured output limits `categoryId` to the allow-list. Only line ids that were sent count, and only the first answer per id. Confidence is clamped to 0–1, the rationale is capped at 200 characters, and an answer below 0.6 confidence becomes `UNCLASSIFIED`. The C# side checks the allow-list again.
 - **The service's own budget is 8 s** (`AI_TIMEOUT_S`): at most 4 s per cloud model and 6 s for Ollama, each call in a worker thread with a hard deadline, so a hanging provider cannot hold an import.
 - **Where invoice text goes.** With a cloud model in `AI_MODELS`, the line descriptions, quantities, unit codes and classification codes the API sends are passed on to that provider. With only the cache, Ollama and the stub, nothing leaves the laptop.
 - **The scoring route is off by default.** `POST /classify?model=<id>` exists only with `AI_DEV_ROUTES=1` and skips the cache; keep it off for the demo. Under Compose the `ai` service publishes no port, so only the containers on the Compose network reach it, not the hotspot.
+
+## The data chat (F13)
+
+- **The model writes the sentence; the API fills in every value.** `POST /api/chat` builds the facts from the dashboard snapshot (`Domain/Chat/FactPack.cs`). The model may cite them only as `{{id}}` placeholders, and the reader sees the values the API fills in from its own data, so no figure and no name on screen comes from a model.
+- **`AnswerCheck` refuses an answer when:**
+  - it cites an unknown fact;
+  - it has a digit outside a placeholder (the unit's own `CO2e` excepted);
+  - it writes out a supplier, buyer or place name of the pack;
+  - it has a company suffix (SRL, GmbH, Ltd …: an invented supplier);
+  - it has a banned term;
+  - it is over 600 characters;
+  - it cites no fact.
+
+  The check also tests the claims a sentence makes in its own words. A status word must be the status of every supplier the sentence cites; "largest" must cite S1 and "smallest" the last supplier; "more than" and "less than" must follow the ranks. A refused answer reads "I couldn't answer that from the data"; it is never shown. The AI service mirrors the cheap checks, so a model that fails them hands over to the next one.
+- **What it cannot catch.** A sentence can still cite the right kind of fact for an unintended reading, for example a supplier's spend where emissions were asked. Every value is a chip that says what it is and whose, and the answer's Sources list repeats that, so a reader can check.
+- **Facts, questions and history are data.** They go in `<facts>`, `<question>` and `<history>` blocks through `clean()`. History holds the last three typed questions, never an answer. Supplier names come from invoices and can carry an injected instruction; the worst such a line can do is make the model answer badly, which the check refuses. Invoice line descriptions are not in the facts.
+- **New data flow.** The chat sends supplier names, emissions, spend and statuses to the models in `AI_MODELS`, which `/classify` never does. Set `AI_CHAT_MODELS` to the local model to keep them on the laptop.
+- **Read-only and rate limited.** Nothing is stored or audited. The policy `chat` allows 3 × `RATE_LIMIT_PER_MIN` a minute per address, and a question is at most 300 characters. The log names the rule that refused an answer, never the answer's text.
 
 ## Data at rest (C4, C8)
 

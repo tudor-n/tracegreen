@@ -147,6 +147,14 @@ The "Fixed agreements" of the F6 plan (`docs/plan/ai-f6.md`), built in `ai/app`.
 - **A reason only restates the data.** It is dropped when it holds a digit or a claim word (lower, closer, cheaper, carbon, distance, …), in `ai/app/suggest.py` and again in `SuggestionService` — a small model wrote false claims ("Timisoara is close to Taoyuan", "road is lower carbon than sea") that nothing checks, and the UI must not show them. The pick stays without a reason — cost if wrong: fewer reasons on screen.
 - **Asked on demand, not on import.** The What if tab asks once when it opens, under the classification timeout; a failure shows the list as before — cost if wrong: none.
 
+## The data chat (F13, 2026-11-06)
+
+- **"The model writes, the app checks"** (the user's choice over fixed sentences). The model writes one or two sentences but cites every value and name as a `{{factId}}` placeholder; the API fills in the values from its data and refuses any answer that types a number or a name, cites an unknown fact, or makes a status, largest, smallest or more-than claim the facts contradict. It keeps "the AI never produces a carbon number": no figure the reader sees passes through a model — cost if wrong: a stricter mode with fixed sentences only.
+- **Comparisons are facts, not the model's arithmetic.** Suppliers are numbered by emissions (S1 is the largest), and the totals, counts by status, the supplier-confirmed share and the lists of suppliers by status are facts of their own — a small model wrote "still estimated" about a supplier-confirmed node until the status claims were checked and the lists added — cost if wrong: more facts.
+- **The suggested questions are answered in the SPA from the store, without the AI**, labelled "From your data": instant, exact, and still there when no model is — cost if wrong: none.
+- **The panel sits where the side panel sits and covers it**; closing it brings the side panel back as it was, and picking a supplier from an answer closes it. The conversation lives while the app is open and is never stored — cost if wrong: none.
+- **Separate budgets for the longer calls** (`AI_CHAT_TIMEOUT_MS` 20 s in the API, `AI_CHAT_TIMEOUT_S` 15 s and `AI_LONG_MODEL_TIMEOUT_S` 12 s per model in the service, on their own HTTP client), so the 10 s classification path stays as it is — cost if wrong: env values.
+
 ## CI (A9)
 
 - **CI pins every action to the commit of a release tag at least two weeks old and runs the toolchains of the Dockerfiles** (`.github/workflows/ci.yml`) — a moved tag cannot change a build, and CI tests what Compose runs — cost if wrong: a manual bump.

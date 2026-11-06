@@ -309,6 +309,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a question about the workspace's data; every value in the answer is filled in from the data, never by the AI */
+        post: operations["Chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -354,6 +371,10 @@ export interface components {
             origin: string;
             mode: components["schemas"]["TransportMode"];
             illustrative: boolean;
+        };
+        AnswerSegment: {
+            text: null | string;
+            factId: null | string;
         };
         ApiProblem: {
             type: string;
@@ -409,6 +430,29 @@ export interface components {
             /** Format: int32 */
             brokenAt: null | number;
         };
+        ChatAnswer: {
+            status: components["schemas"]["ChatStatus"];
+            segments: components["schemas"]["AnswerSegment"][];
+            facts: components["schemas"]["ChatFactView"][];
+            provider: string;
+        };
+        ChatFactView: {
+            id: string;
+            field: string;
+            kind: components["schemas"]["FactKind"];
+            value: string;
+            subject: null | string;
+            /** Format: uuid */
+            nodeId: null | string;
+            /** Format: int64 */
+            auditId: null | number;
+        };
+        ChatRequest: {
+            question: null | string;
+            history?: null | string[];
+        };
+        /** @enum {unknown} */
+        ChatStatus: "answered" | "notAnswered" | "unavailable";
         ClassificationRequest: {
             categoryId: string;
         };
@@ -496,6 +540,8 @@ export interface components {
         };
         /** @enum {unknown} */
         EnergySource: "grid" | "renewable" | "unknown";
+        /** @enum {unknown} */
+        FactKind: "carbonKg" | "eur" | "days" | "share" | "count" | "date" | "text" | "status" | "mode";
         FactorLookup: {
             /** Format: double */
             value: number;
@@ -659,7 +705,7 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "InvalidQuestion";
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -1526,6 +1572,48 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    Chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAnswer"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

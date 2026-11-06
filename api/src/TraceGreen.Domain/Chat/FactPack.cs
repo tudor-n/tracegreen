@@ -168,14 +168,19 @@ public sealed class FactPack
         return new FactPack(facts, cleanNames);
     }
 
-    /// <summary>Ruling 3's provenance line, the same words the side panel shows.</summary>
+    /// <summary>
+    /// Ruling 3's provenance line, the same words the side panel shows (web/src/lib/node-display.ts, provenanceLine):
+    /// "Supplier-confirmed · source year" with any further sources after it, or "Spend-based estimate · source".
+    /// </summary>
     private static string Provenance(NodeView node)
     {
-        var figure = node.Basis == CarbonBasis.Activity && node.Activity is not null ? node.Activity : node.Spend;
-        var first = figure.Factors.FirstOrDefault();
-        return node.Basis == CarbonBasis.Activity
-            ? $"Supplier-confirmed · {first?.Source} {first?.Year}"
-            : $"Spend-based estimate · {first?.Source}";
+        if (node.Basis == CarbonBasis.Activity && node.Activity is { } activity)
+        {
+            var rows = activity.Factors.Select(f => $"{f.Source} {f.Year}").Distinct(StringComparer.Ordinal).ToList();
+            return rows.Count == 0 ? "Supplier-confirmed" : string.Join("; ", ["Supplier-confirmed · " + rows[0], .. rows.Skip(1)]);
+        }
+        var spend = node.Spend.Factors.FirstOrDefault();
+        return spend is null ? "Spend-based estimate" : $"Spend-based estimate · {spend.Source}";
     }
 
     private static string StatusKey(NodeStatus status) => status switch

@@ -1,6 +1,7 @@
 import {
   api,
   type CategoryOption,
+  type ChatAnswer,
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
@@ -169,6 +170,15 @@ export function correctCategory(nodeId: string, categoryId: string): Promise<Ans
  */
 export function fetchSuggestions(nodeId: string, signal?: AbortSignal): Promise<Answer<SuggestionsView>> {
   return fetchBody(() => api.GET('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal }))
+}
+
+/**
+ * POST /api/chat (F13): the question and the last three typed questions. The answer's sentence is the AI's, every value
+ * in it the API filled in from the data after checking the sentence; a question the data does not answer comes back
+ * notAnswered, never as a guess.
+ */
+export function askChat(question: string, history: readonly string[], signal?: AbortSignal): Promise<Answer<ChatAnswer>> {
+  return fetchBody(() => api.POST('/api/chat', { body: { question, history: [...history] }, signal }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

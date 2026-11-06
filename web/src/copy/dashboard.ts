@@ -261,6 +261,7 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   DeliveryChanged: 'Another answer arrived first.',
   TermsNotAccepted: 'Supplier terms not accepted.',
   CategoryNotAllowed: 'That category is not one of the allowed categories.',
+  InvalidQuestion: 'That question could not be asked.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */
