@@ -13,10 +13,31 @@ public sealed class HttpAiAssist(HttpClient http) : IAiAssist
     public async Task<ChatOutcome> ChatAsync(ChatInput input, CancellationToken ct)
     {
         using var response = await http.PostAsJsonAsync("chat", input, Json, ct);
+        if ((int)response.StatusCode == 422)
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemBody>(Json, ct);
+            ChatModelProblem? refused = problem?.Detail?.Code switch
+            {
+                "unknown_model" => ChatModelProblem.Unknown,
+                "model_not_ready" => ChatModelProblem.NotReady,
+                _ => null,
+            };
+            if (refused is not null)
+            {
+                return new ChatOutcome(false, "", [], "stub", refused);
+            }
+        }
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<ChatResponse>(Json, ct)
             ?? throw new InvalidOperationException("Empty response from the AI service.");
         return new ChatOutcome(body.Answerable, body.Text ?? "", body.FactIds ?? [], body.Provider ?? "stub");
+    }
+
+    public async Task<IReadOnlyList<ChatModelInfo>> ChatModelsAsync(CancellationToken ct)
+    {
+        var body = await http.GetFromJsonAsync<ChatModelsResponse>("chat/models", Json, ct)
+            ?? throw new InvalidOperationException("Empty response from the AI service.");
+        return body.Models ?? [];
     }
 
     public async Task<ExtractOutcome> ExtractPdfAsync(byte[] pdf, CancellationToken ct)
@@ -54,6 +75,8 @@ public sealed class HttpAiAssist(HttpClient http) : IAiAssist
 
     private sealed record ChatResponse(bool Answerable, string? Text, List<string>? FactIds, string? Provider);
 
+    private sealed record ChatModelsResponse(List<ChatModelInfo>? Models);
+
     private sealed record ExtractRequest(string PdfBase64);
 
     private sealed record ExtractResponse(DraftInvoice Invoice, Dictionary<string, bool>? Found, string? Provider, int Pages);
@@ -68,6 +91,9 @@ public sealed class StubAiAssist : IAiAssist
 {
     public Task<ChatOutcome> ChatAsync(ChatInput input, CancellationToken ct) =>
         Task.FromResult(new ChatOutcome(false, "", [], "stub"));
+
+    public Task<IReadOnlyList<ChatModelInfo>> ChatModelsAsync(CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ChatModelInfo>>([]);
 
     public Task<ExtractOutcome> ExtractPdfAsync(byte[] pdf, CancellationToken ct) =>
         Task.FromResult(ExtractOutcome.Failed(ExtractFailure.Unavailable));

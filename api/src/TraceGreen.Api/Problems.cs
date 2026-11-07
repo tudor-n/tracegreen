@@ -38,6 +38,8 @@ public enum ProblemCode
     [JsonStringEnumMemberName("ExtractionUnavailable")] ExtractionUnavailable,
     [JsonStringEnumMemberName("DraftExpired")] DraftExpired,
     [JsonStringEnumMemberName("InvalidInvoiceFields")] InvalidInvoiceFields,
+    [JsonStringEnumMemberName("UnknownModel")] UnknownModel,
+    [JsonStringEnumMemberName("ModelNotReady")] ModelNotReady,
     [JsonStringEnumMemberName("InvalidRecord")] InvalidRecord,
     [JsonStringEnumMemberName("NoClaim")] NoClaim,
     [JsonStringEnumMemberName("ClaimChanged")] ClaimChanged,
@@ -87,6 +89,8 @@ public static class Problems
             ProblemCode.ExtractionUnavailable => (StatusCodes.Status503ServiceUnavailable, "No model could read the invoice"),
             ProblemCode.DraftExpired => (StatusCodes.Status410Gone, "Draft expired"),
             ProblemCode.InvalidInvoiceFields => (StatusCodes.Status422UnprocessableEntity, "Invoice fields not accepted"),
+            ProblemCode.UnknownModel => (StatusCodes.Status422UnprocessableEntity, "Model not offered by the chat"),
+            ProblemCode.ModelNotReady => (StatusCodes.Status422UnprocessableEntity, "Model not set up yet"),
             ProblemCode.InvalidRecord => (StatusCodes.Status422UnprocessableEntity, "Record not accepted"),
             ProblemCode.NoClaim => (StatusCodes.Status422UnprocessableEntity, "No such answer on this delivery"),
             ProblemCode.ClaimChanged => (StatusCodes.Status409Conflict, "Answer changed since the page read it"),
@@ -121,6 +125,8 @@ public static class Problems
     public static ProblemCode From(ChatErrorCode code) => code switch
     {
         ChatErrorCode.InvalidQuestion => ProblemCode.InvalidQuestion,
+        ChatErrorCode.UnknownModel => ProblemCode.UnknownModel,
+        ChatErrorCode.ModelNotReady => ProblemCode.ModelNotReady,
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

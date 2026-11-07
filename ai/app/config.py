@@ -37,6 +37,13 @@ class ModelSpec:
     timeout_s: float
     ready: bool
     reason: str | None
+    # The most tokens one answer may take, for a task whose answer is short (the chat); None:
+    # the model's own limit. Applied to Ollama models (num_predict), so a confused local model
+    # stops in seconds instead of writing until its cap.
+    max_tokens: int | None = None
+    # A task's own effort for the Claude models that take one (the chat: ANTHROPIC_CHAT_EFFORT);
+    # None: ANTHROPIC_EFFORT.
+    effort: str | None = None
 
     @property
     def id(self) -> str:
@@ -58,6 +65,23 @@ class Settings:
     # AI_CHAT_MODELS: the models the chat may use, when it should not use all of AI_MODELS (the
     # chat sends supplier names and figures, which /classify never does). None: AI_MODELS.
     chat_models: tuple[ModelSpec, ...] | None = None
+    # OLLAMA_NUM_CTX: Ollama's context window in tokens, the same for every task, since Ollama
+    # reloads the model whenever it changes. Ollama's own 4096 is too small for the chat's facts
+    # (about 5,700 tokens with eight deliveries), and it cuts a longer prompt without a word.
+    ollama_num_ctx: int = 12288
+    # OLLAMA_DISCOVER: the chat box also offers the models the Ollama server has (GET /api/tags),
+    # to be picked by name; Automatic keeps to AI_CHAT_MODELS, else AI_MODELS.
+    ollama_discover: bool = True
+    # OLLAMA_KEEP_ALIVE: how long Ollama keeps a model loaded after a call ("30m", "-1" for ever),
+    # sent with every call, so the next question does not pay the load (seconds, past the cap).
+    ollama_keep_alive: str = "30m"
+    # ANTHROPIC_EFFORT: output_config.effort for every Claude model that takes one. Claude Sonnet
+    # 5.5 and Opus 5.5 always think, at high and medium effort when none is sent, which is slow
+    # for the 4 s cap; these tasks' answers are short, so low is the default.
+    anthropic_effort: str = "low"
+    # ANTHROPIC_CHAT_EFFORT: the same for the chat, whose answer reasons over the whole fact list
+    # (which supplier is larger, which what-if lowers what) within a 12 s cap; medium by default.
+    anthropic_chat_effort: str = "medium"
     # Keys stay out of repr, so logging the settings never prints one.
     anthropic_api_key: str | None = field(default=None, repr=False)
     openai_api_key: str | None = field(default=None, repr=False)
@@ -105,6 +129,11 @@ class Settings:
             )
             or None,
             ollama_base_url=_text(source, "OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
+            ollama_num_ctx=_tokens(source, "OLLAMA_NUM_CTX", 12288),
+            ollama_discover=_flag(source, "OLLAMA_DISCOVER", default="1"),
+            ollama_keep_alive=_text(source, "OLLAMA_KEEP_ALIVE") or "30m",
+            anthropic_effort=_effort(source, "ANTHROPIC_EFFORT", "low"),
+            anthropic_chat_effort=_effort(source, "ANTHROPIC_CHAT_EFFORT", "medium"),
             dev_routes=_flag(source, "AI_DEV_ROUTES"),
             anthropic_api_key=keys["ANTHROPIC_API_KEY"],
             openai_api_key=keys["OPENAI_API_KEY"],
@@ -176,8 +205,31 @@ def _seconds(source: Mapping[str, str], name: str, default: float) -> float:
     return value
 
 
-def _flag(source: Mapping[str, str], name: str) -> bool:
-    raw = _text(source, name) or "0"
+MIN_OLLAMA_NUM_CTX = 2048
+
+
+def _tokens(source: Mapping[str, str], name: str, default: int) -> int:
+    raw = _text(source, name)
+    if raw is None:
+        return default
+    if not raw.isdigit() or int(raw) < MIN_OLLAMA_NUM_CTX:
+        raise ValueError(f"{name} must be a whole number >= {MIN_OLLAMA_NUM_CTX}, not {raw!r}")
+    return int(raw)
+
+
+# The effort levels of the Messages API's output_config.effort.
+ANTHROPIC_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+
+
+def _effort(source: Mapping[str, str], name: str, default: str) -> str:
+    raw = _text(source, name) or default
+    if raw not in ANTHROPIC_EFFORTS:
+        raise ValueError(f"{name} must be one of {', '.join(ANTHROPIC_EFFORTS)}, not {raw!r}")
+    return raw
+
+
+def _flag(source: Mapping[str, str], name: str, default: str = "0") -> bool:
+    raw = _text(source, name) or default
     if raw not in ("0", "1"):
         raise ValueError(f"{name} must be 0 or 1, not {raw!r}")
     return raw == "1"

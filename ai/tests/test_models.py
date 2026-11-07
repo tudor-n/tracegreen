@@ -14,6 +14,7 @@ import time
 import warnings
 from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -617,10 +618,10 @@ CLAUDE_MODELS = [
 ]
 
 
-def production(model_id: str) -> tuple[Any, dict[str, Any]]:
+def production(model_id: str, **env: str) -> tuple[Any, dict[str, Any]]:
     """The chat model behind the production runnable for `model_id`, and the keyword arguments
     the runnable calls it with. Built offline with placeholder keys; nothing is sent."""
-    config = settings(AI_MODELS=model_id, ANTHROPIC_API_KEY="test-key", **KEYS)
+    config = settings(AI_MODELS=model_id, ANTHROPIC_API_KEY="test-key", **KEYS, **env)
     (spec,) = config.models
     runnable = chat_model_factory(config)(spec, answer_schema(load_categories(SEED)))
     extra: dict[str, Any] = {}
@@ -676,6 +677,50 @@ def test_every_claude_model_gets_structured_output_without_temperature_or_a_forc
     assert output_format["type"] == "json_schema"
     category = output_format["schema"]["properties"]["answers"]["items"]["properties"]["categoryId"]
     assert set(category["enum"]) == ALLOW_LIST
+
+
+@pytest.mark.parametrize(
+    ("claude", "env", "effort"),
+    [
+        ("claude-sonnet-5-5", {}, "low"),
+        ("claude-opus-5-5", {}, "low"),
+        ("claude-opus-5-5", {"ANTHROPIC_EFFORT": "high"}, "high"),
+        ("claude-haiku-4-5", {}, None),
+    ],
+)
+def test_a_claude_model_that_takes_an_effort_gets_anthropic_effort(
+    claude: str, env: dict[str, str], effort: str | None
+) -> None:
+    """Sonnet 5.5 and Opus 5.5 think at high and medium effort when none is sent; the service
+    sends ANTHROPIC_EFFORT (default low) beside the schema, and no thinking setting, so each
+    model keeps its own. A model whose profile lists no effort gets none."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        model, kwargs = production(f"anthropic:{claude}", **env)
+        payload = model._get_request_payload(request_messages(), **kwargs)
+    assert payload["output_config"].get("effort") == effort
+    assert payload["output_config"]["format"]["type"] == "json_schema"
+    assert payload.get("thinking") is None
+
+
+def test_anthropic_effort_must_be_a_level_the_api_knows() -> None:
+    assert settings().anthropic_effort == "low"
+    assert settings().anthropic_chat_effort == "medium"
+    with pytest.raises(ValueError, match="ANTHROPIC_EFFORT"):
+        settings(ANTHROPIC_EFFORT="fast")
+    with pytest.raises(ValueError, match="ANTHROPIC_CHAT_EFFORT"):
+        settings(ANTHROPIC_CHAT_EFFORT="fast")
+
+
+def test_a_task_effort_on_the_spec_replaces_anthropic_effort() -> None:
+    config = settings(AI_MODELS="anthropic:claude-sonnet-5-5", ANTHROPIC_API_KEY="test-key")
+    (spec,) = config.models
+    schema = answer_schema(load_categories(SEED))
+    runnable = chat_model_factory(config)(replace(spec, effort="medium"), schema)
+    binding = runnable.first
+    kwargs = {k: v for k, v in binding.kwargs.items() if not k.startswith("ls_")}
+    payload = binding.bound._get_request_payload(request_messages(), **kwargs)
+    assert payload["output_config"]["effort"] == "medium"
 
 
 def test_the_openai_request_is_a_strict_json_schema_at_temperature_0() -> None:

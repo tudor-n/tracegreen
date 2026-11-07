@@ -53,6 +53,14 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
                 max_retries=0,
                 default_request_timeout=spec.timeout_s,
             )
+            # The task's effort (the chat's ANTHROPIC_CHAT_EFFORT), else ANTHROPIC_EFFORT, for a
+            # model whose profile lists that level (claude-sonnet-5-5
+            # and claude-opus-5-5 do; claude-haiku-4-5 takes none). It goes in output_config, not
+            # reasoning_effort, which would also turn on thinking with a summary nobody reads;
+            # the model keeps its own thinking default.
+            effort = spec.effort or settings.anthropic_effort
+            if effort in ((model.profile or {}).get("reasoning_effort_levels") or ()):
+                model = model.model_copy(update={"output_config": {"effort": effort}})
             return model.with_structured_output(schema, method="json_schema")
         if spec.provider == "openai":
             from langchain_openai import ChatOpenAI
@@ -81,12 +89,17 @@ def chat_model_factory(settings: Settings) -> ModelFactory:
 
             # ChatOllama has no retry setting: its HTTP client never retries. reasoning=False
             # turns off a thinking mode, such as Qwen 3.5's, which would use up the budget; a
-            # model without one, such as ministral-3, accepts it.
+            # model without one, such as ministral-3, accepts it. num_ctx is one value for every
+            # task (OLLAMA_NUM_CTX), since Ollama reloads the model when it changes; num_predict
+            # caps a short task's answer (the chat), so a confused model stops in seconds.
             model = ChatOllama(
                 model=spec.model,
                 base_url=settings.ollama_base_url,
                 temperature=0,
                 reasoning=False,
+                num_ctx=settings.ollama_num_ctx,
+                num_predict=spec.max_tokens,
+                keep_alive=settings.ollama_keep_alive,
                 client_kwargs={"timeout": spec.timeout_s},
             )
             # stream=False: ChatOllama streams by default, so its timeout would bound each chunk,

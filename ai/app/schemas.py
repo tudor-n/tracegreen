@@ -99,10 +99,38 @@ class ChatFact(Wire):
     value: str
 
 
+class ChatRetry(Wire):
+    """The API refused the model's earlier answer to this question (Domain/Chat/AnswerCheck.cs):
+    that answer as the model wrote it, and the rule it broke, to ask once more."""
+
+    text: str
+    problem: str
+
+
 class ChatRequest(Wire):
     question: str
     history: list[str] = []
     facts: list[ChatFact] = []
+    # One of GET /chat/models' ids: that model alone answers. None: the chat's models in order.
+    model: str | None = None
+    retry: ChatRetry | None = None
+
+
+class ChatModel(Wire):
+    """A model the chat may use: its own (AI_CHAT_MODELS, else AI_MODELS) in the order the chat
+    tries them, which Automatic asks, then the local Ollama models, which are asked only when
+    picked. `reason` says why one is not ready, e.g. a missing key."""
+
+    id: str
+    provider: str
+    model: str
+    ready: bool
+    reason: str | None = None
+    automatic: bool
+
+
+class ChatModelsResponse(Wire):
+    models: list[ChatModel]
 
 
 class ChatResponse(Wire):

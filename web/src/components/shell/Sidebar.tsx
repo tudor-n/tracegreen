@@ -1,4 +1,4 @@
-import { LayoutGridIcon, type LucideIcon, MessageCircleIcon, ScrollTextIcon, WaypointsIcon } from 'lucide-react'
+import { LayoutGridIcon, type LucideIcon, ScrollTextIcon, SparklesIcon, WaypointsIcon } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { Wordmark } from '@/components/brand/Wordmark'
 import { ConnectionBadge } from '@/components/dashboard/ConnectionBadge'
@@ -50,7 +50,7 @@ export function Sidebar({ connection }: { connection: Connection }) {
               chatOpen ? 'bg-sidebar-accent font-semibold text-foreground' : 'font-medium text-ink-2 hover:bg-fill-strong',
             )}
           >
-            <MessageCircleIcon className="size-[17px]" strokeWidth={1.7} aria-hidden />
+            <SparklesIcon className="size-[17px]" strokeWidth={1.7} aria-hidden />
             <span className="flex-1 text-left">{chatCopy.open}</span>
           </button>
         </li>

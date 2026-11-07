@@ -185,6 +185,35 @@ The dashboard side (ticket 2, on `b/f6-review-dashboard`):
 - **The suggested questions are answered in the SPA from the store, without the AI**, labelled "From your data": instant, exact, and still there when no model is — cost if wrong: none.
 - **The panel sits where the side panel sits and covers it**; closing it brings the side panel back as it was, and picking a supplier from an answer closes it. The conversation lives while the app is open and is never stored — cost if wrong: none.
 - **Separate budgets for the longer calls** (`AI_CHAT_TIMEOUT_MS` 20 s in the API, `AI_CHAT_TIMEOUT_S` 15 s and `AI_LONG_MODEL_TIMEOUT_S` 12 s per model in the service, on their own HTTP client), so the 10 s classification path stays as it is — cost if wrong: env values.
+- **A free chat, data first (2026-11-06, the user's choice over facts-only answers).** The chat answers every message: the buyer's data first, and also help ("I need help", "hello"), how TraceGreen works, what a term means and general advice. It no longer says "I couldn't answer that from the data". What stays: no figure or name from the data passes through a model. Values and names are still `{{factId}}` placeholders the API fills in, and every rule of `AnswerCheck` still holds. The changes:
+  - **General answers.** An answer may cite no fact when it is general. It is labelled "AI-written · general, no values from your data", and it may type no digit (CO2e and Scope 1–3 excepted), no name from the data and no company.
+  - **Uncited claims.** A sentence that claims something about the buyer's data in its own words ("your largest supplier…", "most of it…", "your suppliers are estimated") must cite a fact. That keeps the old refusal of "Most of it is estimated."
+    - Since the review of #54 (2026-11-07) that also covers four more kinds of claim: who emits the most ("the biggest emitter ships by air"), a status over several ("none of the suppliers has confirmed a delivery yet", false on the seed), a share or size ("most of the emissions…", "the total is large", "the main source of your emissions") and a count ("you have four suppliers").
+    - Not claims: what the chat can tell ("I can tell you who emits the most"), advice that names no one ("start with the largest emitters") and how TraceGreen works ("a supplier confirms a delivery in two taps").
+    - It is still a list of patterns (`AnswerCheck.ClaimsData`, mirrored in `ai/app/chat.py`), so a claim worded another way passes. That is why every value an answer shows is a cited fact.
+  - **Two retries.** An answer that breaks a rule goes back to the same model once with the rule and what to do instead, in the AI service for its cheap checks and in the API for the rest. A long answer that still fails is shown without its one false sentence when that is enough. Only then does the reader get the suggested questions.
+  - **Rank claims read as meant.** "Second largest" means S2, "the next largest" the one after the supplier named before, and "the largest estimated emitter" the largest of that status. A status after the verb ("…, which is estimated") is checked as said of that supplier.
+  - **Automatic needs no setup.** While no model of the chat's own is ready, Automatic asks the first local Ollama model, so the facts stay on the machine.
+
+  Cost if wrong: back to facts-only answers by restoring the "no fact cited" rule; the rest stays.
+- **What the chat may say about changes (2026-11-07, after a buyer's conversation with `ministral-3:3b`).**
+  - **What went wrong.** The chat told a buyer that switching a supplier to air would "cut 22.6 tCO₂e by +3.8 t" and "save +€1,620", and that it would "add a what-if". It answered a cake recipe with cost figures, in English, and named a place as a supplier. The causes were three:
+    - a change reached the model unsigned ("3.8 t CO2e");
+    - the model had no what-if figures except one saved scenario, so it guessed;
+    - nothing told it, or checked, that it only reads.
+  - **What-if facts.** The chat now gets the What if tab's results for the six largest suppliers as facts (W1…, largest emissions cut first), worked out by the same C# simulator and never saved. The model can say what lowers emissions or cost instead of guessing; it still calculates nothing. A large supplier with no what-if says why (`Sn.whatIf`: no other mode on its lane and no alternative, or no mass). A second delivery from the same supplier says so.
+  - **Signed changes.** Every change reads with its sign and a word: "+3.80 t CO2e (more)", "-EUR 3,910 (less)", "+33 days (slower)".
+  - **New refusals in `AnswerCheck`.** Each comes with a retry hint:
+    - a change described the wrong way ("cut" or "save" with a positive change, the last direction word before each change fact);
+    - a promise of an action ("I'll add", "I've changed", "let me send"), since the assistant only reads;
+    - the same value twice in one sentence;
+    - a what-if or a figure put under another supplier's name, where a sentence with "its" belongs to the supplier the sentence before named;
+    - a supplier sent "to rail/sea/air/road" when none of its what-ifs offers it.
+  - **Text fixes in the AI service.** Markdown is stripped. A supplier name typed out in full becomes its fact (the model copies names from the question), and the reader sees the data's own name. An answer in another language than the question goes back once. So does an off-topic message (a recipe, a joke, the weather) answered with figures.
+  - **The prompt** now says the assistant only reads and where the buyer acts (What if, Apply, Request data), how to read a change and the what-ifs, how to answer off-topic, and to write plain text.
+  - **Ollama keeps the model loaded** (`OLLAMA_KEEP_ALIVE`, 30 min), and the AI service loads it when it starts, so the first question does not run out of time.
+
+  Cost if wrong: a rule that refuses a true sentence costs one retry, then the trim or the suggested questions; each rule is one method of `AnswerCheck` with its tests.
 
 ## PDF invoice import (F9, 2026-11-06)
 

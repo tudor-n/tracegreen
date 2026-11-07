@@ -1,4 +1,5 @@
 using System.Globalization;
+using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 
 namespace TraceGreen.Domain.Chat;
@@ -24,6 +25,12 @@ public sealed record Fact(
     long? AuditId);
 
 /// <summary>
+/// A change the simulator worked out for the chat (F13): the node, the change (a transport mode or an alternative
+/// supplier) and its result, the same as the What if tab shows. Nothing is saved.
+/// </summary>
+public sealed record WhatIf(NodeView Node, ScenarioChange Change, ScenarioResult Result);
+
+/// <summary>
 /// The facts of one chat question, built from the dashboard snapshot. Every figure is the API's own (the node views,
 /// the KPIs, the saved scenarios), and every comparison the model might need is computed here: suppliers are numbered
 /// by emissions (S1 is the largest), and totals, counts by status and the supplier-confirmed share are facts of their
@@ -34,6 +41,10 @@ public sealed class FactPack
     public const int MaxSuppliers = 40;
     public const int MaxScenarios = 10;
     public const int MaxAuditEntries = 10;
+    public const int MaxWhatIfs = 12;
+
+    /// <summary>The largest suppliers the simulator works out what-ifs for (<c>ChatService</c>).</summary>
+    public const int WhatIfSuppliers = 6;
 
     private readonly Dictionary<string, Fact> _byId;
 
@@ -65,10 +76,36 @@ public sealed class FactPack
         return dot > 1 && int.TryParse(factId.AsSpan(1, dot - 1), NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
     }
 
+    /// <summary>
+    /// The transport modes a supplier's what-ifs offer ("rail" from "switch to rail"), by supplier name, for the suppliers
+    /// the simulator looked at; a supplier with an <c>Sn.whatIf</c> fact is there with none.
+    /// </summary>
+    public IReadOnlyDictionary<string, HashSet<string>> ModesOnOffer => _modesOnOffer ??= OffersOf(Facts);
+
+    private IReadOnlyDictionary<string, HashSet<string>>? _modesOnOffer;
+
+    private static Dictionary<string, HashSet<string>> OffersOf(IEnumerable<Fact> facts)
+    {
+        var offers = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fact in facts.Where(f => f.Subject is not null && (f.Field == "whatIf" || (f.Field == "change" && f.Id[0] == 'W'))))
+        {
+            var modes = offers.TryGetValue(fact.Subject!, out var known) ? known : offers[fact.Subject!] = new(StringComparer.Ordinal);
+            if (fact.Field == "change" && fact.Value.StartsWith("switch to ", StringComparison.Ordinal))
+            {
+                modes.Add(fact.Value["switch to ".Length..]);
+            }
+        }
+        return offers;
+    }
+
     /// <summary>The status (VERIFIED, PARTIAL, ESTIMATED) of supplier <c>Sn</c>.</summary>
     public string? StatusOf(int rank) => Find($"S{rank}.status")?.Value;
 
-    public static FactPack Build(GraphSnapshot snapshot, IReadOnlyList<Scenario> scenarios)
+    /// <summary>
+    /// <paramref name="whatIfs"/> are the simulator's results for the largest suppliers (<c>ChatService</c>); they become
+    /// the W facts, W1 the largest cut in emissions, so the model can say what lowers emissions or cost without guessing.
+    /// </summary>
+    public static FactPack Build(GraphSnapshot snapshot, IReadOnlyList<Scenario> scenarios, IReadOnlyList<WhatIf>? whatIfs = null)
     {
         var facts = new List<Fact>();
         var names = new List<string> { snapshot.Buyer.Name };
@@ -100,12 +137,17 @@ public sealed class FactPack
                 $"the suppliers whose deliveries are {StatusWords(status)}, largest first", list);
         }
 
+        // One S per delivery: a second invoice from the same supplier says so, so an answer can say "two deliveries"
+        // instead of naming the supplier twice as if they were two.
+        var firstRank = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < shown.Count; i++)
         {
             var node = shown[i];
             var id = $"S{i + 1}";
             var rank = i == 0 ? "the largest emitter" : $"rank {i + 1} by emissions";
-            var about = $"supplier {id} ({rank})";
+            var again = firstRank.TryGetValue(node.Label, out var first) ? $", another delivery from the same supplier as S{first}" : "";
+            firstRank.TryAdd(node.Label, i + 1);
+            var about = $"supplier {id} ({rank}{again})";
             var mode = node.TransportMode ?? node.Lane.Mode;
             names.Add(node.Label);
             names.Add(node.Lane.Origin);
@@ -144,13 +186,52 @@ public sealed class FactPack
             }
             var id = $"C{i + 1}";
             var about = $"saved scenario {id}";
-            var change = scenario.Change.Mode is { } m
-                ? $"switch to {ModeName(m)}"
-                : $"switch to {node.Alternatives.FirstOrDefault(a => a.Id == scenario.Change.AlternativeId)?.Label ?? "another supplier"}";
+            var change = ChangeLabel(node, scenario.Change);
             Add($"{id}.supplier", "name", FactKind.Text, node.Label, $"{about}: the supplier it changes", node.Label, node.Label, node.Id);
             Add($"{id}.change", "change", FactKind.Text, change, $"{about}: the change", change, node.Label, node.Id);
-            Add($"{id}.carbonDelta", "carbonDelta", FactKind.CarbonKg, Raw(scenario.Result.Delta.CarbonKg), $"{about}: change in emissions (negative is less)", Tonnes(scenario.Result.Delta.CarbonKg), node.Label, node.Id);
-            Add($"{id}.costDelta", "costDelta", FactKind.Eur, Raw(scenario.Result.Delta.CostEur), $"{about}: change in cost (illustrative)", Euros(scenario.Result.Delta.CostEur), node.Label, node.Id);
+            Add($"{id}.carbonDelta", "carbonDelta", FactKind.CarbonKg, Raw(scenario.Result.Delta.CarbonKg), $"{about}: change in emissions (negative is less)", SignedTonnes(scenario.Result.Delta.CarbonKg), node.Label, node.Id);
+            Add($"{id}.costDelta", "costDelta", FactKind.Eur, Raw(scenario.Result.Delta.CostEur), $"{about}: change in cost (illustrative; negative is less)", SignedEuros(scenario.Result.Delta.CostEur), node.Label, node.Id);
+        }
+
+        // What the simulator says each change would do for the largest suppliers, biggest emissions cut first. The
+        // figures are the API's (Carbon/Simulator); cost and lead time are illustrative, as in the What if tab.
+        var options = (whatIfs ?? [])
+            .Where(w => !w.Result.MassUnknown)
+            .OrderBy(w => w.Result.Delta.CarbonKg)
+            .ThenBy(w => w.Result.Delta.CostEur)
+            .Take(MaxWhatIfs)
+            .ToList();
+        Add("count.whatIfs", "whatIfs", FactKind.Count, Raw(options.Count), "number of what-ifs the simulator worked out for the largest suppliers (nothing saved)", Count(options.Count));
+        for (var i = 0; i < options.Count; i++)
+        {
+            var (node, change, result) = options[i];
+            var id = $"W{i + 1}";
+            var about = i == 0 ? $"what-if {id} (of all the what-ifs, the largest cut in emissions)" : $"what-if {id}";
+            var label = ChangeLabel(node, change);
+            Add($"{id}.supplier", "name", FactKind.Text, node.Label, $"{about}: the supplier it would change", node.Label, node.Label, node.Id);
+            Add($"{id}.change", "change", FactKind.Text, label, $"{about}: the change", label, node.Label, node.Id);
+            Add($"{id}.carbonDelta", "carbonDelta", FactKind.CarbonKg, Raw(result.Delta.CarbonKg), $"{about}: change in emissions", SignedTonnes(result.Delta.CarbonKg), node.Label, node.Id);
+            Add($"{id}.costDelta", "costDelta", FactKind.Eur, Raw(result.Delta.CostEur), $"{about}: change in cost with freight (illustrative)", SignedEuros(result.Delta.CostEur), node.Label, node.Id);
+            Add($"{id}.leadDelta", "leadDelta", FactKind.Days, Raw(result.Delta.LeadDays), $"{about}: change in lead time (illustrative)", SignedDays(result.Delta.LeadDays), node.Label, node.Id);
+            Add($"{id}.badge", "badge", FactKind.Text, BadgeName(result.Badge), $"{about}: the simulator's verdict", BadgeWords(result.Badge), node.Label, node.Id);
+        }
+
+        // A large supplier the simulator found no what-if for says so, so an answer says why instead of inventing one.
+        if (whatIfs is not null)
+        {
+            var simulated = whatIfs.Where(w => !w.Result.MassUnknown).Select(w => w.Node.Id).ToHashSet();
+            for (var i = 0; i < Math.Min(WhatIfSuppliers, shown.Count); i++)
+            {
+                var node = shown[i];
+                if (simulated.Contains(node.Id))
+                {
+                    continue;
+                }
+                var why = node.MassT is null
+                    ? "none: the invoice gives no mass, so a change of transport cannot be estimated"
+                    : "none: its lane has no other transport mode and it has no alternative supplier";
+                Add($"S{i + 1}.whatIf", "whatIf", FactKind.Text, "none", $"supplier S{i + 1}: what-ifs in What if", why, node.Label, node.Id);
+            }
         }
 
         var recent = snapshot.Audit.OrderByDescending(a => a.Id).Take(MaxAuditEntries).ToList();
@@ -200,6 +281,39 @@ public sealed class FactPack
     private static string StatusName(NodeStatus status) => status.ToString().ToUpperInvariant();
 
     private static string ModeName(TransportMode mode) => mode.ToString().ToLowerInvariant();
+
+    private static string ChangeLabel(NodeView node, ScenarioChange change) => change.Mode is { } m
+        ? $"switch to {ModeName(m)}"
+        : $"switch to {node.Alternatives.FirstOrDefault(a => a.Id == change.AlternativeId)?.Label ?? "another supplier"}";
+
+    /// <summary>The badge as the API's JSON names it, which the SPA reads.</summary>
+    private static string BadgeName(MacBadge badge) => badge switch
+    {
+        MacBadge.WinWin => "win-win",
+        MacBadge.BelowEts => "below-ets",
+        MacBadge.Premium => "premium",
+        _ => "not-abatement",
+    };
+
+    private static string BadgeWords(MacBadge badge) => badge switch
+    {
+        MacBadge.WinWin => "win-win: less carbon and less cost",
+        MacBadge.BelowEts => "less carbon, at a cost per tonne below the EU carbon price",
+        MacBadge.Premium => "less carbon, at a cost per tonne above the EU carbon price",
+        _ => "not an abatement option: it saves no carbon",
+    };
+
+    // A change reads with its sign and a word, so a model cannot take an increase for a cut.
+    private static string Direction(decimal value) => value < 0 ? " (less)" : value > 0 ? " (more)" : " (no change)";
+
+    private static string SignedTonnes(decimal kg) =>
+        (kg / 1000m).ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture) + " t CO2e" + Direction(kg);
+
+    private static string SignedEuros(decimal eur) =>
+        (eur < 0 ? "-" : eur > 0 ? "+" : "") + "EUR " + Math.Round(Math.Abs(eur), 0).ToString("#,0", CultureInfo.InvariantCulture) + Direction(eur);
+
+    private static string SignedDays(int days) =>
+        days.ToString("+0;-0;0", CultureInfo.InvariantCulture) + (Math.Abs(days) == 1 ? " day" : " days") + (days < 0 ? " (faster)" : days > 0 ? " (slower)" : " (no change)");
 
     private static string Raw(decimal value) => value.ToString(CultureInfo.InvariantCulture);
 

@@ -28,6 +28,8 @@ export type ChatAction =
   | { type: 'asked'; id: number; question: string; asked: Turn['asked'] }
   | { type: 'answered'; id: number; answer: ChatAnswer }
   | { type: 'failed'; id: number; message: string }
+  /** New chat: the turns go; an answer still on its way finds no turn and changes nothing. */
+  | { type: 'cleared' }
 
 /** At most this many turns stay on screen; older ones scroll away for good. */
 export const MAX_TURNS = 20
@@ -42,6 +44,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return update(state, action.id, toState(action.answer))
     case 'failed':
       return update(state, action.id, { phase: 'error', message: action.message })
+    case 'cleared':
+      return initialChat
   }
 }
 

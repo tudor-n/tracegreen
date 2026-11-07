@@ -6,11 +6,14 @@ carbon number. The C# API calls it with a
 from __future__ import annotations
 
 import logging
+import threading
+from collections.abc import AsyncIterator, Callable, Sequence
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 
 from app.cache import load_cache
-from app.chat import build_chat
+from app.chat import Chat, ChatModelRefused, build_chat
 from app.config import (
     API_CHAT_TIMEOUT_S,
     API_EXTRACT_TIMEOUT_S,
@@ -19,10 +22,13 @@ from app.config import (
     settings,
 )
 from app.extract import build_extractor
+from app.local_models import OllamaTags, warm_up
 from app.models import ModelFactory, chat_model_factory
 from app.pdf import PdfRefused, decode, text_of
 from app.providers import build_chain
 from app.schemas import (
+    ChatModel,
+    ChatModelsResponse,
     ChatRequest,
     ChatResponse,
     ClassifyRequest,
@@ -39,10 +45,17 @@ from app.suggest import build_suggester
 log = logging.getLogger(__name__)
 
 
-def create_app(config: Settings, model_factory: ModelFactory | None = None) -> FastAPI:
+def create_app(
+    config: Settings,
+    model_factory: ModelFactory | None = None,
+    local_models: Callable[[], Sequence[str]] | None = None,
+    warm: bool = False,
+) -> FastAPI:
     """The app for one configuration. The seed files are read here, so a broken seed fails
     at startup. Tests pass a `model_factory` of fake models; production builds the LangChain
-    chat models of AI_MODELS."""
+    chat models of AI_MODELS. `local_models` lists the Ollama server's models for the chat box;
+    by default the server is asked (GET /api/tags) when OLLAMA_DISCOVER is on. `warm` loads the
+    local model Automatic asks first when the server starts (the served app only)."""
     if config.ai_timeout_s >= API_TIMEOUT_S:
         log.warning(
             "AI_TIMEOUT_S is %g s, not under the API's %g s timeout (AI_TIMEOUT_MS): the API "
@@ -67,9 +80,19 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
     # model is first called.
     factory = model_factory or chat_model_factory(config)
     suggester = build_suggester(config, factory)
-    chat_task = build_chat(config, factory)
+    if local_models is None and config.ollama_discover:
+        local_models = OllamaTags(config.ollama_base_url).names
+    chat_task = build_chat(config, factory, local_models)
     extractor = build_extractor(config, factory)
-    app = FastAPI(title="TraceGreen AI", version="0.1.0")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # On start, in the background: the first question should not pay the model's load.
+        if warm:
+            threading.Thread(target=_warm, args=(config, chat_task), daemon=True).start()
+        yield
+
+    app = FastAPI(title="TraceGreen AI", version="0.1.0", lifespan=lifespan)
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -107,11 +130,36 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
         # figure; no model or no valid answer gives none, and the API shows the list as it is.
         return suggester.suggest(request)
 
+    @app.get("/chat/models", response_model=ChatModelsResponse)
+    def chat_models() -> ChatModelsResponse:
+        # The models the chat box offers: the chat's own in the order Automatic tries them, a
+        # model without its key listed, not ready, with the reason; then the Ollama server's
+        # other models, which are asked only when picked.
+        return ChatModelsResponse(
+            models=[
+                ChatModel(
+                    id=spec.id,
+                    provider=spec.provider,
+                    model=spec.model,
+                    ready=spec.ready,
+                    reason=spec.reason,
+                    automatic=automatic,
+                )
+                for spec, automatic in chat_task.listed()
+            ]
+        )
+
     @app.post("/chat", response_model=ChatResponse)
     def chat(request: ChatRequest) -> ChatResponse:
         # F13: a sentence that cites the API's facts by id; the API checks it again and fills
         # the values in. No model, or no valid answer, says the question was not answered.
-        return chat_task.answer(request)
+        # A named model (`model`) answers alone; one the chat lacks or cannot use is 422.
+        try:
+            return chat_task.answer(request)
+        except ChatModelRefused as refused:
+            raise HTTPException(
+                status_code=422, detail={"code": refused.code, "message": str(refused)}
+            ) from None
 
     @app.post("/extract-pdf", response_model=ExtractResponse)
     def extract_pdf(request: ExtractRequest) -> ExtractResponse:
@@ -135,4 +183,10 @@ def create_app(config: Settings, model_factory: ModelFactory | None = None) -> F
     return app
 
 
-app = create_app(settings)
+def _warm(config: Settings, chat_task: Chat) -> None:
+    name = chat_task.first_local()
+    if name is not None:
+        warm_up(config.ollama_base_url, name, config.ollama_num_ctx, config.ollama_keep_alive)
+
+
+app = create_app(settings, warm=True)

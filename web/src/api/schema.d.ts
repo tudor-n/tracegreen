@@ -377,6 +377,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The AI models the chat can be asked with, in the order it tries them; a model without its key is listed as not ready, with the reason */
+        get: operations["ChatModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingest/pdf/extract": {
         parameters: {
             query?: never;
@@ -540,9 +557,22 @@ export interface components {
             /** Format: int64 */
             auditId: null | number;
         };
+        ChatModelView: {
+            id: string;
+            provider: string;
+            model: string;
+            ready: boolean;
+            reason: null | string;
+            automatic: boolean;
+        };
+        ChatModels: {
+            available: boolean;
+            models: components["schemas"]["ChatModelView"][];
+        };
         ChatRequest: {
             question: null | string;
             history?: null | string[];
+            model?: null | string;
         };
         /** @enum {unknown} */
         ChatStatus: "answered" | "notAnswered" | "unavailable";
@@ -903,7 +933,7 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields" | "InvalidRecord" | "NoClaim" | "ClaimChanged" | "InvalidEvidence";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields" | "UnknownModel" | "ModelNotReady" | "InvalidRecord" | "NoClaim" | "ClaimChanged" | "InvalidEvidence";
         ReceiptRequest: {
             /** Format: date */
             receivedOn?: null | string;
@@ -2012,6 +2042,26 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ChatModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatModels"];
                 };
             };
         };
