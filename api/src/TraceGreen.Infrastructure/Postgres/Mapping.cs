@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Infrastructure.Postgres;
 
@@ -18,6 +19,10 @@ internal static class Mapping
 
     private static T De<T>(string json) => JsonSerializer.Deserialize<T>(json, Json)
         ?? throw new InvalidOperationException($"Stored JSON for {typeof(T).Name} is null.");
+
+    private static string? SerOpt<T>(T? value) where T : class => value is null ? null : Ser(value);
+
+    private static T? DeOpt<T>(string? json) where T : class => json is null ? null : JsonSerializer.Deserialize<T>(json, Json);
 
     private static string Name<TEnum>(TEnum value) where TEnum : struct, Enum => value.ToString();
 
@@ -50,6 +55,7 @@ internal static class Mapping
         TransportMode = Name(n.TransportMode), EnergySource = Name(n.EnergySource), CreatedAt = Utc(n.CreatedAt),
         Review = Name(n.Review), ReviewedAt = n.ReviewedAt is { } reviewedAt ? Utc(reviewedAt) : null,
         ClassificationRationale = n.ClassificationRationale,
+        TrustJson = SerOpt(n.Trust), CountedKg = n.CountedKg, TargetJson = SerOpt(n.Target),
     };
 
     public static void Apply(NodeRow row, ClassificationPatch patch)
@@ -62,6 +68,14 @@ internal static class Mapping
         row.ReviewedAt = Utc(patch.ReviewedAt);
         row.SpendKg = patch.SpendKg;
         row.ActivityKg = patch.ActivityKg;
+        row.CountedKg = patch.CountedKg;
+    }
+
+    public static void Apply(NodeRow row, TrustWrite write)
+    {
+        row.TrustJson = SerOpt(write.Trust);
+        row.CountedKg = write.CountedKg;
+        row.TargetJson = SerOpt(write.Target);
     }
 
     public static void Apply(NodeRow row, NodePatch patch)
@@ -73,6 +87,8 @@ internal static class Mapping
         row.MassT = patch.MassT ?? row.MassT;
         row.CostEur = patch.CostEur;
         row.LeadDays = patch.LeadDays;
+        row.TrustJson = SerOpt(patch.Trust);
+        row.CountedKg = patch.CountedKg;
     }
 
     public static SupplierNode ToDomain(NodeRow r) => new(
@@ -80,19 +96,21 @@ internal static class Mapping
         Parse<ClassificationSource>(r.ClassificationSource), r.MassT, r.LaneId, Parse<NodeStatus>(r.Status),
         r.SpendKg, r.ActivityKg, r.SpendEur, r.CostEur, r.LeadDays,
         ParseOpt<TransportMode>(r.TransportMode), ParseOpt<EnergySource>(r.EnergySource), r.CreatedAt,
-        Parse<ClassificationReview>(r.Review), r.ReviewedAt, r.ClassificationRationale);
+        Parse<ClassificationReview>(r.Review), r.ReviewedAt, r.ClassificationRationale,
+        DeOpt<TrustInputs>(r.TrustJson), r.CountedKg, DeOpt<TargetChoice>(r.TargetJson));
 
     public static VerificationRow ToRow(Verification v) => new()
     {
         Id = v.Id, WorkspaceId = v.WorkspaceId, NodeId = v.NodeId, TokenNonce = v.TokenNonce,
         TransportMode = Name(v.TransportMode), EnergySource = Name(v.EnergySource), MassTConfirmed = v.MassTConfirmed,
         ConsumedAt = Utc(v.ConsumedAt), IpHash = v.IpHash, CreatedAt = Utc(v.CreatedAt),
-        TermsVersion = v.TermsVersion, TermsSha256 = v.TermsSha256,
+        TermsVersion = v.TermsVersion, TermsSha256 = v.TermsSha256, EvidenceJson = SerOpt(v.Evidence),
     };
 
     public static Verification ToDomain(VerificationRow r) => new(
         r.Id, r.WorkspaceId, r.NodeId, r.TokenNonce, ParseOpt<TransportMode>(r.TransportMode),
-        ParseOpt<EnergySource>(r.EnergySource), r.MassTConfirmed, r.ConsumedAt, r.IpHash, r.CreatedAt, r.TermsVersion, r.TermsSha256);
+        ParseOpt<EnergySource>(r.EnergySource), r.MassTConfirmed, r.ConsumedAt, r.IpHash, r.CreatedAt, r.TermsVersion, r.TermsSha256,
+        DeOpt<AnswerEvidence>(r.EvidenceJson));
 
     public static AuditRow ToRow(NewAuditEntry e) => new()
     {

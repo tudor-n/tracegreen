@@ -3,9 +3,9 @@ import type { DeliveryFailure, PageFailure } from '@/lib/supplier-state'
 import { type Lang, verifyCopy } from './verify'
 
 // Every string the supplier reads on /supplier (F12), in Romanian (the default) and English. The questions, their
-// answers, "skip", the frame around the supplier terms and the "please reconfirm" lines are those of /verify
-// (./verify.ts; the terms' own text comes from the API), so a supplier who used the phone page reads the same words
-// here. Both languages are typed by SupplierStrings, so a string missing in either one fails `pnpm typecheck`; the
+// answers, "skip", the optional "Add proof" section (F7), the frame around the supplier terms and the "please
+// reconfirm" lines are those of /verify (./verify.ts; the terms' own text comes from the API), so a supplier who used
+// the phone page reads the same words here. Both languages are typed by SupplierStrings, so a string missing in either one fails `pnpm typecheck`; the
 // status record is keyed by the generated enum, so a new status does too.
 
 interface Message {

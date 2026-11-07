@@ -307,7 +307,7 @@ public sealed class FactPack
     private static string Direction(decimal value) => value < 0 ? " (less)" : value > 0 ? " (more)" : " (no change)";
 
     private static string SignedTonnes(decimal kg) =>
-        (kg / 1000m).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " t CO2e" + Direction(kg);
+        (kg / 1000m).ToString("+0.00;-0.00;0.00", CultureInfo.InvariantCulture) + " t CO2e" + Direction(kg);
 
     private static string SignedEuros(decimal eur) =>
         (eur < 0 ? "-" : eur > 0 ? "+" : "") + "EUR " + Math.Round(Math.Abs(eur), 0).ToString("#,0", CultureInfo.InvariantCulture) + Direction(eur);
@@ -322,7 +322,7 @@ public sealed class FactPack
     private static string Raw(DateOnly value) => value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     // The prompt's own renderings, for the model to read and compare; the SPA formats what the reader sees.
-    private static string Tonnes(decimal kg) => (kg / 1000m).ToString("0.0", CultureInfo.InvariantCulture) + " t CO2e";
+    private static string Tonnes(decimal kg) => (kg / 1000m).ToString("0.00", CultureInfo.InvariantCulture) + " t CO2e";
 
     private static string Euros(decimal eur) => "EUR " + Math.Round(eur, 0).ToString("#,0", CultureInfo.InvariantCulture);
 

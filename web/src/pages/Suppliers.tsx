@@ -5,8 +5,9 @@ import { PageHeader, PageMessage } from '@/components/shell/Page'
 import { CheckFilter } from '@/components/suppliers/CheckFilter'
 import { SupplierPanel } from '@/components/suppliers/SupplierPanel'
 import { SupplierTree } from '@/components/suppliers/SupplierTree'
-import { canvasCopy, reviewCopy, suppliersCopy } from '@/copy/dashboard'
+import { answersCopy, canvasCopy, reviewCopy, suppliersCopy } from '@/copy/dashboard'
 import { CHECK_FILTER, categoriesToCheck } from '@/lib/review-display'
+import { ANSWERS_FILTER, answersToCheck } from '@/lib/trust-display'
 import { byCarbonDesc, formatTonnes, hotspotIds, selectLoaded, selectSelectedNode, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
@@ -32,10 +33,16 @@ export default function Suppliers() {
   const select = useGraphStore((s) => s.select)
   const nodes = useMemo(() => byEmissions(nodeMap), [nodeMap])
   const hotspots = useMemo(() => hotspotIds(nodes), [nodes])
-  // The Overview's counter opens this list filtered to the categories to check (F6); the hotspots stay those of all nodes.
+  // The Overview's counters open this list filtered to the categories to check (F6) or to the supplier answers to check,
+  // the most kilograms at risk first (F7); the hotspots stay those of all nodes.
   const [params] = useSearchParams()
-  const checking = params.get(CHECK_FILTER.param) === CHECK_FILTER.value
-  const listed = useMemo(() => (checking ? categoriesToCheck(nodes) : nodes), [checking, nodes])
+  const filter = params.get(CHECK_FILTER.param)
+  const kind = filter === CHECK_FILTER.value ? 'category' : filter === ANSWERS_FILTER.value ? 'answers' : null
+  const checking = kind !== null
+  const listed = useMemo(
+    () => (kind === 'category' ? categoriesToCheck(nodes) : kind === 'answers' ? answersToCheck(nodes) : nodes),
+    [kind, nodes],
+  )
 
   let body
   if (!loaded) {
@@ -50,14 +57,14 @@ export default function Suppliers() {
   } else if (listed.length === 0) {
     body = (
       <>
-        <PageMessage>{reviewCopy.noneToCheck}</PageMessage>
-        <CheckFilter />
+        <PageMessage>{kind === 'answers' ? answersCopy.noneToCheck : reviewCopy.noneToCheck}</PageMessage>
+        <CheckFilter kind={kind ?? 'category'} />
       </>
     )
   } else {
     body = (
       <>
-        {checking && <CheckFilter />}
+        {checking && <CheckFilter kind={kind} />}
         <SupplierTree
           nodes={listed}
           hotspots={hotspots}

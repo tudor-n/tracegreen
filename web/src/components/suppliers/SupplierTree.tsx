@@ -5,9 +5,10 @@ import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
 import { nodeCopy, scenarioCopy, suppliersCopy } from '@/copy/dashboard'
 import { isPlaceholder, justVerified, shownFigure } from '@/lib/node-display'
 import { categoryCheckLabel } from '@/lib/review-display'
+import { answerCheckLabel } from '@/lib/trust-display'
 import { scenarioTitle } from '@/lib/scenario-display'
 import { cn } from '@/lib/utils'
-import { CO2E_UNIT, edgeWidth, formatTonnes, formatTonnesDelta, type ScenarioPreview } from '@/store'
+import { CO2E_UNIT, edgeWidth, formatTonnes, formatTonnesChange, type ScenarioPreview } from '@/store'
 
 // The supplier tree (F2, v2 design): one row per supplier, largest emitter at the top, and a supply line from each
 // row into the buyer. Line width follows the node's tonnes (the store's edgeWidth), colour follows its status, and a
@@ -134,6 +135,7 @@ function SupplierRow({ node, hotspot, selected, onSelect }: { node: NodeView; ho
   const flashing = useVerifiedFlash(node.status)
   const placeholder = shownFigure(node).factors.some(isPlaceholder)
   const check = categoryCheckLabel(node.classification)
+  const answersCheck = answerCheckLabel(node)
   return (
     <button
       type="button"
@@ -159,6 +161,11 @@ function SupplierRow({ node, hotspot, selected, onSelect }: { node: NodeView; ho
           {check !== null && (
             <span data-testid={`node-${node.id}-check`} className="font-semibold text-estimated-ink">
               {check} ·{' '}
+            </span>
+          )}
+          {answersCheck !== null && (
+            <span data-testid={`node-${node.id}-answers-check`} className="font-semibold text-estimated-ink">
+              {answersCheck} ·{' '}
             </span>
           )}
           {nodeCopy.status[node.status]}
@@ -203,7 +210,7 @@ function GhostRow({ preview, alternatives }: { preview: ScenarioPreview; alterna
               {formatTonnes(result.carbonKg)} <span className="text-xs font-medium text-muted-foreground">{CO2E_UNIT}</span>
             </span>
             <span className="text-xs text-muted-foreground">
-              {scenarioCopy.versusNow(`${formatTonnesDelta(result.delta.carbonKg)} ${CO2E_UNIT}`)}
+              {scenarioCopy.versusNow(`${formatTonnesChange(result.carbonKg, result.carbonKg - result.delta.carbonKg)} ${CO2E_UNIT}`)}
             </span>
           </span>
         </>

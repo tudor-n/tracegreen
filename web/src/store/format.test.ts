@@ -7,6 +7,8 @@ import {
   formatFactorValue,
   formatKm,
   formatKpis,
+  formatTonnesChange,
+  formatTonnesGap,
   formatShare,
   formatShareSplit,
   formatTimeLeft,
@@ -19,19 +21,21 @@ import {
 import { kpis } from './testFixtures'
 
 describe('formatTonnes', () => {
-  it('turns kilograms into tonnes with one decimal', () => {
-    expect(formatTonnes(48_000)).toBe('48.0')
-    expect(formatTonnes(1234)).toBe('1.2')
-    expect(formatTonnes(1250)).toBe('1.3')
-    expect(formatTonnes(1_234_567)).toBe('1,234.6')
-    expect(formatTonnesCo2e(2300)).toBe('2.3 tCO₂e')
+  it('turns kilograms into tonnes with two decimals', () => {
+    expect(formatTonnes(48_000)).toBe('48.00')
+    expect(formatTonnes(1234)).toBe('1.23')
+    expect(formatTonnes(1235)).toBe('1.24')
+    expect(formatTonnes(5386.24)).toBe('5.39')
+    expect(formatTonnes(1_234_567)).toBe('1,234.57')
+    expect(formatTonnesCo2e(2300)).toBe('2.30 tCO₂e')
   })
 
-  it('shows a small positive amount as <0.1 and zero as 0.0', () => {
-    expect(formatTonnes(30)).toBe('<0.1')
-    expect(formatTonnes(50)).toBe('0.1')
-    expect(formatTonnes(0)).toBe('0.0')
-    expect(formatTonnes(-0.0001)).toBe('0.0')
+  it('shows a small positive amount as <0.01 and zero as 0.00', () => {
+    expect(formatTonnes(3)).toBe('<0.01')
+    expect(formatTonnes(5)).toBe('0.01')
+    expect(formatTonnes(30)).toBe('0.03')
+    expect(formatTonnes(0)).toBe('0.00')
+    expect(formatTonnes(-0.0001)).toBe('0.00')
   })
 
   it('prints a dash for a missing number', () => {
@@ -40,17 +44,30 @@ describe('formatTonnes', () => {
 })
 
 describe('formatTonnesDelta', () => {
-  it('signs a change in tonnes with one decimal', () => {
-    expect(formatTonnesDelta(-15_074)).toBe('-15.1')
-    expect(formatTonnesDelta(400)).toBe('+0.4')
-    expect(formatTonnesDelta(1_234_567)).toBe('+1,234.6')
+  it('signs a change in tonnes with two decimals', () => {
+    expect(formatTonnesDelta(-15_074)).toBe('-15.07')
+    expect(formatTonnesDelta(400)).toBe('+0.40')
+    expect(formatTonnesDelta(1_234_567)).toBe('+1,234.57')
   })
 
-  it('reads 0.0 without a sign when the change rounds to nothing, and the dash for no number', () => {
-    expect(formatTonnesDelta(0)).toBe('0.0')
-    expect(formatTonnesDelta(20)).toBe('0.0')
-    expect(formatTonnesDelta(-20)).toBe('0.0')
+  it('reads 0.00 without a sign when the change rounds to nothing, and the dash for no number', () => {
+    expect(formatTonnesDelta(0)).toBe('0.00')
+    expect(formatTonnesDelta(2)).toBe('0.00')
+    expect(formatTonnesDelta(-2)).toBe('0.00')
     expect(formatTonnesDelta(Number.NaN)).toBe('–')
+  })
+})
+
+describe('formatTonnesGap and formatTonnesChange', () => {
+  it('work out a gap or a change from the figures as shown, so the three agree on screen', () => {
+    // Oradea: counted 5 386.24 kg ("5.39"), answered 3 245.95 kg ("3.25"); the exact gap, 2 140.29 kg, also reads 2.14.
+    expect(formatTonnesGap(5386.24, 3245.95)).toBe('2.14')
+    // A case where rounding the exact gap would disagree: 1.006 t − 0.994 t is 0.012 t ("0.01"), shown 1.01 − 0.99 = 0.02.
+    expect(formatTonnesDelta(1006 - 994)).toBe('+0.01')
+    expect(formatTonnesGap(1006, 994)).toBe('0.02')
+    expect(formatTonnesChange(994, 1006)).toBe('-0.02')
+    expect(formatTonnesChange(1000, 1000)).toBe('0.00')
+    expect(formatTonnesGap(Number.NaN, 1)).toBe('–')
   })
 })
 
@@ -179,10 +196,10 @@ describe('formatTimeLeft', () => {
 describe('formatKpis', () => {
   it('formats the API figures for the KPI bar', () => {
     const figures = formatKpis({ ...kpis(37_046.86, 5), primaryShare: 0.1273, spendEur: 131_500 })
-    expect(figures).toEqual({ total: '37.0', share: '13%', spend: '€131,500', nodes: '5' })
+    expect(figures).toEqual({ total: '37.05', share: '13%', spend: '€131,500', nodes: '5' })
   })
 
   it('shows no share when there are no emissions to share out', () => {
-    expect(formatKpis(kpis(0, 0))).toEqual({ total: '0.0', share: '–', spend: '€0', nodes: '0' })
+    expect(formatKpis(kpis(0, 0))).toEqual({ total: '0.00', share: '–', spend: '€0', nodes: '0' })
   })
 })

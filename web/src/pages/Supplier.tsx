@@ -8,6 +8,8 @@ import { ResultMessage } from '@/components/verify/ResultMessage'
 import { TermsConsent } from '@/components/verify/TermsConsent'
 import { supplierCopy } from '@/copy/supplier'
 import { type Lang, verifyCopy } from '@/copy/verify'
+import { useDemoTools } from '@/hooks/useDemoTools'
+import { todayUtc } from '@/lib/evidence'
 import { supplierApi } from '@/lib/supplier-api'
 import {
   answerBody,
@@ -20,8 +22,8 @@ import {
 import { resolveLang } from '@/lib/verify-state'
 
 // The supplier page (F12): one link, every delivery from this supplier to the buyer who sent it, each confirmed with the
-// two questions of /verify and sent once the supplier ticked the supplier terms: one box above the list, never ticked
-// for them, as on /verify. It reads the token from ?t= and the language from ?lang=. Like /verify it sets no cookies
+// two questions of /verify (and, if the supplier adds any, the optional proof of F7) and sent once the supplier ticked
+// the supplier terms: one box above the list, never ticked for them, as on /verify. It reads the token from ?t= and the language from ?lang=. Like /verify it sets no cookies
 // and uses no storage, login, email, camera, clipboard or personal data, and nothing here logs the URL or the token.
 // Strings come from web/src/copy/supplier.ts (and the questions from ./verify.ts), the decisions from
 // web/src/lib/supplier-state.ts and the requests from web/src/lib/supplier-api.ts; this page performs and renders them.
@@ -33,6 +35,8 @@ export default function Supplier() {
   const copy = supplierCopy[lang]
   const questions = verifyCopy[lang]
   const [state, dispatch] = useReducer(supplierReducer, token, initialSupplierState)
+  // "Fill demo values" in a delivery's proof section, only while the API runs with demo tools (/api/health).
+  const demoTools = useDemoTools()
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -45,7 +49,11 @@ export default function Supplier() {
     let current = true
     void supplierApi.view(token).then((reply) => {
       if (!current) return
-      dispatch(reply.ok ? { kind: 'loaded', view: reply.data } : { kind: 'loadFailed', failure: reply.failure })
+      dispatch(
+        reply.ok
+          ? { kind: 'loaded', view: reply.data, today: todayUtc(new Date()) }
+          : { kind: 'loadFailed', failure: reply.failure },
+      )
     })
     return () => {
       current = false
@@ -132,11 +140,14 @@ export default function Supplier() {
                     draft={draft}
                     busy={state.draft?.sending === true}
                     termsAccepted={ticked}
+                    today={state.today}
+                    demo={demoTools}
                     warnings={state.warnings[item.nodeId]}
                     onOpen={() => dispatch({ kind: 'open', nodeId: item.nodeId })}
                     onClose={() => dispatch({ kind: 'close' })}
                     onTransport={(value) => dispatch({ kind: 'transport', value })}
                     onEnergy={(value) => dispatch({ kind: 'energy', value })}
+                    onEvidence={(field, value) => dispatch({ kind: 'evidence', field, value })}
                     onSend={() => dispatch({ kind: 'send' })}
                     onReload={() => dispatch({ kind: 'reload' })}
                   />

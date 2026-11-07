@@ -71,6 +71,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the buyer's goods-receipt date and customs record for a delivery; recomputes its trust and counted figure */
+        post: operations["RecordReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{nodeId}/claims/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept or reject one supplier answer (mode, energy or mass) after looking at its evidence; recomputes the counted figure */
+        post: operations["ReviewClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{nodeId}/target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose the best state a delivery could reach (mode, power source or alternative supplier); illustrative like every lane figure */
+        put: operations["SetTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/categories": {
         parameters: {
             query?: never;
@@ -423,6 +474,14 @@ export interface components {
             mode: components["schemas"]["TransportMode"];
             illustrative: boolean;
         };
+        AnswerEvidence: {
+            shippingDocType?: null | components["schemas"]["ShippingDocType"];
+            shippingDocId?: null | string;
+            /** Format: date */
+            dispatchDate?: null | string;
+            energyCertType?: null | components["schemas"]["EnergyCertType"];
+            energyCertId?: null | string;
+        };
         AnswerSegment: {
             text: null | string;
             factId: null | string;
@@ -517,6 +576,30 @@ export interface components {
         };
         /** @enum {unknown} */
         ChatStatus: "answered" | "notAnswered" | "unavailable";
+        ClaimAssessment: {
+            kind: components["schemas"]["ClaimKind"];
+            value: string;
+            level: components["schemas"]["EvidenceLevel"];
+            reduces: boolean;
+            /** Format: double */
+            impactKg: number;
+            review: null | components["schemas"]["ClaimDecision"];
+            reasons: components["schemas"]["ClaimReason"][];
+        };
+        /** @enum {unknown} */
+        ClaimDecision: "accepted" | "rejected";
+        /** @enum {unknown} */
+        ClaimKind: "mode" | "energy" | "mass";
+        ClaimReason: {
+            code: components["schemas"]["ClaimReasonCode"];
+            detail: string;
+        };
+        /** @enum {unknown} */
+        ClaimReasonCode: "NO_EVIDENCE" | "DOCUMENT_GIVEN" | "DOCUMENT_INVALID" | "DOCUMENT_MODE_MISMATCH" | "CUSTOMS_AGREES" | "CUSTOMS_DISAGREES" | "TRANSIT_FITS" | "TRANSIT_TOO_FAST" | "CERTIFICATE_GIVEN" | "CERTIFICATE_INVALID" | "NO_CERTIFICATE" | "MASS_BELOW_INVOICE" | "MASS_FAR_ABOVE_INVOICE" | "RAISES_FIGURE" | "ACCEPTED_BY_BUYER" | "REJECTED_BY_BUYER";
+        ClaimReviewRequest: {
+            decision: components["schemas"]["ClaimDecision"];
+            expectedValue: string;
+        };
         /** @enum {unknown} */
         ClassificationReview: "notNeeded" | "pending" | "confirmed" | "corrected";
         ClassificationReviewRequest: {
@@ -627,7 +710,23 @@ export interface components {
             classificationScheme: string;
         };
         /** @enum {unknown} */
+        EnergyCertType: "guaranteeOfOrigin" | "iRec" | "chinaGec" | "taiwanTRec" | "ppa" | "onSite";
+        /** @enum {unknown} */
         EnergySource: "grid" | "renewable" | "unknown";
+        /** @enum {unknown} */
+        EvidenceLevel: "contradicted" | "unproven" | "documented" | "corroborated" | "reviewed" | "notNeeded";
+        EvidenceView: {
+            shippingDocType: null | components["schemas"]["ShippingDocType"];
+            shippingDocId: null | string;
+            /** Format: date */
+            dispatchDate: null | string;
+            energyCertType: null | components["schemas"]["EnergyCertType"];
+            energyCertId: null | string;
+            /** Format: date */
+            receivedOn: null | string;
+            customsBorderMode: null | components["schemas"]["TransportMode"];
+            customsMrn: null | string;
+        };
         /** @enum {unknown} */
         FactKind: "carbonKg" | "eur" | "days" | "share" | "count" | "date" | "text" | "status" | "mode";
         FactorLookup: {
@@ -689,6 +788,8 @@ export interface components {
             nodeCount: number;
             /** Format: int32 */
             verifiedCount: number;
+            /** Format: double */
+            kgAtRisk: number;
         };
         LaneView: {
             id: string;
@@ -713,6 +814,15 @@ export interface components {
             deltaCostEur: number;
             /** Format: double */
             deltaCarbonT: number;
+        };
+        NodeFigures: {
+            /** Format: double */
+            estimateKg: number;
+            /** Format: double */
+            claimedKg: null | number;
+            /** Format: double */
+            countedKg: null | number;
+            target: null | components["schemas"]["TargetView"];
         };
         /** @enum {unknown} */
         NodeStatus: "ESTIMATED" | "PARTIAL" | "VERIFIED";
@@ -745,6 +855,9 @@ export interface components {
             warnings: components["schemas"]["PlausibilityWarning"][];
             /** Format: date-time */
             createdAt: string;
+            figures: components["schemas"]["NodeFigures"];
+            trust: null | components["schemas"]["TrustAssessment"];
+            evidence: components["schemas"]["EvidenceView"];
         };
         PdfConfirmRequest: {
             draftId: null | string;
@@ -773,7 +886,7 @@ export interface components {
             lines: null | components["schemas"]["DraftLine"][];
         };
         /** @enum {unknown} */
-        PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST";
+        PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST" | "MASS_BELOW_INVOICE";
         PlausibilityWarning: {
             code: components["schemas"]["PlausibilityCode"];
             detail: string;
@@ -785,6 +898,7 @@ export interface components {
             transportMode?: null | components["schemas"]["TransportMode"];
             energySource?: null | components["schemas"]["EnergySource"];
             acceptedTerms?: null | string;
+            evidence?: null | components["schemas"]["AnswerEvidence"];
         };
         PortalAnswerResult: {
             outcome: components["schemas"]["VerifyOutcome"];
@@ -819,7 +933,13 @@ export interface components {
             t: null | string;
         };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields" | "UnknownModel" | "ModelNotReady";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields" | "UnknownModel" | "ModelNotReady" | "InvalidRecord" | "NoClaim" | "ClaimChanged" | "InvalidEvidence";
+        ReceiptRequest: {
+            /** Format: date */
+            receivedOn?: null | string;
+            customsBorderMode?: null | components["schemas"]["TransportMode"];
+            customsMrn?: null | string;
+        };
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -879,6 +999,8 @@ export interface components {
             massUnknown: boolean;
             illustrative: boolean;
         };
+        /** @enum {unknown} */
+        ShippingDocType: "containerNumber" | "airWaybill" | "billOfLading" | "cmr" | "eTransportUit" | "railConsignment";
         SimulateAnswerRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -901,6 +1023,21 @@ export interface components {
             ro: components["schemas"]["TermsText"];
             en: components["schemas"]["TermsText"];
         };
+        TargetRequest: {
+            mode?: null | components["schemas"]["TransportMode"];
+            energy?: null | components["schemas"]["EnergySource"];
+            alternativeId?: null | string;
+        };
+        TargetView: {
+            /** Format: double */
+            kg: number;
+            mode: components["schemas"]["TransportMode"];
+            energy: components["schemas"]["EnergySource"];
+            alternativeId: null | string;
+            alternativeLabel: null | string;
+            isDefault: boolean;
+            illustrative: boolean;
+        };
         TermsAcceptance: {
             before: string;
             link: string;
@@ -920,6 +1057,26 @@ export interface components {
         };
         /** @enum {unknown} */
         TransportMode: "road" | "rail" | "sea" | "air";
+        TrustAssessment: {
+            /** Format: int32 */
+            score: number;
+            band: components["schemas"]["TrustBand"];
+            /** Format: double */
+            kgAtRisk: number;
+            needsReview: boolean;
+            claims: components["schemas"]["ClaimAssessment"][];
+            signals: components["schemas"]["TrustSignal"][];
+        };
+        /** @enum {unknown} */
+        TrustBand: "strong" | "moderate" | "review";
+        TrustSignal: {
+            code: components["schemas"]["TrustSignalCode"];
+            /** Format: int32 */
+            points: number;
+            detail: string;
+        };
+        /** @enum {unknown} */
+        TrustSignalCode: "SAME_NETWORK_AS_LINK_MAKER" | "FAST_ANSWER" | "SELLER_TAX_ID_INVALID" | "MODE_CHANGED_ON_LANE" | "PRIOR_REJECTION" | "SIMULATED_ANSWER" | "RECEIPT_BEFORE_DISPATCH";
         /** @enum {unknown} */
         Uncertainty: "low" | "medium" | "high";
         VerificationView: {
@@ -966,6 +1123,7 @@ export interface components {
             /** Format: double */
             massT?: null | number;
             acceptedTerms?: null | string;
+            evidence?: null | components["schemas"]["AnswerEvidence"];
         };
         VerifyTerms: {
             version: string;
@@ -1086,6 +1244,148 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    RecordReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ReviewClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SetTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

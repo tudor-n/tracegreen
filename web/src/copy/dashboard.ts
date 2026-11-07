@@ -1,4 +1,18 @@
-import type { EnergySource, NodeStatus, ProblemCode, TransportMode } from '@/api/client'
+import type {
+  ClaimDecision,
+  ClaimKind,
+  ClaimReasonCode,
+  EnergyCertType,
+  EnergySource,
+  EvidenceLevel,
+  NodeStatus,
+  PlausibilityCode,
+  ProblemCode,
+  ShippingDocType,
+  TransportMode,
+  TrustBand,
+  TrustSignalCode,
+} from '@/api/client'
 import type { Connection } from '@/hooks/graphSync'
 
 // Dashboard text a juror can read. Components import it from here instead of writing strings inline. The labels that
@@ -258,6 +272,10 @@ export const problemHeadlines: Record<ProblemCode, string> = {
   InvalidInvoiceFields: 'A field needs fixing.',
   UnknownModel: 'The chat does not offer that model.',
   ModelNotReady: 'That model is not set up yet.',
+  InvalidRecord: 'That record cannot be right.',
+  NoClaim: 'The supplier gave no such answer.',
+  ClaimChanged: 'The answer changed since this page loaded.',
+  InvalidEvidence: 'The proof given cannot be right.',
 }
 
 /** The v2 shell: the sidebar's sections. The audit section keeps its one name, auditPanelCopy.open. */
@@ -326,4 +344,155 @@ export const reviewCopy = {
   categoriesLoading: 'Loading the categories…',
   categoriesFailed: "Can't load the categories.",
   retry: 'Try again',
+} as const
+
+/**
+ * The trust model (F7) on the dashboard: the three figures of a node, how far its supplier answers can be believed, the
+ * buyer's own records and the list of answers to check. Keyed by the generated codes, so a new level, reason or signal
+ * fails the typecheck until it has words here. A reduction a supplier claims counts once something backs it; the copy
+ * says "backed" and "not backed yet", never that a value is proven true.
+ */
+export const figuresCopy = {
+  estimateShort: 'Estimate',
+  supplierShort: 'From supplier',
+  targetShort: 'Best possible',
+  noAnswer: 'No answer yet',
+  partialAnswer: 'Partial answer: the estimate counts',
+  noMass: 'No mass known',
+  answeredShort: (tonnes: string) => `answered ${tonnes} t`,
+  energyShort: { grid: 'grid', renewable: 'renewable', unknown: 'unknown' } satisfies Record<EnergySource, string>,
+  targetNote: 'Best possible is a what-if target: illustrative, not in the total.',
+  countedNote: 'Counted: reductions nothing backs yet are added back.',
+  changeTarget: 'Change target',
+  targetMode: 'Mode',
+  targetEnergy: 'Power',
+  targetAlternative: 'Supplier',
+  targetSameSupplier: 'This supplier',
+  targetSave: 'Save target',
+  targetReset: 'Back to default',
+  cancel: 'Cancel',
+  saving: 'Saving…',
+  saved: 'Target saved.',
+} as const
+
+export const trustCopy = {
+  titleShort: 'Trust in the answers',
+  scoreShort: (score: number) => `${score}/100`,
+  whyScore: 'Why this score',
+  band: { strong: 'Well backed', moderate: 'Partly backed', review: 'Needs a check' } satisfies Record<TrustBand, string>,
+  atRisk: (tonnes: string) => `${tonnes} of claimed reductions not backed yet`,
+  nothingAtRisk: 'Every claimed reduction is backed.',
+  partial: 'Partial answer: the spend estimate counts until both questions are answered.',
+  claims: 'Answers',
+  claimKind: { mode: 'Transport', energy: 'Power', mass: 'Mass' } satisfies Record<ClaimKind, string>,
+  level: {
+    contradicted: 'Contradicted',
+    unproven: 'Not backed yet',
+    documented: 'Backed by a document',
+    corroborated: 'Matches your records',
+    reviewed: 'Accepted by a person',
+    notNeeded: 'Nothing to back',
+  } satisfies Record<EvidenceLevel, string>,
+  reason: {
+    NO_EVIDENCE: 'No document or record backs this answer yet.',
+    DOCUMENT_GIVEN: 'The supplier named a shipping document whose number passes its check.',
+    DOCUMENT_INVALID: 'The document number fails its check.',
+    DOCUMENT_MODE_MISMATCH: 'The document belongs to another transport mode.',
+    CUSTOMS_AGREES: 'Your customs declaration gives the same mode at the border.',
+    CUSTOMS_DISAGREES: 'Your customs declaration gives another mode at the border.',
+    TRANSIT_FITS: 'The time from dispatch to receipt fits this mode and not the default.',
+    TRANSIT_TOO_FAST: 'The goods arrived too soon after dispatch for this mode.',
+    CERTIFICATE_GIVEN: 'The supplier named the certificate behind the renewable power.',
+    CERTIFICATE_INVALID: 'The certificate id is not in a usable form.',
+    NO_CERTIFICATE: 'Renewable power without a certificate counts as grid power.',
+    MASS_BELOW_INVOICE: 'The shipping mass is below the goods mass on the invoice.',
+    MASS_FAR_ABOVE_INVOICE: 'The shipping mass is more than twice the invoice mass.',
+    RAISES_FIGURE: 'This answer does not lower the figure, so it is taken as given.',
+    ACCEPTED_BY_BUYER: 'A person accepted this answer.',
+    REJECTED_BY_BUYER: 'A person rejected this answer.',
+  } satisfies Record<ClaimReasonCode, string>,
+  signals: 'How the answer arrived',
+  signal: {
+    SAME_NETWORK_AS_LINK_MAKER: 'Answered from the network the link was made on',
+    FAST_ANSWER: 'Answered within two minutes of the link',
+    SELLER_TAX_ID_INVALID: "The seller's tax id fails its check",
+    MODE_CHANGED_ON_LANE: 'Another mode than this supplier gave last time on this lane',
+    PRIOR_REJECTION: 'An earlier answer from this supplier was rejected',
+    SIMULATED_ANSWER: 'Answered by the demo tool, not a supplier',
+    RECEIPT_BEFORE_DISPATCH: 'The receipt date is before the dispatch date',
+  } satisfies Record<TrustSignalCode, string>,
+  points: (points: number) => `−${points}`,
+  accept: 'Accept',
+  reject: 'Reject',
+  acceptHelp: 'You checked a document for this answer: count it as given.',
+  rejectHelp: 'The answer is wrong: count the default instead.',
+  decided: { accepted: 'accepted', rejected: 'rejected' } satisfies Record<ClaimDecision, string>,
+  massValue: (tonnes: string) => `${tonnes} t`,
+  saving: 'Saving…',
+  saved: 'Saved.',
+  /** 409: the supplier answered again after this page loaded. */
+  changed: 'The supplier changed this answer in the meantime. It now shows as it is; check it again.',
+  invalid: 'That cannot be saved. A date in the future, or an MRN that is not 18 characters, is refused.',
+} as const
+
+/** What backs the answers: the supplier's document and certificate, and the buyer's own records of the delivery. */
+export const evidenceCopy = {
+  title: 'Evidence',
+  shippingDoc: 'Shipping document',
+  dispatchDate: 'Dispatched',
+  certificate: 'Certificate',
+  none: 'None given',
+  docType: {
+    containerNumber: 'Container',
+    airWaybill: 'Air waybill',
+    billOfLading: 'Bill of lading',
+    cmr: 'CMR',
+    eTransportUit: 'e-Transport UIT',
+    railConsignment: 'Rail consignment note',
+  } satisfies Record<ShippingDocType, string>,
+  certType: {
+    guaranteeOfOrigin: 'Guarantee of origin',
+    iRec: 'I-REC',
+    chinaGec: 'China GEC',
+    taiwanTRec: 'Taiwan T-REC',
+    ppa: 'Power purchase agreement',
+    onSite: 'Own generation',
+  } satisfies Record<EnergyCertType, string>,
+  records: 'Your records',
+  receivedOn: 'Goods received on',
+  borderMode: 'Mode at the EU border (customs)',
+  borderNone: 'Not recorded',
+  mrn: 'Customs MRN',
+  save: 'Save records',
+  recordsPrompt: 'Add your goods receipt or customs record to back or contradict the transport answer.',
+  recordedLine: (received: string | null, border: string | null) =>
+    ['Your records:', received === null ? null : `received ${received}`, border === null ? null : `${border} at the border`]
+      .filter(Boolean)
+      .join(' '),
+  addRecords: 'Add your records',
+  editRecords: 'Edit records',
+  receivedOnShort: 'Received on',
+  borderModeShort: 'Customs: mode at border',
+  fillDemo: 'Fill demo values',
+  demoTag: 'demo values',
+  close: 'Close',
+} as const
+
+/** The plausibility warnings on the dashboard (D2: shown, never blocking), by code. */
+export const warningCopy = {
+  AIR_HEAVY: 'Heavy for air freight',
+  SEA_TOO_FAST: 'Too fast for sea freight',
+  MASS_BELOW_INVOICE: 'Mass below the invoice',
+} satisfies Record<PlausibilityCode, string>
+
+/** The Overview's counter of answers to check and the filtered supplier list (F7). */
+export const answersCopy = {
+  count: (n: number) => (n === 1 ? '1 supplier answer to check' : `${n} supplier answers to check`),
+  countBody: (tonnes: string) =>
+    `${tonnes} of the reductions they claim is not backed yet, so the totals leave it out. Largest first.`,
+  countBodyNoRisk: 'Their answers carry a contradiction or a weak score. Largest first.',
+  filtered: 'Showing the answers to check, the most at stake first.',
+  showAll: 'Show all suppliers',
+  noneToCheck: 'No supplier answers left to check.',
+  atRiskKpi: (tonnes: string) => `${tonnes} of claimed reductions not backed yet`,
 } as const

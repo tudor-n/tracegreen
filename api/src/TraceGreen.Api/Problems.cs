@@ -40,6 +40,10 @@ public enum ProblemCode
     [JsonStringEnumMemberName("InvalidInvoiceFields")] InvalidInvoiceFields,
     [JsonStringEnumMemberName("UnknownModel")] UnknownModel,
     [JsonStringEnumMemberName("ModelNotReady")] ModelNotReady,
+    [JsonStringEnumMemberName("InvalidRecord")] InvalidRecord,
+    [JsonStringEnumMemberName("NoClaim")] NoClaim,
+    [JsonStringEnumMemberName("ClaimChanged")] ClaimChanged,
+    [JsonStringEnumMemberName("InvalidEvidence")] InvalidEvidence,
 }
 
 /// <summary>RFC 9457 problem details with a typed <see cref="Code"/>; <see cref="NodeId"/> is set on a duplicate import.</summary>
@@ -87,6 +91,10 @@ public static class Problems
             ProblemCode.InvalidInvoiceFields => (StatusCodes.Status422UnprocessableEntity, "Invoice fields not accepted"),
             ProblemCode.UnknownModel => (StatusCodes.Status422UnprocessableEntity, "Model not offered by the chat"),
             ProblemCode.ModelNotReady => (StatusCodes.Status422UnprocessableEntity, "Model not set up yet"),
+            ProblemCode.InvalidRecord => (StatusCodes.Status422UnprocessableEntity, "Record not accepted"),
+            ProblemCode.NoClaim => (StatusCodes.Status422UnprocessableEntity, "No such answer on this delivery"),
+            ProblemCode.ClaimChanged => (StatusCodes.Status409Conflict, "Answer changed since the page read it"),
+            ProblemCode.InvalidEvidence => (StatusCodes.Status422UnprocessableEntity, "Proof not accepted"),
             _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
         };
         return Results.Json(new ApiProblem("about:blank", title, status, detail, code, nodeId), ApiJson.Options, ContentType, status);

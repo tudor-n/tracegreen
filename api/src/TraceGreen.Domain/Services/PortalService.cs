@@ -5,6 +5,7 @@ using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
@@ -16,7 +17,7 @@ namespace TraceGreen.Domain.Services;
 /// </summary>
 public enum PortalErrorCode
 {
-    InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, DeliveryChanged, InvalidAnswer, TermsNotAccepted,
+    InvalidToken, Expired, SupplierGone, NodeNotFound, AlreadyConfirmed, DeliveryChanged, InvalidAnswer, TermsNotAccepted, InvalidEvidence,
 }
 
 public sealed record PortalError(PortalErrorCode Code, string Message);
@@ -40,6 +41,7 @@ public sealed class PortalService(
     PortalLinkSigner signer,
     LinkService links,
     VerifyService verify,
+    LinkOriginStore origins,
     SeedBundle seed,
     TimeProvider clock,
     ServiceOptions options)
@@ -52,7 +54,8 @@ public sealed class PortalService(
     private sealed record Delivery(SupplierNode Node, Invoice Invoice, Lane Lane);
 
     /// <param name="baseUrl">The browser-facing origin the phone opens, without a trailing slash.</param>
-    public async Task<Result<LinkGrant, PortalError>> RequestAsync(Ctx ctx, Guid nodeId, string baseUrl, CancellationToken ct)
+    /// <param name="clientAddress">The address of whoever asked for the link; only its keyed hash is kept, in memory (F7).</param>
+    public async Task<Result<LinkGrant, PortalError>> RequestAsync(Ctx ctx, Guid nodeId, string baseUrl, string? clientAddress, CancellationToken ct)
     {
         var node = await repo.GetNodeAsync(ctx, nodeId, ct);
         var invoice = node is null ? null : await repo.GetInvoiceAsync(ctx, node.InvoiceId, ct);
@@ -73,6 +76,10 @@ public sealed class PortalService(
         };
         var entry = await repo.AppendAuditAsync(ctx, prev => AuditChain.Build(prev, ctx.WorkspaceId, now, ctx.Actor, "portal.requested", payload), ct);
         bus.Publish(ctx.WorkspaceId, (seq, ts) => new AuditAppended(seq, ts, ctx.WorkspaceId, entry));
+        if (clientAddress is not null)
+        {
+            origins.Remember(LinkOriginStore.PortalKey(token), Hashing.IpHash(clientAddress, options.IpHashKey));
+        }
         return Result<LinkGrant, PortalError>.Ok(new LinkGrant(node.Id, $"{baseUrl}/supplier?t={Uri.EscapeDataString(token)}", expiresAt));
     }
 
@@ -93,9 +100,10 @@ public sealed class PortalService(
     /// </summary>
     /// <param name="acceptedTerms">The <see cref="SupplierTerms.Sha256"/> of the terms the supplier ticked on the page.</param>
     /// <param name="clientAddress">Passed on to <see cref="VerifyService.SubmitAsync"/>, which stores only its hash.</param>
+    /// <param name="evidence">What the supplier gave to back the answers (F7); checked like the phone page's.</param>
     public async Task<Result<PortalAnswerResult, PortalError>> AnswerAsync(
         string? token, Guid nodeId, TransportMode? mode, EnergySource? energy, string? acceptedTerms, string? clientAddress,
-        CancellationToken ct)
+        AnswerEvidence? evidence, CancellationToken ct)
     {
         var opened = await OpenAsync(token, ct);
         if (!opened.IsOk)
@@ -143,8 +151,11 @@ public sealed class PortalService(
         {
             return Fail(new PortalError(PortalErrorCode.NodeNotFound, minted.Error.Message));
         }
+        // The supplier opened the page link, not the single-use link minted here, so the answer's origin is the page link's.
+        var origin = new AnswerOrigin(supplier.ExpiresAt - options.LinkTtl, origins.MakerOf(LinkOriginStore.PortalKey(token!)));
         var submitted = await verify.SubmitAsync(
-            new VerifyAnswer(minted.Value.Token, keptMode, keptEnergy, null, acceptedTerms), clientAddress, NodeAnswerState.Of(node), ct);
+            new VerifyAnswer(minted.Value.Token, keptMode, keptEnergy, null, acceptedTerms, Evidence: evidence),
+            clientAddress, NodeAnswerState.Of(node), origin, ct);
         return submitted.IsOk
             ? Result<PortalAnswerResult, PortalError>.Ok(new PortalAnswerResult(submitted.Value, await BuildViewAsync(supplier, ct)))
             : Fail(From(submitted.Error));
@@ -157,16 +168,8 @@ public sealed class PortalService(
     public static string SupplierKey(SupplierNode node, Invoice invoice)
     {
         var country = node.Country.Trim().ToUpperInvariant();
-        var taxId = string.Concat(invoice.VendorCui.Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant();
-        if (taxId.Length == 0)
-        {
-            return $"name|{node.Label.Trim().ToUpperInvariant()}";
-        }
-        if (country.Length > 0 && taxId.Length > country.Length && taxId.StartsWith(country, StringComparison.Ordinal))
-        {
-            taxId = taxId[country.Length..];
-        }
-        return $"tax|{country}|{taxId}";
+        var taxId = TaxIds.Normalize(invoice.VendorCui, country);
+        return taxId.Length == 0 ? $"name|{node.Label.Trim().ToUpperInvariant()}" : $"tax|{country}|{taxId}";
     }
 
     private async Task<Result<Supplier, PortalError>> OpenAsync(string? token, CancellationToken ct)
@@ -270,6 +273,7 @@ public sealed class PortalService(
         error.Code switch
         {
             VerifyErrorCode.InvalidAnswer => PortalErrorCode.InvalidAnswer,
+            VerifyErrorCode.InvalidEvidence => PortalErrorCode.InvalidEvidence,
             VerifyErrorCode.NodeNotFound => PortalErrorCode.NodeNotFound,
             VerifyErrorCode.Expired => PortalErrorCode.Expired,
             VerifyErrorCode.InvoiceChanged => PortalErrorCode.SupplierGone,

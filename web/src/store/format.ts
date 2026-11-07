@@ -1,12 +1,12 @@
 import type { Kpis } from '@/api/client'
 
 // Presentation only: the API sends kilograms, euros and days; these turn them into what the UI shows
-// (CLAUDE.md: tonnes with one decimal, euros without decimals, days as integers). No carbon is computed here.
+// (CLAUDE.md: tonnes with two decimals, euros without decimals, days as integers). No carbon is computed here.
 
-const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const tonnes = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const tonnesDelta = new Intl.NumberFormat('en-GB', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
   signDisplay: 'exceptZero',
 })
 const euros = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
@@ -29,15 +29,32 @@ export const CO2E_UNIT = 'tCO₂e'
 /** Rounding can give -0, which Intl prints as "-0". */
 const noNegativeZero = (n: number) => (Object.is(n, -0) ? 0 : n)
 
+/** Kilograms in the hundredths of a tonne the UI shows (10 kg each): 5 386.24 → 539. */
+const shownHundredths = (kg: number) => Math.round(kg / 10)
+
 /**
- * Kilograms as tonnes with one decimal, without a unit: 48 000 → "48.0". A positive amount below 0.05 t shows as
- * "<0.1" rather than "0.0", so a small supplier never reads as carbon-free.
+ * Kilograms as tonnes with two decimals, without a unit: 48 000 → "48.00", 5 386.24 → "5.39". A positive amount below
+ * 0.005 t shows as "<0.01" rather than "0.00", so a small supplier never reads as carbon-free.
  */
 export function formatTonnes(kg: number): string {
   if (!Number.isFinite(kg)) return MISSING
-  const t = kg / 1000
-  if (t > 0 && t < 0.05) return '<0.1'
-  return tonnes.format(noNegativeZero(Math.round(t * 10) / 10))
+  if (kg > 0 && kg < 5) return '<0.01'
+  return tonnes.format(noNegativeZero(shownHundredths(kg) / 100))
+}
+
+/**
+ * The gap between two figures shown side by side, worked out from the figures as shown, so the three always agree on
+ * screen: counted 5 386.24 kg ("5.39") and answered 3 245.95 kg ("3.25") give "2.14", whatever the exact gap rounds to.
+ */
+export function formatTonnesGap(higherKg: number, lowerKg: number): string {
+  if (!Number.isFinite(higherKg) || !Number.isFinite(lowerKg)) return MISSING
+  return tonnes.format(noNegativeZero(Math.abs(shownHundredths(higherKg) - shownHundredths(lowerKg)) / 100))
+}
+
+/** The change from one shown figure to another, signed, worked out from the figures as shown (see formatTonnesGap). */
+export function formatTonnesChange(afterKg: number, beforeKg: number): string {
+  if (!Number.isFinite(afterKg) || !Number.isFinite(beforeKg)) return MISSING
+  return tonnesDelta.format(noNegativeZero((shownHundredths(afterKg) - shownHundredths(beforeKg)) / 100))
 }
 
 /** "48.0 tCO₂e". */
@@ -46,12 +63,13 @@ export function formatTonnesCo2e(kg: number): string {
 }
 
 /**
- * A change in kilograms (a scenario delta from the API) as signed tonnes with one decimal, without a unit:
- * −15 074 → "-15.1", 400 → "+0.4". A change that rounds to nothing reads "0.0", without a sign.
+ * A change in kilograms (a scenario delta from the API) as signed tonnes with two decimals, without a unit:
+ * −15 074 → "-15.07", 400 → "+0.40". A change that rounds to nothing reads "0.00", without a sign. Where both figures
+ * are on screen, formatTonnesChange keeps the change in step with them.
  */
 export function formatTonnesDelta(kg: number): string {
   if (!Number.isFinite(kg)) return MISSING
-  return tonnesDelta.format(noNegativeZero(Math.round((kg / 1000) * 10) / 10))
+  return tonnesDelta.format(noNegativeZero(shownHundredths(kg) / 100))
 }
 
 /** Whole euros: 12 345.6 → "€12,346". */
@@ -155,7 +173,7 @@ export function formatTimeLeft(ms: number): string {
 }
 
 export interface KpiFigures {
-  /** Tonnes with one decimal, without the unit. */
+  /** Tonnes with two decimals, without the unit. */
   total: string
   share: string
   spend: string

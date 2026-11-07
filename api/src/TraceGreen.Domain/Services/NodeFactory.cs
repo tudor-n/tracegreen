@@ -3,6 +3,7 @@ using TraceGreen.Domain.Copy;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
@@ -17,7 +18,8 @@ public sealed record NodeClassification(string CategoryId, double? Confidence, C
 /// Builds an invoice and its supplier node the same way for the seed and for imports: spend estimate from the total,
 /// mass from the unit codes (or the supplier's confirmed mass), cost and lead time from the lane leg, and an activity
 /// estimate once the supplier answered and a mass is known. A verification rebuilds the node here so it ends up exactly
-/// as the seed would have built it from the same answers.
+/// as the seed would have built it from the same answers. The counted figure (F7) comes from <see cref="TrustAssessor"/>
+/// over the node's <see cref="TrustInputs"/>, so every rebuild (an answer, a review, a buyer's record) recomputes it.
 /// </summary>
 public static class NodeFactory
 {
@@ -40,7 +42,8 @@ public static class NodeFactory
         SeedBundle bundle,
         FactorTable table,
         DateTimeOffset createdAt,
-        decimal? confirmedMassT = null)
+        decimal? confirmedMassT = null,
+        TrustInputs? trust = null)
     {
         var extracted = invoice.Extracted;
         var category = bundle.CategoryOf(classification.CategoryId);
@@ -55,7 +58,7 @@ public static class NodeFactory
         var costPerKg = lane.CostPerKgByMode.GetValueOrDefault(mode) ?? 0m;
         var leadDays = lane.LeadDaysByMode.GetValueOrDefault(mode) ?? 0;
 
-        return new SupplierNode(
+        var node = new SupplierNode(
             Id: id,
             WorkspaceId: invoice.WorkspaceId,
             InvoiceId: invoice.Id,
@@ -77,8 +80,14 @@ public static class NodeFactory
             EnergySource: energySource,
             CreatedAt: createdAt,
             Review: InitialReview(classification.Source),
-            ClassificationRationale: Reason(classification.Rationale));
+            ClassificationRationale: Reason(classification.Rationale),
+            Trust: trust);
+        return WithCounted(node, invoice, lane, bundle, table);
     }
+
+    /// <summary>The node with its counted figure recomputed from its answers and trust inputs as they now are.</summary>
+    public static SupplierNode WithCounted(SupplierNode node, Invoice invoice, Lane lane, SeedBundle bundle, FactorTable table) =>
+        node with { CountedKg = TrustAssessor.Assess(node, invoice, lane, bundle.CategoryOf(node.CategoryId), table)?.CountedKg };
 
     /// <summary>Longest reason kept, the same cap the AI service applies to a model's rationale.</summary>
     public const int MaxRationaleChars = 200;

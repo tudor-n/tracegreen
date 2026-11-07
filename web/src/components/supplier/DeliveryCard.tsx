@@ -1,15 +1,25 @@
 import type { EnergySource, NodeStatus, PlausibilityWarning, PortalItem, TransportMode } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { AnswerGroup } from '@/components/verify/AnswerGroup'
+import { ProofSection } from '@/components/verify/ProofSection'
 import { ReconfirmBanner } from '@/components/verify/ResultMessage'
 import type { SupplierStrings } from '@/copy/supplier'
 import type { Lang, VerifyStrings } from '@/copy/verify'
-import { answerSummary, type Draft, isOpenForAnswers } from '@/lib/supplier-state'
-import { canSubmit, formatIssueDate, offeredEnergy, offeredModes, reconfirmLines } from '@/lib/verify-state'
+import { dispatchDateBounds, type EvidenceField, hasEvidenceProblem, NO_EVIDENCE_PROBLEMS } from '@/lib/evidence'
+import { answerSummary, type Draft, draftProblems, isOpenForAnswers } from '@/lib/supplier-state'
+import {
+  canSubmit,
+  demoEvidenceInputs,
+  formatIssueDate,
+  offeredEnergy,
+  offeredModes,
+  reconfirmLines,
+} from '@/lib/verify-state'
 import { cn } from '@/lib/utils'
 
 // One delivery on the supplier page: what was invoiced, its status as a colour and a word, and, when it is the open
-// one, the two questions of /verify with their pre-selected answers. Invoice text is rendered as text. Sized like the
+// one, the two questions of /verify with their pre-selected answers and the optional "Add proof" section (F7), sent with
+// this delivery's answers. Invoice text is rendered as text. Sized like the
 // phone page: every control at least 52 px high. In the v2 grouped style the open delivery's questions sit on a grey
 // inset, so their white lists read as lists and not as more card.
 
@@ -30,11 +40,16 @@ interface DeliveryCardProps {
   busy: boolean
   /** True when the supplier ticked the terms box above the list; nothing is sent without it. */
   termsAccepted: boolean
+  /** The UTC date the list arrived on, which bounds the dispatch date. */
+  today: string
+  /** True when the API runs with demo tools: the proof section then offers "Fill demo values". */
+  demo: boolean
   warnings: PlausibilityWarning[] | undefined
   onOpen: () => void
   onClose: () => void
   onTransport: (value: TransportMode | null) => void
   onEnergy: (value: EnergySource | null) => void
+  onEvidence: (field: EvidenceField, value: string) => void
   onSend: () => void
   onReload: () => void
 }
@@ -47,17 +62,22 @@ export function DeliveryCard({
   draft,
   busy,
   termsAccepted,
+  today,
+  demo,
   warnings,
   onOpen,
   onClose,
   onTransport,
   onEnergy,
+  onEvidence,
   onSend,
   onReload,
 }: DeliveryCardProps) {
   const id = `delivery-${item.nodeId}`
   const summary = answerSummary(item, { transport: questions.transport.options, energy: questions.energy.options })
   const sending = draft?.sending ?? false
+  const problems = draft === null ? NO_EVIDENCE_PROBLEMS : draftProblems(draft, item, today)
+  const proofBlocked = hasEvidenceProblem(problems)
 
   return (
     <li data-testid={id} data-status={item.status} className="flex flex-col gap-4 rounded-[18px] bg-card p-5 shadow-card transition-shadow duration-300 data-[status=VERIFIED]:shadow-[var(--shadow-card),0_0_0_1px_rgb(18_129_79/0.18)]">
@@ -121,15 +141,36 @@ export function DeliveryCard({
             disabled={sending}
             onChange={onEnergy}
           />
+          <ProofSection
+            copy={questions.proof}
+            evidence={draft.evidence}
+            answers={draft.answers}
+            problems={problems}
+            dateBounds={dispatchDateBounds(item.issueDate, today)}
+            disabled={sending}
+            refused={draft.proofRefused ? questions.proof.refused : null}
+            demo={demo}
+            onDemo={() => {
+              for (const { field, value } of demoEvidenceInputs(draft.evidence, draft.answers, item.issueDate, today)) {
+                onEvidence(field, value)
+              }
+            }}
+            testId={`${id}-proof`}
+            onChange={onEvidence}
+          />
 
           {!canSubmit(draft.answers) ? (
             <p role="status" className="text-center text-[15px] text-ink-2">
               {questions.answerOne}
             </p>
+          ) : !termsAccepted ? (
+            <p role="status" className="text-center text-[15px] text-ink-2">
+              {questions.terms.tickToSubmit}
+            </p>
           ) : (
-            !termsAccepted && (
+            proofBlocked && (
               <p role="status" className="text-center text-[15px] text-ink-2">
-                {questions.terms.tickToSubmit}
+                {questions.proof.fixToSend}
               </p>
             )
           )}
@@ -148,7 +189,7 @@ export function DeliveryCard({
               <Button
                 data-testid={`${id}-confirm`}
                 className="h-[52px] w-full text-[17px]"
-                disabled={sending || !termsAccepted || !canSubmit(draft.answers)}
+                disabled={sending || !termsAccepted || !canSubmit(draft.answers) || proofBlocked}
                 onClick={onSend}
               >
                 {sending ? copy.sending : copy.send}

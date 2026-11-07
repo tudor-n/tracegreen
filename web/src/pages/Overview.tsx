@@ -2,14 +2,16 @@ import { InfoIcon } from 'lucide-react'
 import { useMemo } from 'react'
 import { Link, useNavigate } from 'react-router'
 import type { Kpis, NodeView } from '@/api/client'
+import { AnswerChecks } from '@/components/dashboard/AnswerChecks'
 import { CategoryChecks } from '@/components/dashboard/CategoryChecks'
 import { PageHeader, PageMessage, Surface } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { canvasCopy, kpiCopy, overviewCopy } from '@/copy/dashboard'
+import { answersCopy, canvasCopy, kpiCopy, overviewCopy } from '@/copy/dashboard'
 import { supplierConfirmedShare } from '@/copy/labels'
 import { categoriesToCheck } from '@/lib/review-display'
-import { byCarbonDesc, CO2E_UNIT, formatKpis, formatShareSplit, selectLoaded, useGraphStore } from '@/store'
+import { answersToCheck } from '@/lib/trust-display'
+import { byCarbonDesc, CO2E_UNIT, formatKpis, formatShareSplit, formatTonnesCo2e, selectLoaded, useGraphStore } from '@/store'
 import { useShell } from '@/hooks/useShell'
 
 // "Where do I stand?": the total, the supplier-confirmed share and how the total splits, and the one next step. Every
@@ -23,6 +25,7 @@ export default function Overview() {
   const nodes = useGraphStore((s) => s.nodes)
   const next = useMemo(() => nextToConfirm(Object.values(nodes)), [nodes])
   const checks = useMemo(() => categoriesToCheck(Object.values(nodes)).length, [nodes])
+  const answers = useMemo(() => answersToCheck(Object.values(nodes)), [nodes])
 
   let body
   if (!loaded || kpis === null) {
@@ -38,6 +41,7 @@ export default function Overview() {
     body = (
       <>
         <CategoryChecks count={checks} />
+        <AnswerChecks nodes={answers} kgAtRisk={kpis.kgAtRisk} />
         <Cards kpis={kpis} next={next} />
       </>
     )
@@ -75,6 +79,12 @@ function Cards({ kpis, next }: { kpis: Kpis; next: NodeView | null }) {
           <p data-testid="kpi-nodes" className="text-[13px] text-muted-foreground">
             <span data-testid="kpi-spend">{overviewCopy.totalCaption(kpis.nodeCount, figures.nodes, figures.spend)}</span>
           </p>
+          {kpis.kgAtRisk > 0 && (
+            // F7: the totals count every unbacked reduction's fallback; this is what backing them could take off.
+            <p data-testid="kpi-at-risk" className="text-[13px] font-medium text-estimated-ink">
+              {answersCopy.atRiskKpi(formatTonnesCo2e(kpis.kgAtRisk))}
+            </p>
+          )}
         </Surface>
         <Surface aria-label={supplierConfirmedShare.label} data-testid="kpi-share" className="flex flex-[1_1_300px] flex-col gap-3">
           <h2 className="flex items-center gap-1.5 text-[15px] font-semibold">

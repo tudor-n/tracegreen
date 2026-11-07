@@ -5,12 +5,15 @@ import { LinkCard } from '@/components/dashboard/LinkCard'
 import { SimulatorPanel } from '@/components/dashboard/SimulatorPanel'
 import { Chip, type ChipTone, Group, GroupRow } from '@/components/shell/Page'
 import { Button } from '@/components/ui/button'
-import { drawerCopy, energySourceCopy, nodeCopy, suppliersCopy, transportModeCopy } from '@/copy/dashboard'
+import { drawerCopy, energySourceCopy, nodeCopy, suppliersCopy, transportModeCopy, warningCopy } from '@/copy/dashboard'
 import { AI_MAPPED, ILLUSTRATIVE, uncertaintyLabel } from '@/copy/labels'
 import { requestLink, requestPortalLink } from '@/lib/dashboard-actions'
 import { aiMappedLabel, aiReason, isPlaceholder, provenanceLine, shownFigure } from '@/lib/node-display'
 import { categoryCheckLabel, categorySourceNote } from '@/lib/review-display'
+import { answerCheckLabel } from '@/lib/trust-display'
 import { CategoryCheckChip, CategoryReview } from './CategoryReview'
+import { NodeFigures } from './NodeFigures'
+import { EvidenceGroup, TrustReview } from './TrustReview'
 import { cn } from '@/lib/utils'
 import {
   CO2E_UNIT,
@@ -33,7 +36,9 @@ import {
 // node closes it too (hydrateState). Frozen test hooks (RUNBOOK): `node-drawer`, `drawer-request`, `qr-url`, `drawer-simulate`;
 // `drawer-portal` and `portal-url` for the supplier page link (F12), which lists every delivery from this supplier.
 // The classification review (F6): `drawer-check` (the flag), `drawer-figure`, `drawer-category-source`, and the control's
-// own hooks in CategoryReview.
+// own hooks in CategoryReview. The trust model (F7): `drawer-answers-check` (the flag), `drawer-warning-<code>` (the
+// plausibility warnings, D2), and the hooks of NodeFigures and TrustReview; the evidence and the buyer's records are on
+// the Details tab.
 
 type Tab = 'summary' | 'details' | 'factors' | 'whatIf'
 
@@ -47,6 +52,7 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
   const select = useGraphStore((s) => s.select)
   const ai = aiMappedLabel(node.classification)
   const check = categoryCheckLabel(node.classification)
+  const answersCheck = answerCheckLabel(node)
   const panel = useRef<HTMLElement>(null)
 
   // Below the lg breakpoint the panel sits under the tree; bring it into view when another supplier is picked.
@@ -96,6 +102,16 @@ export function SupplierPanel({ node, hotspot }: { node: NodeView; hotspot: bool
             <CategoryCheckChip label={check} />
           </span>
         )}
+        {answersCheck !== null && (
+          <span data-testid="drawer-answers-check">
+            <CategoryCheckChip label={answersCheck} />
+          </span>
+        )}
+        {[...new Set(node.warnings.map((w) => w.code))].map((code) => (
+          <span key={code} data-testid={`drawer-warning-${code}`} title={node.warnings.find((w) => w.code === code)?.detail}>
+            <Chip tone="estimated">{warningCopy[code]}</Chip>
+          </span>
+        ))}
       </div>
       <PanelBody key={node.id} node={node} />
     </aside>
@@ -155,7 +171,13 @@ function PanelBody({ node }: { node: NodeView }) {
       </div>
       <div role="tabpanel" className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300" key={shown}>
         {shown === 'summary' && (
-          <Summary node={node} links={links} requesting={requesting} error={error} onRequest={(kind) => void onRequest(kind)} />
+          <Summary
+            node={node}
+            links={links}
+            requesting={requesting}
+            error={error}
+            onRequest={(kind) => void onRequest(kind)}
+          />
         )}
         {shown === 'details' && <Details node={node} />}
         {shown === 'factors' && <Factors node={node} />}
@@ -216,9 +238,12 @@ function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
         )}
       </div>
 
+      <NodeFigures node={node} />
+
       <CategoryReview node={node} />
 
-      {answered && (
+      {/* The trust card lists each answer with its level; a node with answers but no assessment keeps the plain list. */}
+      {answered && node.trust === null && (
         <Group title={drawerCopy.answers}>
           <GroupRow label={drawerCopy.transport}>
             {node.transportMode === null ? drawerCopy.skipped : transportModeCopy[node.transportMode]}
@@ -228,6 +253,8 @@ function Summary({ node, links, requesting, error, onRequest }: SummaryProps) {
           </GroupRow>
         </Group>
       )}
+
+      <TrustReview node={node} />
 
       {links.verify !== null && <LinkCard link={links.verify} />}
       {links.portal !== null && <LinkCard link={links.portal} kind="portal" />}
@@ -304,6 +331,7 @@ function Details({ node }: { node: NodeView }) {
           <span data-testid="drawer-lead-time">{formatDays(node.leadDays)}</span>
         </GroupRow>
       </Group>
+      <EvidenceGroup node={node} />
     </>
   )
 }

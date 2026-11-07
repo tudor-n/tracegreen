@@ -306,13 +306,13 @@ public class ChatWhatIfTests
     {
         Assert.Equal("switch to sea", F("W1.change").Value);
         Assert.Equal("-14000", F("W1.carbonDelta").Value);
-        Assert.Equal("-14.0 t CO2e (less)", F("W1.carbonDelta").PromptText);
+        Assert.Equal("-14.00 t CO2e (less)", F("W1.carbonDelta").PromptText);
         Assert.Equal("-EUR 3,910 (less)", F("W1.costDelta").PromptText);
         Assert.Equal("+33 days (slower)", F("W1.leadDelta").PromptText);
         Assert.Equal("win-win", F("W1.badge").Value);
         Assert.Contains("the largest cut in emissions", F("W1.carbonDelta").About);
         Assert.Equal("switch to air", F("W3.change").Value);
-        Assert.Equal("+3.8 t CO2e (more)", F("W3.carbonDelta").PromptText);
+        Assert.Equal("+3.80 t CO2e (more)", F("W3.carbonDelta").PromptText);
         Assert.Equal(Views[0].Id, F("W3.supplier").NodeId);
         Assert.Equal("3", F("count.whatIfs").Value);
     }
