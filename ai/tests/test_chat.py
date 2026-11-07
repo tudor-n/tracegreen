@@ -397,7 +397,7 @@ def test_an_answer_that_breaks_a_rule_goes_back_once_with_the_rule() -> None:
         ),
         ("{{S9.name}} is the largest.", "S9.name, which is not one of the facts"),
         ("It is about {{S1.name}} {S1.carbon}}.", "not written as {{id}}"),
-        ("The total is large.", None),
+        ("The total is large.", "without citing the fact"),
         ("Estimated means the figure comes from the invoice spend.", None),
         ("Most of it is estimated.", "without citing the fact"),
         ("Your largest supplier is the board maker.", "without citing the fact"),
@@ -414,6 +414,64 @@ def test_the_cheap_checks_name_the_rule(text: str, problem: str | None) -> None:
         assert broke is None and answer_ is not None
     else:
         assert answer_ is None and broke is not None and problem in broke.rule
+
+
+# Review of #54 (2026-11-07): sentences that cite no fact but claim something about the data, some
+# of it false on the seed, passed as general answers. The same list is in ChatFactsTests.cs.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The biggest emitter ships by air.",
+        "The board maker is the largest emitter.",
+        "Your Taiwanese supplier emits the most.",
+        "None of the suppliers has confirmed a delivery yet.",
+        "Every delivery is supplier-confirmed.",
+        "Almost every delivery is still estimated.",
+        "Two deliveries are still estimated.",
+        "The suppliers are mostly estimated.",
+        "Most of the emissions come from one supplier.",
+        "Transport is the main source of your emissions.",
+        "Your footprint is dominated by air freight.",
+        "You have four suppliers.",
+        "There is no what-if for that supplier.",
+        "I can tell you that the biggest emitter ships by air.",
+    ],
+)
+def test_an_uncited_claim_about_the_data_goes_back(text: str) -> None:
+    _, broke = check_answer(answer(text), {})
+
+    assert broke is not None and "without citing the fact" in broke.rule
+    assert "{{list.estimated}}" in broke.hint
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Hello! I can tell you who emits the most, what is still estimated and what a change of "
+        "transport or supplier would do. What would you like to know?",
+        "I can tell you who emits the most, which suppliers are still estimated, what the total is "
+        "and what a change of transport or supplier would do. Ask about any supplier, or tell me "
+        "what you are trying to decide.",
+        "I can't change anything myself, I only read your data. Open the supplier on the Suppliers "
+        "screen and use What if to try the change, then Apply to save it.",
+        "I can only help with your suppliers and emissions. Try asking which supplier emits the "
+        "most.",
+        "A supplier confirms a delivery in two taps, through a single-use link the buyer sends "
+        "with Request data on the Suppliers screen.",
+        "The figure then follows the confirmed transport mode, and the delivery becomes "
+        "supplier-confirmed, or partly confirmed when one answer is skipped.",
+        "Each delivery starts as a spend-based estimate until its supplier confirms it.",
+        "The supplier-confirmed share is measured by emissions, not by node count.",
+        "Purchased goods are usually the largest source of a factory's emissions, and air freight "
+        "emits far more than sea.",
+        "Most emissions of a factory come from what it buys, its Scope 3. Start with the largest "
+        "emitters.",
+    ],
+)
+def test_help_and_how_tracegreen_works_stay_general(text: str) -> None:
+    found, broke = check_answer(answer(text), {})
+
+    assert broke is None and found == (text, [])
 
 
 def test_a_data_answer_must_cite_a_fact() -> None:

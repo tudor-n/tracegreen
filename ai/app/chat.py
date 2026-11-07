@@ -51,14 +51,55 @@ COMPANY_SUFFIX = re.compile(
 )
 UPPER_SUFFIX = re.compile(r"(?<![^\W\d_])(?:SA|AG|BV|SAS|Co\.|Limited)(?![^\W\d_])")
 SENTENCE_END = re.compile(r"[.!?;]+(?=\s|$)")
-# A sentence that asserts something about the buyer's own data in its own words: "your largest
-# supplier…", "most of your emissions…", "your suppliers are estimated". Saying what the chat can
-# tell ("who emits the most, which suppliers are estimated") is not one.
+# A sentence that asserts something about the buyer's own data in its own words (claims_data, as
+# AnswerCheck.cs). A share, size or status of "your" data: "your largest supplier…", "most of the
+# emissions…", "your suppliers are estimated", "the total is large", "the main source of your…".
 DATA_CLAIM = re.compile(
     r"\byour\b[^.!?;]{0,40}\b(?:largest|biggest|highest|top|main|smallest|lowest|least)\b"
-    r"|\b(?:most|majority|half|all|none)\s+of\s+(?:your|it|them)\b"
+    r"|\b(?:most|majority|half|all|none|much|bulk)\s+of\s+(?:your|it|them|the\s+"
+    r"(?:emissions|total|carbon|footprint|spend|suppliers|deliveries|invoices))\b"
     r"|\byour\b[^.!?;]{0,60}\b(?:is|are)\s+(?:mostly\s+|still\s+|all\s+|now\s+)?"
     r"(?:estimated|(?:supplier-)?confirmed|verified|partly\s+confirmed)\b"
+    r"|\b(?:the|your)\s+(?:[\w-]+\s+)?(?:total|footprint|emissions|spend|costs?|carbon)\s+"
+    r"(?:is|are|was|were|comes?|came)\s+(?:\w+\s+)?(?:large|small|high|low|big|huge|tiny|mostly|"
+    r"mainly|largely|dominated|driven|concentrated)\b"
+    r"|\b(?:largest|biggest|highest|top|main|primary|smallest|lowest)\s+(?:[\w-]+\s+)?"
+    r"(?:sources?|emitters?|suppliers?|contributors?|drivers?|share|part)\s+of\s+your\b"
+)
+# Who emits the most or the least, said of someone: "the biggest emitter ships by air", "the board
+# maker is the largest emitter", "it emits the most". "Start with the largest emitters" passes.
+RANK_CLAIM = re.compile(
+    r"\b(?:the|your)\s+(?:largest|biggest|highest|top|main|smallest|lowest)\s+(?:[\w-]+\s+)?"
+    r"(?:emitters?|suppliers?|polluters?|deliver(?:y|ies))\b(?:\s+[\w-]+){0,3}?\s+(?:is|are|was|"
+    r"were|has|have|ships?|emits?|uses?|comes?|sends?|accounts?|makes?|produces?|remains?|sits?)\b"
+    r"|\b(?:is|are|was|were|remains?)\s+(?:by\s+far\s+|still\s+)?(?:the|your)\s+(?:largest|biggest|"
+    r"highest|top|main|smallest|lowest)\s+(?:[\w-]+\s+)?(?:emitters?|suppliers?|polluters?)\b"
+    r"|\bemits?\s+(?:by\s+far\s+)?the\s+(?:most|least)\b"
+)
+# A status said of several suppliers or deliveries, or of all of them: "none of the suppliers has
+# confirmed", "every delivery is supplier-confirmed", "the suppliers are mostly estimated". How
+# TraceGreen works ("a supplier confirms a delivery", "each delivery starts as an estimate") passes.
+STATUS_OF_MANY = re.compile(
+    r"\b(?:none|all|every|most|many|some|few|half|several|both|neither|no|majority|one|two|three|"
+    r"four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?:\s+of)?(?:\s+(?:the|your|these|those|"
+    r"their))?(?:\s+[\w-]+){0,2}?\s+(?:suppliers?|deliver(?:y|ies)|invoices?|figures?|emitters?)\b"
+    r"[^.!?;]{0,40}?\b(?:is|are|was|were|has|have|had|remains?|stays?)\b[^.!?;]{0,30}?"
+    r"\b(?:estimated|estimates?|confirmed|verified|unconfirmed|spend-based)\b"
+    r"|\bthe\s+(?:[\w-]+\s+)?(?:suppliers|deliveries|invoices|figures|emitters)\b[^.!?;]{0,40}?"
+    r"\b(?:is|are|was|were|has|have|remain|stay)\b[^.!?;]{0,30}?"
+    r"\b(?:estimated|estimates?|confirmed|verified|unconfirmed|spend-based)\b"
+)
+# How many there are, in words: "you have four suppliers", "there is no what-if for it".
+COUNT_CLAIM = re.compile(
+    r"\b(?:you\s+have|there\s+(?:are|is))\s+(?:only\s+|just\s+)?(?:no|one|two|three|four|five|six|"
+    r"seven|eight|nine|ten|eleven|twelve|several|many|few|some|a\s+few)\s+(?:[\w-]+\s+)?"
+    r"(?:suppliers?|deliver(?:y|ies)|invoices?|emitters?|scenarios?|what-ifs?)\b"
+)
+# What the chat can tell, up to the next comma or the sentence's end ("tell you who emits the
+# most", "try asking which supplier…"): not a claim, so claims_data reads past it.
+CAN_TELL = re.compile(
+    r"\b(?:tell|tells|show|shows|see|know|find|ask|asking|check|learn|explain|compare|say|says)\s+"
+    r"(?:out\s+)?(?:you\s+|me\s+)?(?:who|which|what|whether|where|how)\b[^,;:.!?]*"
 )
 NAME_FACT = re.compile(r"^(?:S\d+\.(?:name|origin)|[CW]\d+\.supplier)$")
 # The assistant saying it will do, or did, what only the buyer can (as AnswerCheck.cs).
@@ -128,8 +169,9 @@ each fact once.
 and the supplier-confirmed share are facts of their own; use them instead of adding up.
 - To say which suppliers have a status, cite the list fact ({{list.estimated}}, \
 {{list.partial}} or {{list.confirmed}}); for one supplier's status, cite its {{S1.status}}. Never \
-say in your own words that the buyer's suppliers or emissions are large, small, estimated or \
-confirmed: cite the fact that says so.
+say in your own words which supplier emits the most, how many suppliers or deliveries there are, \
+or that the buyer's suppliers or emissions are large, small, estimated or confirmed: cite the fact \
+that says so.
 - The W facts are what-ifs the simulator worked out for the largest suppliers, nothing saved: \
 W1 cuts emissions the most. Each has the supplier it would change ({{W1.supplier}}), the change \
 ({{W1.change}}), and the change in emissions, cost and lead time. Suggest a change for a \
@@ -514,9 +556,22 @@ def check_answer(
                 "deliveries from one supplier as two deliveries"
             )
             return None, _broke("it cites a fact twice in one sentence", hint)
-        if not ids and DATA_CLAIM.search(sentence.lower()):
-            return None, _broke("it claims something about the data without citing the fact")
+        if not ids and claims_data(sentence):
+            hint = (
+                "it states something about the buyer's data (who emits the most, a status, a share "
+                "or a count) without citing the fact that holds it; cite that fact, such as "
+                "{{S1.name}}, {{list.estimated}} or {{count.deliveries}}, or leave the claim out"
+            )
+            return None, _broke("it claims something about the data without citing the fact", hint)
     return (text, list(dict.fromkeys(cited))), None
+
+
+def claims_data(sentence: str) -> bool:
+    """Whether a sentence that cites no fact claims something about the buyer's data in its own
+    words: who emits the most, a status over several, a count, or a share, size or status of
+    "your" data, once what the chat can tell is taken out (as AnswerCheck.ClaimsData)."""
+    said = CAN_TELL.sub(" ", sentence.lower())
+    return any(p.search(said) for p in (DATA_CLAIM, RANK_CLAIM, STATUS_OF_MANY, COUNT_CLAIM))
 
 
 def cite_typed_names(text: str, facts: Mapping[str, str]) -> str:

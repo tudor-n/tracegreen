@@ -152,6 +152,16 @@ public class ChatFactsTests
     [InlineData("I can tell you who emits the most, which suppliers are still estimated and what a change of transport would do.")]
     [InlineData("Estimated means the figure comes from the invoice spend; supplier-confirmed means the supplier answered.")]
     [InlineData("Most emissions of a factory come from what it buys, its Scope 3. Start with the largest emitters.")]
+    // The system prompt's own general examples (ai/app/chat.py) and how TraceGreen works, which must stay general.
+    [InlineData("Hello! I can tell you who emits the most, what is still estimated and what a change of transport or supplier would do. What would you like to know?")]
+    [InlineData("I can tell you who emits the most, which suppliers are still estimated, what the total is and what a change of transport or supplier would do. Ask about any supplier, or tell me what you are trying to decide.")]
+    [InlineData("I can't change anything myself, I only read your data. Open the supplier on the Suppliers screen and use What if to try the change, then Apply to save it.")]
+    [InlineData("I can only help with your suppliers and emissions. Try asking which supplier emits the most.")]
+    [InlineData("A supplier confirms a delivery in two taps, through a single-use link the buyer sends with Request data on the Suppliers screen.")]
+    [InlineData("The figure then follows the confirmed transport mode, and the delivery becomes supplier-confirmed, or partly confirmed when one answer is skipped.")]
+    [InlineData("Each delivery starts as a spend-based estimate until its supplier confirms it.")]
+    [InlineData("The supplier-confirmed share is measured by emissions, not by node count.")]
+    [InlineData("Purchased goods are usually the largest source of a factory's emissions, and air freight emits far more than sea.")]
     public void AGeneralAnswerMayCiteNoFact(string text)
     {
         var result = AnswerCheck.Check(text, Pack);
@@ -160,6 +170,27 @@ public class ChatFactsTests
         Assert.Empty(result.FactIds);
         Assert.Equal(text, Assert.Single(result.Segments).Text);
     }
+
+    // Review of #54 (2026-11-07): a sentence that cites no fact passed as general while it claimed something about the
+    // data, some of it false on the seed (S1 is supplier-confirmed; two of four deliveries are estimated).
+    [Theory]
+    [InlineData("The biggest emitter ships by air.")]
+    [InlineData("The board maker is the largest emitter.")]
+    [InlineData("Your Taiwanese supplier emits the most.")]
+    [InlineData("None of the suppliers has confirmed a delivery yet.")]
+    [InlineData("Every delivery is supplier-confirmed.")]
+    [InlineData("Almost every delivery is still estimated.")]
+    [InlineData("Two deliveries are still estimated.")]
+    [InlineData("The suppliers are mostly estimated.")]
+    [InlineData("Most of the emissions come from one supplier.")]
+    [InlineData("Transport is the main source of your emissions.")]
+    [InlineData("The total is large.")]
+    [InlineData("Your footprint is dominated by air freight.")]
+    [InlineData("You have four suppliers.")]
+    [InlineData("There is no what-if for that supplier.")]
+    [InlineData("I can tell you that the biggest emitter ships by air.")]
+    public void AnUncitedClaimAboutTheDataIsRefused(string text) =>
+        Assert.Equal("a claim about the data without a fact", AnswerCheck.Check(text, Pack).Problem);
 
     [Fact]
     public void ThePackListsTheNamesAnAnswerMayOnlyCite()

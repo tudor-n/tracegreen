@@ -166,7 +166,8 @@ public static partial class AnswerCheck
         "a smallest claim the data does not hold" =>
             "it calls a supplier the smallest when the facts rank another one lower; the highest S number emits the least",
         "a comparison the data does not hold" => "it compares two suppliers the wrong way round; a lower S number emits more",
-        "a claim about the data without a fact" => "it states something about the buyer's data without citing the fact that holds it",
+        "a claim about the data without a fact" =>
+            "it states something about the buyer's data (who emits the most, a status, a share or a count) without citing the fact that holds it; cite that fact, such as {{S1.name}}, {{list.estimated}} or {{count.deliveries}}, or leave the claim out",
         _ => problem,
     };
 
@@ -192,7 +193,7 @@ public static partial class AnswerCheck
                 about = named;
             }
             var words = string.Join(' ', sentence.Where(s => s.Text is not null).Select(s => s.Text)).ToLowerInvariant();
-            if (!sentence.Any(s => s.FactId is not null) && DataClaim().IsMatch(words))
+            if (!sentence.Any(s => s.FactId is not null) && ClaimsData(words))
             {
                 return "a claim about the data without a fact";
             }
@@ -635,12 +636,53 @@ public static partial class AnswerCheck
     private static partial Regex Unit();
 
     /// <summary>
-    /// A claim about the buyer's own data in a sentence's own words: "your largest supplier…", "most of your emissions…",
-    /// "your suppliers are estimated". Saying what the chat can tell ("who emits the most") is not one. Mirrored in
-    /// <c>ai/app/chat.py</c> (DATA_CLAIM), so a model is told and asked again before the answer reaches the API.
+    /// Whether a sentence that cites no fact claims something about the buyer's data in its own words: who emits the most
+    /// (<see cref="RankClaim"/>), a status over several suppliers or deliveries (<see cref="StatusOfMany"/>), a count
+    /// (<see cref="CountClaim"/>), or a share, size or status of "your" data (<see cref="DataClaim"/>). What the chat can
+    /// tell ("I can tell you who emits the most", "try asking which supplier…") is taken out first (<see cref="CanTell"/>),
+    /// and advice that names no one ("start with the largest emitters") is not a claim. Still a list of patterns: a claim
+    /// in other words passes, which is why every value an answer shows is a cited fact. Mirrored in <c>ai/app/chat.py</c>
+    /// (<c>claims_data</c>), so a model is told and asked again before the answer reaches the API.
     /// </summary>
-    [GeneratedRegex(@"\byour\b[^.!?;]{0,40}\b(?:largest|biggest|highest|top|main|smallest|lowest|least)\b|\b(?:most|majority|half|all|none)\s+of\s+(?:your|it|them)\b|\byour\b[^.!?;]{0,60}\b(?:is|are)\s+(?:mostly\s+|still\s+|all\s+|now\s+)?(?:estimated|(?:supplier-)?confirmed|verified|partly\s+confirmed)\b")]
+    private static bool ClaimsData(string words)
+    {
+        var said = CanTell().Replace(words, " ");
+        return DataClaim().IsMatch(said) || RankClaim().IsMatch(said) || StatusOfMany().IsMatch(said) || CountClaim().IsMatch(said);
+    }
+
+    /// <summary>
+    /// A share, size or status of the buyer's own data: "your largest supplier…", "most of your emissions…", "most of the
+    /// emissions…", "your suppliers are estimated", "the total is large", "your footprint is mostly…", "the main source of
+    /// your emissions".
+    /// </summary>
+    [GeneratedRegex(@"\byour\b[^.!?;]{0,40}\b(?:largest|biggest|highest|top|main|smallest|lowest|least)\b|\b(?:most|majority|half|all|none|much|bulk)\s+of\s+(?:your|it|them|the\s+(?:emissions|total|carbon|footprint|spend|suppliers|deliveries|invoices))\b|\byour\b[^.!?;]{0,60}\b(?:is|are)\s+(?:mostly\s+|still\s+|all\s+|now\s+)?(?:estimated|(?:supplier-)?confirmed|verified|partly\s+confirmed)\b|\b(?:the|your)\s+(?:[\w-]+\s+)?(?:total|footprint|emissions|spend|costs?|carbon)\s+(?:is|are|was|were|comes?|came)\s+(?:\w+\s+)?(?:large|small|high|low|big|huge|tiny|mostly|mainly|largely|dominated|driven|concentrated)\b|\b(?:largest|biggest|highest|top|main|primary|smallest|lowest)\s+(?:[\w-]+\s+)?(?:sources?|emitters?|suppliers?|contributors?|drivers?|share|part)\s+of\s+your\b")]
     private static partial Regex DataClaim();
+
+    /// <summary>
+    /// Who emits the most or the least, said of someone: "the biggest emitter ships by air", "the board maker is the
+    /// largest emitter", "it emits the most". "Start with the largest emitters" names no one and passes.
+    /// </summary>
+    [GeneratedRegex(@"\b(?:the|your)\s+(?:largest|biggest|highest|top|main|smallest|lowest)\s+(?:[\w-]+\s+)?(?:emitters?|suppliers?|polluters?|deliver(?:y|ies))\b(?:\s+[\w-]+){0,3}?\s+(?:is|are|was|were|has|have|ships?|emits?|uses?|comes?|sends?|accounts?|makes?|produces?|remains?|sits?)\b|\b(?:is|are|was|were|remains?)\s+(?:by\s+far\s+|still\s+)?(?:the|your)\s+(?:largest|biggest|highest|top|main|smallest|lowest)\s+(?:[\w-]+\s+)?(?:emitters?|suppliers?|polluters?)\b|\bemits?\s+(?:by\s+far\s+)?the\s+(?:most|least)\b")]
+    private static partial Regex RankClaim();
+
+    /// <summary>
+    /// A status said of several suppliers or deliveries, or of all of them: "none of the suppliers has confirmed",
+    /// "every delivery is supplier-confirmed", "two deliveries are still estimated", "the suppliers are mostly estimated".
+    /// How TraceGreen works ("a supplier confirms a delivery in two taps", "each delivery starts as an estimate") passes.
+    /// </summary>
+    [GeneratedRegex(@"\b(?:none|all|every|most|many|some|few|half|several|both|neither|no|majority|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b(?:\s+of)?(?:\s+(?:the|your|these|those|their))?(?:\s+[\w-]+){0,2}?\s+(?:suppliers?|deliver(?:y|ies)|invoices?|figures?|emitters?)\b[^.!?;]{0,40}?\b(?:is|are|was|were|has|have|had|remains?|stays?)\b[^.!?;]{0,30}?\b(?:estimated|estimates?|confirmed|verified|unconfirmed|spend-based)\b|\bthe\s+(?:[\w-]+\s+)?(?:suppliers|deliveries|invoices|figures|emitters)\b[^.!?;]{0,40}?\b(?:is|are|was|were|has|have|remain|stay)\b[^.!?;]{0,30}?\b(?:estimated|estimates?|confirmed|verified|unconfirmed|spend-based)\b")]
+    private static partial Regex StatusOfMany();
+
+    /// <summary>How many there are, in words: "you have four suppliers", "there is no what-if for it".</summary>
+    [GeneratedRegex(@"\b(?:you\s+have|there\s+(?:are|is))\s+(?:only\s+|just\s+)?(?:no|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|many|few|some|a\s+few)\s+(?:[\w-]+\s+)?(?:suppliers?|deliver(?:y|ies)|invoices?|emitters?|scenarios?|what-ifs?)\b")]
+    private static partial Regex CountClaim();
+
+    /// <summary>
+    /// What the chat can tell, up to the next comma or the sentence's end: "tell you who emits the most", "try asking
+    /// which supplier…", "find out what a change would do". Not a claim, so <see cref="ClaimsData"/> reads past it.
+    /// </summary>
+    [GeneratedRegex(@"\b(?:tell|tells|show|shows|see|know|find|ask|asking|check|learn|explain|compare|say|says)\s+(?:out\s+)?(?:you\s+|me\s+)?(?:who|which|what|whether|where|how)\b[^,;:.!?]*")]
+    private static partial Regex CanTell();
 
     [GeneratedRegex(@"(?<![\p{L}])(?:S\.R\.L\.?|SRL|GmbH|Ltd\.?|Inc\.?|LLC|PLC|Corp\.?|S\.A\.)(?![\p{L}])", RegexOptions.IgnoreCase)]
     private static partial Regex CompanySuffix();
