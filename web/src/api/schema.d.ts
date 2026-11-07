@@ -54,6 +54,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/classification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm or change a node's category; recomputes its figures, appends classification.reviewed and publishes node.updated */
+        post: operations["ReviewClassification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{nodeId}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record the buyer's goods-receipt date and customs record for a delivery; recomputes its trust and counted figure */
+        post: operations["RecordReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{nodeId}/claims/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept or reject one supplier answer (mode, energy or mass) after looking at its evidence; recomputes the counted figure */
+        post: operations["ReviewClaim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{nodeId}/target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose the best state a delivery could reach (mode, power source or alternative supplier); illustrative like every lane figure */
+        put: operations["SetTarget"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The categories a buyer may set for a node, which are also the AI's allow-list */
+        get: operations["ListCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ingest/ubl": {
         parameters: {
             query?: never;
@@ -112,7 +197,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults; nothing personal */
+        /** What the supplier page shows for a link: supplier, item, the lane's modes and the defaults, and the supplier terms; nothing personal */
         get: operations["GetVerifyContext"];
         put?: never;
         post?: never;
@@ -131,8 +216,76 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit the supplier's answers: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
+        /** Submit the supplier's answers with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block */
         post: operations["SubmitVerification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mint the supplier page link for the supplier of a node and record portal.requested in the audit log */
+        post: operations["RequestPortalLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What the supplier page shows: the supplier's deliveries to the buyer, open ones first, with the answers to pre-select and the supplier terms */
+        post: operations["GetPortalView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm one delivery from the supplier page with the accepted terms' SHA-256: both answered → VERIFIED, one skipped → PARTIAL; warnings never block. Returns the list as it now is */
+        post: operations["SubmitPortalAnswer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/terms/supplier": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current supplier terms in Romanian and English, with their version and the SHA-256 a submit sends back */
+        get: operations["GetSupplierTerms"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -190,6 +343,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/{nodeId}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which of the node's curated alternatives the AI picks, with a short reason each; no figures */
+        get: operations["SuggestAlternatives"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer a question about the workspace's data; every value in the answer is filled in from the data, never by the AI */
+        post: operations["Chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The AI models the chat can be asked with, in the order it tries them; a model without its key is listed as not ready, with the reason */
+        get: operations["ChatModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/pdf/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Read a PDF invoice's fields into a draft for a person to check; nothing is imported */
+        post: operations["ExtractPdfInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ingest/pdf/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a PDF invoice's fields as a person checked them, as an ESTIMATED node */
+        post: operations["ConfirmPdfInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dev/reset": {
         parameters: {
             query?: never;
@@ -236,6 +474,18 @@ export interface components {
             mode: components["schemas"]["TransportMode"];
             illustrative: boolean;
         };
+        AnswerEvidence: {
+            shippingDocType?: null | components["schemas"]["ShippingDocType"];
+            shippingDocId?: null | string;
+            /** Format: date */
+            dispatchDate?: null | string;
+            energyCertType?: null | components["schemas"]["EnergyCertType"];
+            energyCertId?: null | string;
+        };
+        AnswerSegment: {
+            text: null | string;
+            factId: null | string;
+        };
         ApiProblem: {
             type: string;
             title: string;
@@ -279,6 +529,10 @@ export interface components {
             kg: number;
             factors: components["schemas"]["FactorLookup"][];
         };
+        CategoryOption: {
+            id: string;
+            label: string;
+        };
         ChainVerification: {
             valid: boolean;
             /** Format: int32 */
@@ -286,8 +540,74 @@ export interface components {
             /** Format: int32 */
             brokenAt: null | number;
         };
+        ChatAnswer: {
+            status: components["schemas"]["ChatStatus"];
+            segments: components["schemas"]["AnswerSegment"][];
+            facts: components["schemas"]["ChatFactView"][];
+            provider: string;
+        };
+        ChatFactView: {
+            id: string;
+            field: string;
+            kind: components["schemas"]["FactKind"];
+            value: string;
+            subject: null | string;
+            /** Format: uuid */
+            nodeId: null | string;
+            /** Format: int64 */
+            auditId: null | number;
+        };
+        ChatModelView: {
+            id: string;
+            provider: string;
+            model: string;
+            ready: boolean;
+            reason: null | string;
+            automatic: boolean;
+        };
+        ChatModels: {
+            available: boolean;
+            models: components["schemas"]["ChatModelView"][];
+        };
+        ChatRequest: {
+            question: null | string;
+            history?: null | string[];
+            model?: null | string;
+        };
         /** @enum {unknown} */
-        ClassificationSource: "invoice" | "cache" | "model" | "stub";
+        ChatStatus: "answered" | "notAnswered" | "unavailable";
+        ClaimAssessment: {
+            kind: components["schemas"]["ClaimKind"];
+            value: string;
+            level: components["schemas"]["EvidenceLevel"];
+            reduces: boolean;
+            /** Format: double */
+            impactKg: number;
+            review: null | components["schemas"]["ClaimDecision"];
+            reasons: components["schemas"]["ClaimReason"][];
+        };
+        /** @enum {unknown} */
+        ClaimDecision: "accepted" | "rejected";
+        /** @enum {unknown} */
+        ClaimKind: "mode" | "energy" | "mass";
+        ClaimReason: {
+            code: components["schemas"]["ClaimReasonCode"];
+            detail: string;
+        };
+        /** @enum {unknown} */
+        ClaimReasonCode: "NO_EVIDENCE" | "DOCUMENT_GIVEN" | "DOCUMENT_INVALID" | "DOCUMENT_MODE_MISMATCH" | "CUSTOMS_AGREES" | "CUSTOMS_DISAGREES" | "TRANSIT_FITS" | "TRANSIT_TOO_FAST" | "CERTIFICATE_GIVEN" | "CERTIFICATE_INVALID" | "NO_CERTIFICATE" | "MASS_BELOW_INVOICE" | "MASS_FAR_ABOVE_INVOICE" | "RAISES_FIGURE" | "ACCEPTED_BY_BUYER" | "REJECTED_BY_BUYER";
+        ClaimReviewRequest: {
+            decision: components["schemas"]["ClaimDecision"];
+            expectedValue: string;
+        };
+        /** @enum {unknown} */
+        ClassificationReview: "notNeeded" | "pending" | "confirmed" | "corrected";
+        ClassificationReviewRequest: {
+            categoryId: string;
+            expectedCategoryId: string;
+        };
+        /** @enum {unknown} */
+        ClassificationSource: "invoice" | "cache" | "model" | "stub" | "buyer";
         ClassificationView: {
             categoryId: string;
             categoryLabel: string;
@@ -296,6 +616,10 @@ export interface components {
             confidence: null | number;
             aiMapped: boolean;
             lineDescription: string;
+            review: components["schemas"]["ClassificationReview"];
+            /** Format: date-time */
+            reviewedAt: null | string;
+            rationale: null | string;
         };
         DomainEvent: components["schemas"]["DomainEventNodeCreated"] | components["schemas"]["DomainEventNodeUpdated"] | components["schemas"]["DomainEventNodeVerified"] | components["schemas"]["DomainEventAuditAppended"] | components["schemas"]["DomainEventScenarioSaved"] | components["schemas"]["DomainEventGraphReset"];
         DomainEventAuditAppended: {
@@ -367,8 +691,44 @@ export interface components {
             /** Format: uuid */
             workspaceId: string;
         };
+        DraftInvoice: {
+            supplierName: string;
+            supplierTaxId: string;
+            supplierCountry: string;
+            invoiceNumber: string;
+            issueDate: string;
+            currency: string;
+            totalNet: string;
+            lines: components["schemas"]["DraftLine"][];
+        };
+        DraftLine: {
+            description: string;
+            quantity: string;
+            unitCode: string;
+            amount: string;
+            classificationCode: string;
+            classificationScheme: string;
+        };
+        /** @enum {unknown} */
+        EnergyCertType: "guaranteeOfOrigin" | "iRec" | "chinaGec" | "taiwanTRec" | "ppa" | "onSite";
         /** @enum {unknown} */
         EnergySource: "grid" | "renewable" | "unknown";
+        /** @enum {unknown} */
+        EvidenceLevel: "contradicted" | "unproven" | "documented" | "corroborated" | "reviewed" | "notNeeded";
+        EvidenceView: {
+            shippingDocType: null | components["schemas"]["ShippingDocType"];
+            shippingDocId: null | string;
+            /** Format: date */
+            dispatchDate: null | string;
+            energyCertType: null | components["schemas"]["EnergyCertType"];
+            energyCertId: null | string;
+            /** Format: date */
+            receivedOn: null | string;
+            customsBorderMode: null | components["schemas"]["TransportMode"];
+            customsMrn: null | string;
+        };
+        /** @enum {unknown} */
+        FactKind: "carbonKg" | "eur" | "days" | "share" | "count" | "date" | "text" | "status" | "mode";
         FactorLookup: {
             /** Format: double */
             value: number;
@@ -428,6 +788,8 @@ export interface components {
             nodeCount: number;
             /** Format: int32 */
             verifiedCount: number;
+            /** Format: double */
+            kgAtRisk: number;
         };
         LaneView: {
             id: string;
@@ -452,6 +814,15 @@ export interface components {
             deltaCostEur: number;
             /** Format: double */
             deltaCarbonT: number;
+        };
+        NodeFigures: {
+            /** Format: double */
+            estimateKg: number;
+            /** Format: double */
+            claimedKg: null | number;
+            /** Format: double */
+            countedKg: null | number;
+            target: null | components["schemas"]["TargetView"];
         };
         /** @enum {unknown} */
         NodeStatus: "ESTIMATED" | "PARTIAL" | "VERIFIED";
@@ -484,15 +855,91 @@ export interface components {
             warnings: components["schemas"]["PlausibilityWarning"][];
             /** Format: date-time */
             createdAt: string;
+            figures: components["schemas"]["NodeFigures"];
+            trust: null | components["schemas"]["TrustAssessment"];
+            evidence: components["schemas"]["EvidenceView"];
+        };
+        PdfConfirmRequest: {
+            draftId: null | string;
+            invoice: null | components["schemas"]["PdfInvoiceForm"];
+        };
+        PdfDraftView: {
+            draftId: string;
+            invoice: components["schemas"]["DraftInvoice"];
+            found: {
+                [key: string]: boolean;
+            };
+            provider: string;
+            /** Format: int32 */
+            pages: number;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        PdfInvoiceForm: {
+            supplierName: null | string;
+            supplierTaxId: null | string;
+            supplierCountry: null | string;
+            invoiceNumber: null | string;
+            issueDate: null | string;
+            currency: null | string;
+            totalNet: null | string;
+            lines: null | components["schemas"]["DraftLine"][];
         };
         /** @enum {unknown} */
-        PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST";
+        PlausibilityCode: "AIR_HEAVY" | "SEA_TOO_FAST" | "MASS_BELOW_INVOICE";
         PlausibilityWarning: {
             code: components["schemas"]["PlausibilityCode"];
             detail: string;
         };
+        PortalAnswerRequest: {
+            t: null | string;
+            /** Format: uuid */
+            nodeId: string;
+            transportMode?: null | components["schemas"]["TransportMode"];
+            energySource?: null | components["schemas"]["EnergySource"];
+            acceptedTerms?: null | string;
+            evidence?: null | components["schemas"]["AnswerEvidence"];
+        };
+        PortalAnswerResult: {
+            outcome: components["schemas"]["VerifyOutcome"];
+            view: components["schemas"]["PortalView"];
+        };
+        PortalItem: {
+            /** Format: uuid */
+            nodeId: string;
+            status: components["schemas"]["NodeStatus"];
+            invoiceNumber: string;
+            /** Format: date */
+            issueDate: string;
+            itemDescription: string;
+            origin: string;
+            dest: string;
+            modes: components["schemas"]["TransportMode"][];
+            defaultMode: components["schemas"]["TransportMode"];
+            energySources: components["schemas"]["EnergySource"][];
+            defaultEnergy: components["schemas"]["EnergySource"];
+            answeredMode: null | components["schemas"]["TransportMode"];
+            answeredEnergy: null | components["schemas"]["EnergySource"];
+        };
+        PortalView: {
+            supplierLabel: string;
+            buyerName: string;
+            /** Format: date-time */
+            expiresAt: string;
+            items: components["schemas"]["PortalItem"][];
+            terms: components["schemas"]["VerifyTerms"];
+        };
+        PortalViewRequest: {
+            t: null | string;
+        };
         /** @enum {unknown} */
-        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown";
+        ProblemCode: "TooLarge" | "DoctypeForbidden" | "NotUblInvoice" | "Schema" | "Duplicate" | "MissingFile" | "UnsupportedMediaType" | "UnsupportedCurrency" | "NoLane" | "NodeNotFound" | "InvalidToken" | "LinkExpired" | "InvoiceChanged" | "AlreadyUsed" | "InvalidAnswer" | "RateLimited" | "AlternativeNotFound" | "InvalidChange" | "ModeNotAvailable" | "MassUnknown" | "AlreadyConfirmed" | "DeliveryChanged" | "TermsNotAccepted" | "CategoryNotAllowed" | "CategoryChanged" | "InvalidQuestion" | "NotPdf" | "PdfNoText" | "PdfUnreadable" | "ExtractionUnavailable" | "DraftExpired" | "InvalidInvoiceFields" | "UnknownModel" | "ModelNotReady" | "InvalidRecord" | "NoClaim" | "ClaimChanged" | "InvalidEvidence";
+        ReceiptRequest: {
+            /** Format: date */
+            receivedOn?: null | string;
+            customsBorderMode?: null | components["schemas"]["TransportMode"];
+            customsMrn?: null | string;
+        };
         RequestLinkRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -552,6 +999,8 @@ export interface components {
             massUnknown: boolean;
             illustrative: boolean;
         };
+        /** @enum {unknown} */
+        ShippingDocType: "containerNumber" | "airWaybill" | "billOfLading" | "cmr" | "eTransportUit" | "railConsignment";
         SimulateAnswerRequest: {
             /** Format: uuid */
             nodeId: string;
@@ -560,8 +1009,74 @@ export interface components {
             /** Format: double */
             massT?: null | number;
         };
+        SuggestionView: {
+            alternativeId: string;
+            rationale: null | string;
+        };
+        SuggestionsView: {
+            suggestions: components["schemas"]["SuggestionView"][];
+            provider: string;
+        };
+        SupplierTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsText"];
+            en: components["schemas"]["TermsText"];
+        };
+        TargetRequest: {
+            mode?: null | components["schemas"]["TransportMode"];
+            energy?: null | components["schemas"]["EnergySource"];
+            alternativeId?: null | string;
+        };
+        TargetView: {
+            /** Format: double */
+            kg: number;
+            mode: components["schemas"]["TransportMode"];
+            energy: components["schemas"]["EnergySource"];
+            alternativeId: null | string;
+            alternativeLabel: null | string;
+            isDefault: boolean;
+            illustrative: boolean;
+        };
+        TermsAcceptance: {
+            before: string;
+            link: string;
+            after: string;
+        };
+        TermsSection: {
+            /** Format: int32 */
+            number: number;
+            heading: string;
+            paragraphs: string[];
+        };
+        TermsText: {
+            title: string;
+            keyPoints: string[];
+            acceptance: components["schemas"]["TermsAcceptance"];
+            sections: components["schemas"]["TermsSection"][];
+        };
         /** @enum {unknown} */
         TransportMode: "road" | "rail" | "sea" | "air";
+        TrustAssessment: {
+            /** Format: int32 */
+            score: number;
+            band: components["schemas"]["TrustBand"];
+            /** Format: double */
+            kgAtRisk: number;
+            needsReview: boolean;
+            claims: components["schemas"]["ClaimAssessment"][];
+            signals: components["schemas"]["TrustSignal"][];
+        };
+        /** @enum {unknown} */
+        TrustBand: "strong" | "moderate" | "review";
+        TrustSignal: {
+            code: components["schemas"]["TrustSignalCode"];
+            /** Format: int32 */
+            points: number;
+            detail: string;
+        };
+        /** @enum {unknown} */
+        TrustSignalCode: "SAME_NETWORK_AS_LINK_MAKER" | "FAST_ANSWER" | "SELLER_TAX_ID_INVALID" | "MODE_CHANGED_ON_LANE" | "PRIOR_REJECTION" | "SIMULATED_ANSWER" | "RECEIPT_BEFORE_DISPATCH";
         /** @enum {unknown} */
         Uncertainty: "low" | "medium" | "high";
         VerificationView: {
@@ -593,6 +1108,7 @@ export interface components {
             massT: null | number;
             /** Format: date-time */
             expiresAt: string;
+            terms: components["schemas"]["VerifyTerms"];
         };
         VerifyOutcome: {
             /** Format: uuid */
@@ -606,6 +1122,14 @@ export interface components {
             energySource?: null | components["schemas"]["EnergySource"];
             /** Format: double */
             massT?: null | number;
+            acceptedTerms?: null | string;
+            evidence?: null | components["schemas"]["AnswerEvidence"];
+        };
+        VerifyTerms: {
+            version: string;
+            sha256: string;
+            ro: components["schemas"]["TermsAcceptance"];
+            en: components["schemas"]["TermsAcceptance"];
         };
     };
     responses: never;
@@ -681,6 +1205,221 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GraphSnapshot"];
+                };
+            };
+        };
+    };
+    ReviewClassification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClassificationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    RecordReceipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ReviewClaim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SetTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ListCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOption"][];
                 };
             };
         };
@@ -948,6 +1687,188 @@ export interface operations {
             };
         };
     };
+    RequestPortalLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestLinkResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetPortalView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalViewRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalView"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SubmitPortalAnswer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalAnswerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAnswerResult"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    GetSupplierTerms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierTerms"];
+                };
+            };
+        };
+    };
     VerifyAuditChain: {
         parameters: {
             query?: never;
@@ -1034,6 +1955,224 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    SuggestAlternatives: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionsView"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    Chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAnswer"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ChatModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatModels"];
+                };
+            };
+        };
+    };
+    ExtractPdfInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PdfDraftView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Payload Too Large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unsupported Media Type */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+        };
+    };
+    ConfirmPdfInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PdfConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResult"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Gone */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -16,6 +16,7 @@ public class InvoiceRow
     public string InvoiceHash { get; set; } = "";
     public string ExtractedJson { get; set; } = "{}";
     public DateTimeOffset CreatedAt { get; set; }
+    public string DocumentKind { get; set; } = "ubl";
 }
 
 public class NodeRow
@@ -40,6 +41,12 @@ public class NodeRow
     public string? TransportMode { get; set; }
     public string? EnergySource { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string Review { get; set; } = "";
+    public DateTimeOffset? ReviewedAt { get; set; }
+    public string? ClassificationRationale { get; set; }
+    public string? TrustJson { get; set; }
+    public decimal? CountedKg { get; set; }
+    public string? TargetJson { get; set; }
 }
 
 public class VerificationRow
@@ -54,6 +61,9 @@ public class VerificationRow
     public DateTimeOffset ConsumedAt { get; set; }
     public string IpHash { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
+    public string? TermsVersion { get; set; }
+    public string? TermsSha256 { get; set; }
+    public string? EvidenceJson { get; set; }
 }
 
 public class AuditRow
@@ -112,6 +122,15 @@ public class AlternativeRow
     public string LaneId { get; set; } = "";
     public decimal CostEur { get; set; }
     public decimal MassT { get; set; }
+}
+
+/// <summary>A category the buyer chose for a line description, keyed by the description's <c>CacheKey</c> (F6).</summary>
+public class BuyerClassificationRow
+{
+    public Guid WorkspaceId { get; set; }
+    public string LineKey { get; set; } = "";
+    public string CategoryId { get; set; } = "";
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public class BuyerRow

@@ -2,6 +2,7 @@ using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Plausibility;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
@@ -33,21 +34,34 @@ public sealed class NodeViewMapper
         var mode = node.TransportMode ?? lane.ModeDefault;
 
         var spend = new CarbonFigure(node.SpendKg, Factors.SpendInputs(node.SectorId, invoice.IssueDate).ToList());
-        var activity = node.ActivityKg is { } activityKg
-            ? new CarbonFigure(activityKg, Rows(
-                (FactorKind.Transport, FactorTable.TransportKey(mode)),
+        var trust = TrustAssessor.Assess(node, invoice, lane, category, Factors);
+        // F7: a verified node's activity figure is the counted one, so its rows are those of the state it is counted from
+        // (an unbacked mode counts the lane's default mode's row). When no mass backs it, no activity figure counts and the
+        // spend estimate stands.
+        var counted = node.Status == NodeStatus.Verified ? trust?.CountedState : null;
+        var activity = node.ActivityKg is { } activityKg && counted is not { MassT: null }
+            ? new CarbonFigure(node.Status == NodeStatus.Verified ? node.CarbonKg : activityKg, Rows(
+                (FactorKind.Transport, FactorTable.TransportKey(counted?.Mode ?? mode)),
                 (FactorKind.Material, category.MaterialKey)))
             : null;
         var basis = node.Status == NodeStatus.Verified && activity is not null ? CarbonBasis.Activity : CarbonBasis.Spend;
 
         var line = InvoiceFacts.DominantLine(invoice.Extracted.Lines);
+        var aiMapped = node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model;
         var classification = new ClassificationView(
             CategoryId: node.CategoryId,
             CategoryLabel: category.Label,
             Source: node.ClassificationSource,
             Confidence: node.AiConfidence,
-            AiMapped: node.ClassificationSource is ClassificationSource.Cache or ClassificationSource.Model,
-            LineDescription: line.Description);
+            AiMapped: aiMapped,
+            LineDescription: line.Description,
+            Review: node.Review,
+            ReviewedAt: node.ReviewedAt,
+            // No reason for UNCLASSIFIED (what is kept then is a rejection note, such as the model's out-of-list answer,
+            // not a reason for a category) or after a buyer's review (the kept reason was for the category before it).
+            Rationale: node.CategoryId == Ids.Unclassified || node.ClassificationSource == ClassificationSource.Buyer
+                ? null
+                : node.ClassificationRationale);
 
         // Every lane is illustrative until a sourced lane table exists (CLAUDE.md: lane costs and lead times are labelled).
         var laneView = new LaneView(
@@ -59,6 +73,12 @@ public sealed class NodeViewMapper
             Modes: Simulator.AvailableModes(lane),
             DistanceKm: lane.DistanceKm.GetValueOrDefault(mode),
             Illustrative: true);
+
+        var figures = new NodeFigures(
+            EstimateKg: node.SpendKg,
+            ClaimedKg: trust?.ClaimedKg,
+            CountedKg: trust?.CountedKg,
+            Target: TargetFigure.Compute(node, lane, category, _seed, Factors));
 
         return new NodeView(
             Id: node.Id,
@@ -80,8 +100,11 @@ public sealed class NodeViewMapper
             SpendEur: node.SpendEur,
             CostEur: node.CostEur,
             LeadDays: node.LeadDays,
-            Warnings: PlausibilityRules.Check(node.TransportMode, node.MassT),
-            CreatedAt: node.CreatedAt);
+            Warnings: PlausibilityRules.For(node, InvoiceFacts.MassTFromLines(invoice.Extracted.Lines), lane),
+            CreatedAt: node.CreatedAt,
+            Figures: figures,
+            Trust: trust?.Assessment,
+            Evidence: EvidenceView.Of(node.Trust));
     }
 
     private AlternativeView Alternative(Alternative alternative)

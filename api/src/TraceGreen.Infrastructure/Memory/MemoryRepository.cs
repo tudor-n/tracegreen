@@ -86,17 +86,25 @@ public sealed class MemoryRepository : IRepository
         }
     }
 
-    public Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct)
+    public Task<RecordVerificationResult> RecordVerificationAsync(
+        Ctx ctx, Verification verification, VerificationPatcher build, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
     {
         lock (_gate)
         {
             var ws = Get(ctx.WorkspaceId);
-            if (!ws.Nonces.Add(verification.TokenNonce))
+            if (ws.Nonces.Contains(verification.TokenNonce))
             {
                 return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.AlreadyUsed, null, null));
             }
             var node = ws.Nodes.GetValueOrDefault(verification.NodeId)
                 ?? throw new InvalidOperationException($"Node {verification.NodeId} not found.");
+            // Checked before the nonce is taken, so a refused answer leaves nothing behind.
+            if (expected is not null && NodeAnswerState.Of(node) != expected)
+            {
+                return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.NodeChanged, node, null));
+            }
+            ws.Nonces.Add(verification.TokenNonce);
+            var patch = build(node);
             var patched = node with
             {
                 Status = patch.Status,
@@ -106,11 +114,78 @@ public sealed class MemoryRepository : IRepository
                 MassT = patch.MassT ?? node.MassT,
                 CostEur = patch.CostEur,
                 LeadDays = patch.LeadDays,
+                Trust = patch.Trust,
+                CountedKg = patch.CountedKg,
             };
             ws.Nodes[node.Id] = patched;
             ws.Verifications[verification.Id] = verification;
             var entry = ws.Append(audit);
             return Task.FromResult(new RecordVerificationResult(RecordVerificationStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var ws = Get(ctx.WorkspaceId);
+            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.NodeNotFound, null, null));
+            }
+            if (!string.Equals(node.CategoryId, expectedCategoryId, StringComparison.Ordinal))
+            {
+                return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.CategoryChanged, node, null));
+            }
+            var write = review(node);
+            var patch = write.Patch;
+            var patched = node with
+            {
+                CategoryId = patch.CategoryId,
+                SectorId = patch.SectorId,
+                ClassificationSource = patch.Source,
+                AiConfidence = patch.Confidence,
+                Review = patch.Review,
+                ReviewedAt = patch.ReviewedAt,
+                SpendKg = patch.SpendKg,
+                ActivityKg = patch.ActivityKg,
+                CountedKg = patch.CountedKg,
+            };
+            ws.Nodes[node.Id] = patched;
+            ws.BuyerCategories[write.LineKey] = patch.CategoryId;
+            var entry = ws.Append(write.Audit);
+            return Task.FromResult(new ReviewClassificationResult(ReviewClassificationStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<UpdateTrustResult> UpdateTrustAsync(Ctx ctx, Guid nodeId, TrustUpdater update, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var ws = Get(ctx.WorkspaceId);
+            if (ws.Nodes.GetValueOrDefault(nodeId) is not { } node)
+            {
+                return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.NodeNotFound, null, null));
+            }
+            if (update(node) is not { } write)
+            {
+                return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.Refused, node, null));
+            }
+            var patched = node with { Trust = write.Trust, CountedKg = write.CountedKg, Target = write.Target };
+            ws.Nodes[node.Id] = patched;
+            var entry = ws.Append(write.Audit);
+            return Task.FromResult(new UpdateTrustResult(UpdateTrustStatus.Ok, patched, entry));
+        }
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var known = Get(ctx.WorkspaceId).BuyerCategories;
+            return Task.FromResult<IReadOnlyDictionary<string, string>>(
+                lineKeys.Distinct(StringComparer.Ordinal).Where(known.ContainsKey).ToDictionary(k => k, k => known[k], StringComparer.Ordinal));
         }
     }
 
@@ -216,6 +291,8 @@ public sealed class MemoryRepository : IRepository
         public readonly HashSet<string> Nonces = new(StringComparer.Ordinal);
         public readonly List<AuditEntry> Audit = new();
         public readonly Dictionary<Guid, Scenario> Scenarios = new();
+        /// <summary>The buyer's category by <c>CacheKey</c> of a line description (F6).</summary>
+        public readonly Dictionary<string, string> BuyerCategories = new(StringComparer.Ordinal);
         public long LastAuditId;
 
         public AuditEntry Append(AuditBuilder build)
@@ -233,6 +310,7 @@ public sealed class MemoryRepository : IRepository
             Nonces.Clear();
             Audit.Clear();
             Scenarios.Clear();
+            BuyerCategories.Clear();
             LastAuditId = 0;
         }
     }

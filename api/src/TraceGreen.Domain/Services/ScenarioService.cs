@@ -2,6 +2,7 @@ using TraceGreen.Domain.Carbon;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Ports;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Domain.Services;
 
@@ -61,10 +62,15 @@ public sealed class ScenarioService(IRepository repo, IEventBus bus, SeedBundle 
             return Fail(ScenarioErrorCode.NodeNotFound, $"No node {nodeId} in this workspace.");
         }
 
-        return change.Mode is { } mode ? ModeChange(node, mode) : SupplierSwap(node, alternativeId!);
+        if (change.Mode is not { } mode)
+        {
+            return SupplierSwap(node, alternativeId!);
+        }
+        var invoice = await repo.GetInvoiceAsync(ctx, node.InvoiceId, ct);
+        return ModeChange(node, invoice, mode);
     }
 
-    private Result<Run, ScenarioError> ModeChange(SupplierNode node, TransportMode mode)
+    private Result<Run, ScenarioError> ModeChange(SupplierNode node, Invoice? invoice, TransportMode mode)
     {
         var lane = LaneOf(node.LaneId);
         if (!Simulator.AvailableModes(lane).Contains(mode))
@@ -77,8 +83,15 @@ public sealed class ScenarioService(IRepository repo, IEventBus bus, SeedBundle 
             return Fail(ScenarioErrorCode.MassUnknown, "The invoice gives no mass for this item, so a change of mode cannot be estimated.");
         }
 
-        var material = seed.CategoryOf(node.CategoryId).MaterialKey;
-        var result = Simulator.ModeChange(node, lane, material, mode, mapper.Factors, options.EtsPriceEurPerT);
+        var category = seed.CategoryOf(node.CategoryId);
+        // F7: the scenario keeps the answers the counted figure rests on, so a claim nothing backs is not credited to the
+        // change of mode.
+        var counted = invoice is null ? null : TrustAssessor.Assess(node, invoice, lane, category, mapper.Factors)?.CountedState;
+        if (counted is { MassT: null })
+        {
+            return Fail(ScenarioErrorCode.MassUnknown, "No mass backs this delivery's figure yet, so a change of mode cannot be estimated.");
+        }
+        var result = Simulator.ModeChange(node, lane, category.MaterialKey, mode, mapper.Factors, options.EtsPriceEurPerT, counted);
         return Result<Run, ScenarioError>.Ok(new Run(ScenarioKind.Mode, new ScenarioChange(mode, null), result));
     }
 

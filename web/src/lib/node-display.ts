@@ -39,6 +39,16 @@ export function isPlaceholder(factor: FactorLookup): boolean {
   return factor.source.includes('PLACEHOLDER')
 }
 
+/**
+ * The AI's reason for the category, shown only when the AI chose it (the label says whose words they are); null when the
+ * invoice's own code decided, or when no reason was kept. The text is the model's: render it as text.
+ */
+export function aiReason(classification: ClassificationView): string | null {
+  if (!classification.aiMapped) return null
+  const reason = classification.rationale?.trim()
+  return reason ? reason : null
+}
+
 /** "AI-mapped · 0.92" when an AI classification (cache or model) chose the category, null when the invoice did. */
 export function aiMappedLabel(classification: ClassificationView): string | null {
   if (!classification.aiMapped) return null

@@ -30,12 +30,24 @@ export const uncertaintyLabel = {
 
 /** CLAUDE.md: the label on every value an AI classification produced (cache or model). */
 export const AI_MAPPED = 'AI-mapped'
+/** The label on a chat answer the AI wrote (F13): the sentence is the AI's, every value in it is the data's. */
+export const AI_WRITTEN = 'AI-written · values from your data'
+/** The label on a chat answer the AI wrote with no value from the data in it: help, a term, general advice. */
+export const AI_GENERAL = 'AI-written · general, no values from your data'
+/** The label on a chat answer given with a fixed sentence, without the AI. */
+export const FROM_YOUR_DATA = 'From your data'
 /** CLAUDE.md: the label on every alternative the AI suggested. */
 export const AI_SUGGESTED = 'AI-suggested · illustrative'
 /** CLAUDE.md: the label on every field the AI read from a PDF. */
 export const AI_EXTRACTED = 'AI-extracted · check fields'
 /** Lane cost and lead time, and any other figure that is not measured. */
 export const ILLUSTRATIVE = 'illustrative'
+/** F6: the flag on a node whose category waits for a person (an AI-mapped category, or one left unclassified). */
+export const CHECK_CATEGORY = 'Check category'
+/** F6: the provenance note once a person confirmed or chose the node's category (source `buyer`). */
+export const CATEGORY_SET_BY_BUYER = 'Category set by buyer'
+/** F7: the flag on a node whose supplier answers wait for a person (a reduction not backed yet, a contradiction, a weak score). */
+export const CHECK_ANSWERS = 'Check answers'
 
 /** The simulator's MAC badge, by the generated badge value. */
 export const macBadgeLabel = {

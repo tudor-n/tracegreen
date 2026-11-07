@@ -26,7 +26,8 @@ export interface GraphDomain {
   mode: string
 }
 
-export type Panel = 'drawer' | 'audit' | 'simulator'
+/** `chat` (F13) opens where the side panel sits and covers it; picking a supplier closes it again. */
+export type Panel = 'drawer' | 'simulator' | 'chat'
 
 /** The figures of the base node that a scenario's deltas are taken against. */
 export type ScenarioBaseline = Pick<NodeView, 'carbonKg' | 'costEur' | 'leadDays'>
@@ -87,7 +88,7 @@ export const initialDomain: GraphDomain = { buyer: null, nodes: {}, kpis: null, 
 
 export const initialUi: GraphUi = {
   selectedNodeId: null,
-  openPanels: { drawer: false, audit: false, simulator: false },
+  openPanels: { drawer: false, simulator: false, chat: false },
   scenarioPreview: null,
 }
 
@@ -182,7 +183,8 @@ export function createGraphStore(): GraphStore {
         const open = nodeId !== null
         return {
           selectedNodeId: nodeId,
-          openPanels: { ...s.openPanels, drawer: open, simulator: open && s.openPanels.simulator },
+          // Picking a supplier (in the tree or from a chat answer) shows its side panel, so the chat steps aside.
+          openPanels: { drawer: open, simulator: open && s.openPanels.simulator, chat: open ? false : s.openPanels.chat },
           scenarioPreview: s.scenarioPreview?.nodeId === nodeId ? s.scenarioPreview : null,
         }
       }),

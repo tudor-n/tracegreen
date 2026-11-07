@@ -15,6 +15,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
     public DbSet<LaneRow> Lanes => Set<LaneRow>();
     public DbSet<AlternativeRow> Alternatives => Set<AlternativeRow>();
     public DbSet<BuyerRow> Buyers => Set<BuyerRow>();
+    public DbSet<BuyerClassificationRow> BuyerClassifications => Set<BuyerClassificationRow>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
@@ -24,12 +25,15 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.WorkspaceId, x.RawXmlHash });
             e.Property(x => x.ExtractedJson).HasColumnType("jsonb");
+            e.Property(x => x.DocumentKind).HasDefaultValue("ubl");
         });
         model.Entity<NodeRow>(e =>
         {
             e.ToTable("nodes");
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.WorkspaceId);
+            e.Property(x => x.TrustJson).HasColumnType("jsonb");
+            e.Property(x => x.TargetJson).HasColumnType("jsonb");
         });
         model.Entity<VerificationRow>(e =>
         {
@@ -37,6 +41,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.TokenNonce).IsUnique();
             e.HasIndex(x => new { x.WorkspaceId, x.NodeId });
+            e.Property(x => x.EvidenceJson).HasColumnType("jsonb");
         });
         model.Entity<AuditRow>(e =>
         {
@@ -65,6 +70,7 @@ public sealed partial class TraceGreenDbContext(DbContextOptions<TraceGreenDbCon
         });
         model.Entity<AlternativeRow>(e => { e.ToTable("alternatives"); e.HasKey(x => x.Id); });
         model.Entity<BuyerRow>(e => { e.ToTable("buyers"); e.HasKey(x => x.WorkspaceId); });
+        model.Entity<BuyerClassificationRow>(e => { e.ToTable("buyer_classifications"); e.HasKey(x => new { x.WorkspaceId, x.LineKey }); });
 
         // snake_case columns, keys and indexes so the schema reads naturally in psql and on Supabase.
         foreach (var entity in model.Model.GetEntityTypes())

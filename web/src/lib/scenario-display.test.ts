@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { node } from '@/store/testFixtures'
-import { DELTA_STEP, deltaDirection, modeOptions, sameChange, scenarioTitle } from './scenario-display'
+import { aiSuggestion, DELTA_STEP, deltaDirection, modeOptions, sameChange, scenarioTitle } from './scenario-display'
 
 const n1Alt = { id: 'N1-alt', label: 'Cluj Metal Works SRL', country: 'RO', origin: 'RO-CJ', mode: 'road', illustrative: true } as const
 
@@ -57,5 +57,25 @@ describe('deltaDirection', () => {
     expect(deltaDirection(33, DELTA_STEP.leadDays)).toBe('higher')
     expect(deltaDirection(-0.4, DELTA_STEP.costEur)).toBe('same')
     expect(deltaDirection(Number.NaN, DELTA_STEP.costEur)).toBe('same')
+  })
+})
+
+describe('aiSuggestion', () => {
+  const suggestions = [
+    { alternativeId: 'N1-alt', rationale: '  Same die-cast parts, made in Romania. ' },
+    { alternativeId: 'N2-alt', rationale: null },
+  ]
+
+  it("is the AI's reason for an alternative it picked", () => {
+    expect(aiSuggestion(suggestions, 'N1-alt')).toEqual({ reason: 'Same die-cast parts, made in Romania.' })
+  })
+
+  it('keeps the pick without a reason when none survived the checks', () => {
+    expect(aiSuggestion(suggestions, 'N2-alt')).toEqual({ reason: null })
+  })
+
+  it('is nothing for an alternative the AI did not pick', () => {
+    expect(aiSuggestion(suggestions, 'other')).toBeNull()
+    expect(aiSuggestion([], 'N1-alt')).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
 # Development stack: `docker compose build && docker compose up`
 #   db   Postgres 17                               localhost:5432
-#   ai   FastAPI with --reload                     (internal) ai:8000
+#   ai   FastAPI with --reload                     (internal) ai:8000; reaches Ollama on the host as host.docker.internal:11434
 #   api  ASP.NET Core (dotnet run; `docker compose restart api` after C# edits), applies migrations + seed on boot   localhost:8080
 #   web  Vite dev server, proxies /api -> api       localhost:3000   <- open this
 # Source trees are bind-mounted; build outputs live in anonymous volumes; every watcher polls (Windows bind mounts emit no inotify events).
@@ -34,9 +34,28 @@ services:
     environment:
       SEED_DIR: /seed
       WATCHFILES_FORCE_POLLING: "true"
+      # Models and keys come from the root .env (git-ignored); see .env.example and docs/RUNBOOK.md, "AI models".
+      AI_MODELS: ${AI_MODELS:-}
       AI_MODEL: ${AI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_TIMEOUT_S: "10"
+      ANTHROPIC_EFFORT: ${ANTHROPIC_EFFORT:-low}
+      ANTHROPIC_CHAT_EFFORT: ${ANTHROPIC_CHAT_EFFORT:-medium}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-12288}
+      OLLAMA_DISCOVER: ${OLLAMA_DISCOVER:-1}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
+      AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      AI_CHAT_TIMEOUT_S: ${AI_CHAT_TIMEOUT_S:-15}
+      AI_EXTRACT_TIMEOUT_S: ${AI_EXTRACT_TIMEOUT_S:-20}
+      AI_LONG_MODEL_TIMEOUT_S: ${AI_LONG_MODEL_TIMEOUT_S:-12}
+      AI_CHAT_MODELS: ${AI_CHAT_MODELS:-}
+      AI_DEV_ROUTES: ${AI_DEV_ROUTES:-0}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 5s
@@ -52,6 +71,8 @@ services:
       - /src/artifacts
       - nuget:/root/.nuget/packages
       - ./seed:/seed:ro
+      # Read by the banned-term parity test (BannedTermsTests), so `docker compose exec api dotnet test` passes too.
+      - ./scripts:/scripts:ro
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://0.0.0.0:8080
@@ -61,9 +82,11 @@ services:
       DEMO_TOOLS: "1"
       AI_BASE_URL: http://ai:8000
       AI_TIMEOUT_MS: "10000"
+      AI_CHAT_TIMEOUT_MS: ${AI_CHAT_TIMEOUT_MS:-20000}
+      AI_EXTRACT_TIMEOUT_MS: ${AI_EXTRACT_TIMEOUT_MS:-25000}
       SEED_DIR: /seed
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      ETS_PRICE_EUR_PER_T: "70"
+      ETS_PRICE_EUR_PER_T: "90.01"
     ports:
       - "8080:8080"
     depends_on:

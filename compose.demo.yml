@@ -32,6 +32,8 @@ services:
       DATA_MODE: ${DATA_MODE:-}
       AI_BASE_URL: http://ai:8000
       AI_TIMEOUT_MS: "10000"
+      AI_CHAT_TIMEOUT_MS: ${AI_CHAT_TIMEOUT_MS:-20000}
+      AI_EXTRACT_TIMEOUT_MS: ${AI_EXTRACT_TIMEOUT_MS:-25000}
       SEED_DIR: /seed
     volumes: !override
       - ./seed:/seed:ro
@@ -48,11 +50,29 @@ services:
       target: runtime
     volumes: !override
       - ./seed:/seed:ro
+    # The same model variables as compose.yml, from the root .env; extra_hosts (Ollama on the host) comes from there too.
+    # The scoring route stays off in the demo image.
     environment: !override
       SEED_DIR: /seed
+      AI_MODELS: ${AI_MODELS:-}
       AI_MODEL: ${AI_MODEL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_TIMEOUT_S: "10"
+      ANTHROPIC_EFFORT: ${ANTHROPIC_EFFORT:-low}
+      ANTHROPIC_CHAT_EFFORT: ${ANTHROPIC_CHAT_EFFORT:-medium}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-12288}
+      OLLAMA_DISCOVER: ${OLLAMA_DISCOVER:-1}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      AI_TIMEOUT_S: ${AI_TIMEOUT_S:-8}
+      AI_MODEL_TIMEOUT_S: ${AI_MODEL_TIMEOUT_S:-4}
+      OLLAMA_TIMEOUT_S: ${OLLAMA_TIMEOUT_S:-6}
+      AI_CHAT_TIMEOUT_S: ${AI_CHAT_TIMEOUT_S:-15}
+      AI_EXTRACT_TIMEOUT_S: ${AI_EXTRACT_TIMEOUT_S:-20}
+      AI_LONG_MODEL_TIMEOUT_S: ${AI_LONG_MODEL_TIMEOUT_S:-12}
+      AI_CHAT_MODELS: ${AI_CHAT_MODELS:-}
+      AI_DEV_ROUTES: "0"
 
   web:
     build:

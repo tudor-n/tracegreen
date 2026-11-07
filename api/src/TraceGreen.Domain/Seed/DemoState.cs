@@ -66,7 +66,7 @@ public static class DemoState
             var at = node.CreatedAt.AddHours(1);
             verifications.Add(new Verification(
                 spec.VerificationId!.Value, workspaceId, spec.NodeId, spec.Nonce!, spec.TransportMode, spec.EnergySource,
-                node.MassT, at, "seed", at));
+                node.MassT, at, "seed", at, TermsVersion: null, TermsSha256: null));
             Append(at, "verification.submitted", new JsonObject
             {
                 ["nodeId"] = spec.NodeId.ToString("D"),
@@ -83,9 +83,9 @@ public static class DemoState
         DemoNodeSpec spec, ExtractedInvoice extracted, string xml, SeedBundle bundle, FactorTable table, Lane lane, DateTimeOffset createdAt)
     {
         var invoice = NodeFactory.NewInvoice(spec.InvoiceId, bundle.DemoState.WorkspaceId, extracted, xml, createdAt);
-        var (categoryId, confidence, source, _) = InvoiceClassification.Offline(InvoiceFacts.DominantLine(extracted.Lines), bundle);
+        var (categoryId, confidence, source, rationale) = InvoiceClassification.Offline(InvoiceFacts.DominantLine(extracted.Lines), bundle);
         var node = NodeFactory.NewNode(
-            spec.NodeId, invoice, new NodeClassification(categoryId, confidence, source), lane, spec.Status,
+            spec.NodeId, invoice, new NodeClassification(categoryId, confidence, source, rationale), lane, spec.Status,
             spec.TransportMode, spec.EnergySource, bundle, table, createdAt);
         return (invoice, node);
     }

@@ -1,6 +1,6 @@
 # Roadmap status
 
-Status of TraceGreen by roadmap ID, as of 2026-11-05. The strategy roadmap itself is kept outside the repository. Only its IDs and the parts that describe the product live here (ruling R7 in `DECISIONS.md`). Detail and the order of remaining work: `NEXT.md`. Team tasks (`A#`, `B#`, `C#`): `docs/plan/`.
+Status of TraceGreen by roadmap ID, as of 2026-11-06. The strategy roadmap itself is kept outside the repository. Only its IDs and the parts that describe the product live here (ruling R7 in `DECISIONS.md`). Detail and the order of remaining work: `NEXT.md`. Team tasks (`A#`, `B#`, `C#`): `docs/plan/`.
 
 Legend: **done**; **built** (the code exists, but the milestone check that proves it has not been recorded); **partial**; **open**; **outside** (work that happens outside the repository, such as pitch, events and logistics).
 
@@ -17,15 +17,17 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 |---|---|---|---|
 | F1 | e-Factura import (UBL 2.1, BT-158 classification code and BT-159 origin country, unit codes) | **done** | `Domain/Ubl`, `POST /api/ingest/ubl`; the seed XMLs pass ANAF's validator (`NEXT.md`) |
 | F2 | Supply-chain graph: status colours, hotspot ring, log-width edges, KPI bar | **done** | `web/src/store`, `components/graph`, `KpiBar`; KPIs from the API, labelled per ruling R2 |
-| F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; M2's timed run is still open |
+| F3 | Supplier verification loop: signed link and QR, `/verify/:id`, live flip | **built** | API (A5, A6), node drawer and link card (B4), supplier page (C5, phone-tested), flip animation; the Supplier Terms ticked before a submit and recorded in the audit log, printable at `/terms/supplier` (2026-11-06, operator details still placeholders, `docs/legal/README.md`); M2's timed run is still open |
 | F4 | What-if simulator: mode or supplier swap, deltas, MAC badge, saved scenario | **done** | Backend (A7: `POST /api/simulate`, `POST /api/scenarios`, `NodeView.alternatives`); the simulator panel and ghost node in the drawer (B5), checked in the browser in both data modes (`NEXT.md`) |
 | F5 | Audit log panel with chain check | **done** | `AuditPanel`, `POST /api/audit/verify` |
-| F6 | AI line-item classifier with the "AI-mapped" label | **partial** | The C# side classifies from the invoice code, then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The Python service answers `/classify` from the cache, then the stub, with the allow-list enforced (C7); the live model provider is open, and D4 places it in hackathon hours H1–H4 |
-| F7 | Plausibility check | **partial** | `AIR_HEAVY` on the answer and the node (D2); `SEA_TOO_FAST` is in the contract but not evaluated (D3) |
+| F6 | AI line-item classifier with the "AI-mapped" label | **built** | The C# side classifies from the invoice code (CPV, and HS since F6), then `seed/ai-cache.json`, then the AI client, then the stub, and the label is shown. The Python service answers `/classify` from the cache, then the models in `AI_MODELS` (two cloud models and a local `ministral-3:3b` through Ollama), then the stub, within 8 s, with the allow-list and a 0.6 confidence threshold enforced (C7, F6); the Romanian invoices R1–R3 exercise the AI and HS-rule paths. The local model is scored (`docs/ai-eval.md`: 80%) and the AI demo steps are rehearsed with it; the cloud models' scores and the failover steps wait for API keys (`NEXT.md`). Every AI-mapped node waits for a person's review: the API (`POST /api/nodes/{nodeId}/classification`, both data modes) and the dashboard (the "Check category" flag, the Overview's counter, Correct / Change category in the side panel) are built (`NEXT.md`, "Classification review (F6)") |
+| F7 | Plausibility check | **built** | `AIR_HEAVY`, `SEA_TOO_FAST` (from the supplier's dispatch date and the buyer's receipt date, no BT-72 needed) and `MASS_BELOW_INVOICE` on the answer and the node (D2), now shown on the dashboard too. The supplier trust model (`docs/TRUST.md`, 2026-11-06): a reduction a supplier claims counts once a document, the buyer's records or a person backs it; each node shows the estimate, the supplier's figure as answered and as counted, and a target; a 0–100 score and the kilograms at risk order the "Answers to check" list. Optional proof fields on `/verify` and `/supplier`; the buyer's records and decisions in the side panel (`Domain/Trust`, `TrustService`). Stages S2 and S3 in `TRUST.md` remain |
 | F8 | Optional mass confirmation | **partial** | `POST /api/verify` accepts `massT` and a confirmed mass replaces the invoice's; the supplier page does not ask for it yet |
-| F9 | PDF invoice drop | **open** | Hackathon, if time |
+| F9 | PDF invoice drop | **built** | Import invoice also takes a PDF: `POST /api/ingest/pdf/extract` (`PdfImportService`; the AI service's `/extract-pdf` reads the text layer with pypdf and a model copies the fields) gives a draft, and the review form, labelled "AI-extracted · check fields" with the fields the PDF's text does not show marked, lets a person check it; `POST /api/ingest/pdf/confirm` validates and imports it like any invoice and audits which fields the person changed. Scans (no text layer) are refused. Sample: `seed/invoices/P1-bistrita.pdf` |
 | F10 | Scenario export | **open** | Only if everything else is done |
-| F11 | AI alternative suggester | **open** | The alternatives come from the curated `seed/alternatives.json` |
+| F11 | AI alternative suggester | **built** | `GET /api/nodes/{id}/suggestions` (`SuggestionService`) and the AI service's `/suggest` (`ai/app/suggest.py`): the AI picks among the node's curated alternatives from `seed/alternatives.json` only, under short ids, and never sends a figure; the simulator shows "AI-suggested · illustrative" and the AI's reason under the alternative it picked. A reason with a digit or a claim word (lower, closer, cheaper, carbon, …) is dropped on both sides. The seed has one alternative for `zinc_diecast` and one for `pcb`, so the AI can endorse at most one per node (`NEXT.md`) |
+| F12 | Supplier page: one link per supplier, every delivery confirmed from one list | **built** | `PortalService`, `POST /api/portal-link`, `/api/portal/{view,answer}`, `/supplier`, the drawer's "Supplier page link"; the Supplier Terms ticked once per page visit and recorded with each answer; `web/e2e/supplier-portal.spec.ts` passes in both data modes, on the Vite dev stack and in CI on the demo image; not yet run on a real phone (`NEXT.md`) |
+| F13 | Data chat: ask about the workspace's data, answers checked against it | **built** | `POST /api/chat` (`ChatService`, `Domain/Chat/FactPack.cs` and `AnswerCheck.cs`) and the AI service's `/chat`; the panel opens from "Ask" in the sidebar on every screen. The AI writes the sentence and cites every value and name by fact id; the API refuses typed numbers and names, unknown facts, and status, largest, smallest or comparison claims the facts contradict, and fills every value in from the data. Four suggested questions are answered from the data without the AI. Checked with `qwen2.5:14b` through Ollama (`NEXT.md`) |
 
 ## Controls
 
@@ -35,9 +37,9 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | C2 | Token bound to the invoice hash; a mismatch is 410 | **done** | `VerifyService`, `Hashing.InvoiceHash` |
 | C3 | Single use through a unique nonce; a second use is 409 | **done** | Both repositories; the context route answers 409 too |
 | C4 | Hash-chained audit log with an on-screen check | **done** | `AuditChain`, append-only trigger, `AuditPanel` |
-| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES` |
+| C5 | Rate limit on `/api/verify`: 10 a minute per address | **done** | ASP.NET Core limiter, `TRUSTED_PROXIES`; the supplier page's routes count apart, at 3 × the limit (F12) |
 | C6 | Untrusted text rendered as text; CSP header | **done** | `react/no-danger` lint; CSP in `web/nginx.conf` (demo image) |
-| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` |
+| C7 | Supplier page without cookies, login or email | **done** | `/verify/:nodeId` and `/supplier` (F12) |
 | C8 | RLS; secrets only on the server | **partial** | RLS is enabled with no policies yet (the app connects as owner); secrets are server-only; see "Known gaps" in `SECURITY.md` |
 | C9 | 7-day expiry with a countdown on the QR card | **done** | `LINK_TTL_SECONDS` default 604800; "expires in …" on the link card |
 
@@ -48,7 +50,7 @@ Legend: **done**; **built** (the code exists, but the milestone check that prove
 | T1 | 19 Oct | Team registration and dates | **outside** |
 | T2 | 20 Oct | Repository and CI | **done**: repo on the .NET / FastAPI / Vite stack; CI added in A9 (`.github/workflows/ci.yml`) |
 | T3 | 21 Oct | Database, tables, RLS, offline mode | **done**: Postgres with migrations `Init` and `Rls`, plus `DATA_MODE=memory` |
-| T4 | 22 Oct | Factor rows with source, year and row label, and a spend-factor source | **partial**: the spend source is decided (D1, US EPA v1.3) and `docs/factor-sources.md` exists. The freight and material rows and `ETS_PRICE_EUR_PER_T` are still placeholders; a person replaces them |
+| T4 | 22 Oct | Factor rows with source, year and row label, and a spend-factor source | **done** (2026-11-06): spend rows from US EPA v1.3 (D1); freight and material rows from DESNZ 2026, chosen with a person; `ETS_PRICE_EUR_PER_T` 90.01 from the 2026-11-05 EU primary auction (`docs/factor-sources.md`) |
 | T5 | 23 Oct | UBL parser and seed XMLs validated at ANAF | **done** (`NEXT.md`, "Seed XML validation") |
 | T6 | 23 Oct | Carbon math with MAC guard tests | **done**: `Domain/Carbon` |
 | T7 | 24 Oct | Graph, status colours, KPI bar | **done** (M1) |

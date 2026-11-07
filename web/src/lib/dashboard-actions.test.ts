@@ -1,7 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { savedScenario, scenarioResult } from '@/store/testFixtures'
-import { failureMessage, requestLink, saveScenario, simulateChange, verifyAuditChain } from './dashboard-actions'
+import {
+  askChat,
+  confirmPdf,
+  extractPdf,
+  failureMessage,
+  fetchChatModels,
+  fetchSuggestions,
+  requestLink,
+  requestPortalLink,
+  saveScenario,
+  simulateChange,
+  verifyAuditChain,
+} from './dashboard-actions'
 
 const problem = (status: number, code: string, detail: string) => ({
   type: 'about:blank',
@@ -41,6 +53,23 @@ describe('failureMessage', () => {
 
   it("reads a proxy's bare 413 as too large", () => {
     expect(failureMessage(413, '<html>413 Request Entity Too Large</html>')).toBe('File too large.')
+  })
+})
+
+describe('requestPortalLink', () => {
+  const nodeId = '00000000-0000-0000-0000-0000000000a1'
+  const link = { nodeId, url: 'http://192.168.137.1:3000/supplier?t=p1.x', expiresAt: '2026-11-03T10:00:00Z', loopback: false }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the node id to the supplier page route and returns the link', async () => {
+    const post = vi
+      .spyOn(api, 'POST')
+      .mockResolvedValue({ data: link, response: new Response(null, { status: 201 }) } as never)
+    expect(await requestPortalLink(nodeId)).toEqual({ ok: true, data: link })
+    expect(post).toHaveBeenCalledWith('/api/portal-link', { body: { nodeId } })
   })
 })
 
@@ -162,5 +191,110 @@ describe('saveScenario', () => {
       ok: false,
       message: 'Supplier not on the graph. No node on the graph.',
     })
+  })
+})
+
+describe('fetchSuggestions', () => {
+  const nodeId = '11111111-1111-4111-8111-000000000002'
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("asks for the node's suggestions with the caller's abort signal", async () => {
+    const view = { suggestions: [{ alternativeId: 'N2-alt', rationale: 'Fits.' }], provider: 'openai:model-a' }
+    const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: view, response: new Response(null, { status: 200 }) } as never)
+    const signal = new AbortController().signal
+    expect(await fetchSuggestions(nodeId, signal)).toEqual({ ok: true, data: view })
+    expect(get).toHaveBeenCalledWith('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal })
+  })
+
+  it('reports an unreachable API instead of throwing', async () => {
+    vi.spyOn(api, 'GET').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect((await fetchSuggestions(nodeId)).ok).toBe(false)
+  })
+})
+
+describe('askChat', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the question with the earlier questions and returns the checked answer', async () => {
+    const answer = { status: 'answered', segments: [{ text: null, factId: 'S1.name' }], facts: [], provider: 'openai:model-a' }
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: answer, response: new Response(null, { status: 200 }) } as never)
+    expect(await askChat('Who emits most?', ['Before?'])).toEqual({ ok: true, data: answer })
+    expect(post).toHaveBeenCalledWith('/api/chat', { body: { question: 'Who emits most?', history: ['Before?'] }, signal: undefined })
+  })
+
+  it('shows the rate limit as its headline', async () => {
+    vi.spyOn(api, 'POST').mockResolvedValue({
+      error: problem(429, 'RateLimited', 'Too many attempts from this address; wait a minute.'),
+      response: new Response(null, { status: 429 }),
+    } as never)
+    const result = await askChat('Q', [])
+    expect(result.ok).toBe(false)
+  })
+
+  it('sends the chosen model with the question', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: {}, response: new Response(null, { status: 200 }) } as never)
+    await askChat('Q', [], 'ollama:qwen2.5:14b')
+    expect(post).toHaveBeenCalledWith('/api/chat', { body: { question: 'Q', history: [], model: 'ollama:qwen2.5:14b' }, signal: undefined })
+  })
+
+  it('shows a model the server does not offer as its headline', async () => {
+    vi.spyOn(api, 'POST').mockResolvedValue({
+      error: problem(422, 'ModelNotReady', 'That model is not set up on the server yet; pick another one or Automatic.'),
+      response: new Response(null, { status: 422 }),
+    } as never)
+    expect(await askChat('Q', [], 'anthropic:claude-x')).toEqual({
+      ok: false,
+      message: 'That model is not set up yet. That model is not set up on the server yet; pick another one or Automatic.',
+    })
+  })
+})
+
+describe('fetchChatModels', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns the server list', async () => {
+    const list = { available: true, models: [{ id: 'ollama:m', provider: 'ollama', model: 'm', ready: true, reason: null, automatic: false }] }
+    const get = vi.spyOn(api, 'GET').mockResolvedValue({ data: list, response: new Response(null, { status: 200 }) } as never)
+    const signal = new AbortController().signal
+    expect(await fetchChatModels(signal)).toEqual({ ok: true, data: list })
+    expect(get).toHaveBeenCalledWith('/api/chat/models', { signal })
+  })
+
+  it('fails on a network error, so the panel can offer Automatic alone', async () => {
+    vi.spyOn(api, 'GET').mockRejectedValue(new TypeError('Failed to fetch'))
+    expect((await fetchChatModels()).ok).toBe(false)
+  })
+})
+
+describe('extractPdf and confirmPdf', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('sends the PDF itself in the multipart field file', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: { draftId: 'd' }, response: new Response(null, { status: 200 }) } as never)
+    const file = new File(['%PDF-1.4'], 'invoice.pdf', { type: 'application/pdf' })
+
+    await extractPdf(file)
+
+    const [path, options] = post.mock.calls[0] as unknown as [string, { body: unknown; bodySerializer: () => FormData }]
+    expect(path).toBe('/api/ingest/pdf/extract')
+    expect(options.body).toBe(file)
+    expect(options.bodySerializer().get('file')).toBe(file)
+  })
+
+  it('confirms the draft with the checked fields', async () => {
+    const post = vi.spyOn(api, 'POST').mockResolvedValue({ data: { node: { label: 'X' } }, response: new Response(null, { status: 201 }) } as never)
+    const invoice = { supplierName: 'A', supplierTaxId: 'RO1', supplierCountry: 'RO', invoiceNumber: 'N', issueDate: '2026-10-22', currency: 'EUR', totalNet: '1', lines: [] }
+
+    expect((await confirmPdf('d', invoice)).ok).toBe(true)
+    expect(post).toHaveBeenCalledWith('/api/ingest/pdf/confirm', { body: { draftId: 'd', invoice } })
   })
 })

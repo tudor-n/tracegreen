@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -162,18 +163,38 @@ def test_health_reports_the_provider_chain_and_the_cache_size() -> None:
         "provider": "cache,stub",
         "cacheEntries": entries,
         "modelConfigured": False,
+        "models": [],
     }
 
 
-def test_suggest_accepts_the_api_request_and_returns_no_suggestions_yet() -> None:
+def test_suggest_without_a_model_suggests_nothing() -> None:
     request = {
-        "node": {"id": "11111111-1111-4111-8111-000000000001", "categoryId": "zinc_diecast"},
-        "candidates": [{"id": "N1-alt", "label": "Alternative", "nodeCategory": "zinc_diecast"}],
+        "node": {
+            "categoryLabel": "Zinc die-cast parts",
+            "lineDescription": "Zinc die-cast sensor housings",
+            "country": "CN",
+            "origin": "Shenzhen, CN",
+            "mode": "air",
+            "status": "ESTIMATED",
+        },
+        "candidates": [
+            {
+                "alternativeId": "N1-alt",
+                "label": "Alternative",
+                "country": "RO",
+                "origin": "Bistrita, RO",
+                "mode": "road",
+            }
+        ],
     }
     response = client().post("/suggest", json=request)
     assert response.status_code == 200
-    assert response.json() == {"suggestions": []}
+    assert response.json() == {"suggestions": [], "provider": "stub"}
 
 
-def test_extract_pdf_is_not_implemented() -> None:
-    assert client().post("/extract-pdf").status_code == 501
+def test_extract_pdf_without_a_model_is_unavailable() -> None:
+    from tests.pdf_fixture import make_pdf
+
+    pdf = base64.b64encode(make_pdf(["Invoice 1"])).decode()
+    response = client().post("/extract-pdf", json={"pdfBase64": pdf})
+    assert response.status_code == 503

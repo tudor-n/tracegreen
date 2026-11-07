@@ -77,14 +77,14 @@ public class ScenarioEndpointTests : IClassFixture<TestWebAppFactory>
 
         // Same figures as SimulatorTests.N1AirToSeaIsWinWin: the service only resolves the inputs.
         Assert.Equal("win-win", result.GetProperty("badge").GetString());
-        Assert.Equal(7488.8m, result.GetProperty("carbonKg").GetDecimal());
+        Assert.Equal(8576.311622m, result.GetProperty("carbonKg").GetDecimal());
         Assert.Equal(48690m, result.GetProperty("costEur").GetDecimal());
         Assert.Equal(40, result.GetProperty("leadDays").GetInt32());
         Assert.Equal(33, result.GetProperty("delta").GetProperty("leadDays").GetInt32());
         Assert.Equal("abatement", result.GetProperty("mac").GetProperty("kind").GetString());
         Assert.True(result.GetProperty("illustrative").GetBoolean());
         Assert.False(result.GetProperty("massUnknown").GetBoolean());
-        Assert.Contains("PLACEHOLDER", result.GetProperty("inputs")[0].GetProperty("source").GetString());
+        Assert.Equal("DESNZ UK GHG conversion factors", result.GetProperty("inputs")[0].GetProperty("source").GetString());
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class ScenarioEndpointTests : IClassFixture<TestWebAppFactory>
         var result = await Ok(await Simulate(new { nodeId = N1, alternativeId = "N1-alt" }));
 
         Assert.Contains(result.GetProperty("badge").GetString(), new[] { "premium", "below-ets" });
-        Assert.Equal(6941.4m, result.GetProperty("carbonKg").GetDecimal());
+        Assert.Equal(8015.909262m, result.GetProperty("carbonKg").GetDecimal());
         Assert.Equal(2, result.GetProperty("leadDays").GetInt32());
     }
 

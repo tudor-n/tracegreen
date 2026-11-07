@@ -99,7 +99,8 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         return new InsertInvoiceResult(InsertInvoiceStatus.Ok, Mapping.ToDomain(row), null);
     }
 
-    public async Task<RecordVerificationResult> RecordVerificationAsync(Ctx ctx, Verification verification, NodePatch patch, AuditBuilder audit, CancellationToken ct)
+    public async Task<RecordVerificationResult> RecordVerificationAsync(
+        Ctx ctx, Verification verification, VerificationPatcher build, AuditBuilder audit, NodeAnswerState? expected, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -111,7 +112,14 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         }
         var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == verification.NodeId, ct)
             ?? throw new InvalidOperationException($"Node {verification.NodeId} not found.");
-        Mapping.Apply(nodeRow, patch);
+        // Read under the workspace's advisory lock, which every write takes, so no other answer can land between this check
+        // and the commit. Returning disposes the transaction uncommitted.
+        var current = Mapping.ToDomain(nodeRow);
+        if (expected is not null && NodeAnswerState.Of(current) != expected)
+        {
+            return new RecordVerificationResult(RecordVerificationStatus.NodeChanged, current, null);
+        }
+        Mapping.Apply(nodeRow, build(current));
         db.Verifications.Add(Mapping.ToRow(verification));
         var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, audit, ct);
         try
@@ -124,6 +132,85 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         }
         await tx.CommitAsync(ct);
         return new RecordVerificationResult(RecordVerificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
+    public async Task<ReviewClassificationResult> ReviewClassificationAsync(
+        Ctx ctx, Guid nodeId, string expectedCategoryId, ClassificationReviewer review, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockWorkspaceAsync(db, ctx.WorkspaceId, ct);
+
+        // Read under the workspace's advisory lock, which every write takes, so the review is computed from the node as it
+        // is at the commit. Returning before the commit disposes the transaction uncommitted.
+        var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == nodeId, ct);
+        if (nodeRow is null)
+        {
+            return new ReviewClassificationResult(ReviewClassificationStatus.NodeNotFound, null, null);
+        }
+        var current = Mapping.ToDomain(nodeRow);
+        if (!string.Equals(current.CategoryId, expectedCategoryId, StringComparison.Ordinal))
+        {
+            return new ReviewClassificationResult(ReviewClassificationStatus.CategoryChanged, current, null);
+        }
+        var write = review(current);
+        Mapping.Apply(nodeRow, write.Patch);
+        var remembered = await db.BuyerClassifications.FirstOrDefaultAsync(b => b.WorkspaceId == ctx.WorkspaceId && b.LineKey == write.LineKey, ct);
+        if (remembered is null)
+        {
+            db.BuyerClassifications.Add(new BuyerClassificationRow
+            {
+                WorkspaceId = ctx.WorkspaceId, LineKey = write.LineKey, CategoryId = write.Patch.CategoryId, UpdatedAt = write.Patch.ReviewedAt.ToUniversalTime(),
+            });
+        }
+        else
+        {
+            remembered.CategoryId = write.Patch.CategoryId;
+            remembered.UpdatedAt = write.Patch.ReviewedAt.ToUniversalTime();
+        }
+        var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, write.Audit, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return new ReviewClassificationResult(ReviewClassificationStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
+    public async Task<UpdateTrustResult> UpdateTrustAsync(Ctx ctx, Guid nodeId, TrustUpdater update, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await LockWorkspaceAsync(db, ctx.WorkspaceId, ct);
+
+        // Read under the workspace's advisory lock, which every write takes, so the write is computed from the node as it is
+        // at the commit. Returning before the commit disposes the transaction uncommitted.
+        var nodeRow = await db.Nodes.FirstOrDefaultAsync(n => n.WorkspaceId == ctx.WorkspaceId && n.Id == nodeId, ct);
+        if (nodeRow is null)
+        {
+            return new UpdateTrustResult(UpdateTrustStatus.NodeNotFound, null, null);
+        }
+        var current = Mapping.ToDomain(nodeRow);
+        if (update(current) is not { } write)
+        {
+            return new UpdateTrustResult(UpdateTrustStatus.Refused, current, null);
+        }
+        Mapping.Apply(nodeRow, write);
+        var auditRow = await StageAuditAsync(db, ctx.WorkspaceId, write.Audit, ct);
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return new UpdateTrustResult(UpdateTrustStatus.Ok, Mapping.ToDomain(nodeRow), Mapping.ToDomain(auditRow));
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> ListBuyerClassificationsAsync(Ctx ctx, IReadOnlyCollection<string> lineKeys, CancellationToken ct)
+    {
+        if (lineKeys.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        var keys = lineKeys.Distinct(StringComparer.Ordinal).ToList();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var rows = await db.BuyerClassifications.AsNoTracking()
+            .Where(b => b.WorkspaceId == ctx.WorkspaceId && keys.Contains(b.LineKey))
+            .ToListAsync(ct);
+        return rows.ToDictionary(r => r.LineKey, r => r.CategoryId, StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyList<Verification>> ListVerificationsAsync(Ctx ctx, Guid nodeId, CancellationToken ct)
@@ -221,7 +308,7 @@ public sealed class EfRepository(IDbContextFactory<TraceGreenDbContext> factory)
         {
             // Row triggers keep audit_log immutable; TRUNCATE is statement-level and is the one sanctioned reset path (single-tenant demo).
             await db.Database.ExecuteSqlRawAsync(
-                "TRUNCATE TABLE invoices, nodes, verifications, scenarios, audit_log RESTART IDENTITY", ct);
+                "TRUNCATE TABLE invoices, nodes, verifications, scenarios, buyer_classifications, audit_log RESTART IDENTITY", ct);
         }
 
         var alreadySeeded = await db.AuditLog.AnyAsync(a => a.WorkspaceId == workspaceId, ct)

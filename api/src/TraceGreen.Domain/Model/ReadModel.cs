@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Domain.Model;
 
@@ -14,6 +15,10 @@ public sealed record CarbonFigure(decimal Kg, IReadOnlyList<FactorLookup> Factor
 /// <summary>
 /// How the node's category was decided. <see cref="AiMapped"/> is true when the category came from the AI (live or
 /// pre-computed cache), so the UI must label it "AI-mapped". <see cref="LineDescription"/> is invoice text: render it as text.
+/// <see cref="Review"/> says whether a person still has to confirm or change the category; <see cref="ReviewedAt"/> is when
+/// a person last did (null before). After a review the source is <c>buyer</c> and the confidence null.
+/// <see cref="Rationale"/> is the one-line reason of whatever chose the category (a model's own words when AI-mapped),
+/// at most 200 characters, null when none was kept; render it as text.
 /// </summary>
 public sealed record ClassificationView(
     string CategoryId,
@@ -21,7 +26,10 @@ public sealed record ClassificationView(
     ClassificationSource Source,
     double? Confidence,
     bool AiMapped,
-    string LineDescription);
+    string LineDescription,
+    ClassificationReview Review,
+    DateTimeOffset? ReviewedAt,
+    string? Rationale);
 
 /// <summary>
 /// The node's freight lane. <see cref="Mode"/> is the confirmed mode, or the lane default before the supplier answers;
@@ -53,6 +61,9 @@ public sealed record InvoiceSummary(Guid Id, string Number, DateOnly IssueDate, 
 /// <see cref="CostEur"/> and <see cref="LeadDays"/> derive from the lane and are illustrative like it.
 /// <see cref="Warnings"/> are derived from the supplier's answers on every read (D2: shown, never blocking).
 /// <see cref="Alternatives"/> are the suppliers of the same category the simulator offers for this node.
+/// <see cref="Figures"/> are the node's three figures (F7): the spend estimate, the supplier data as claimed and as counted,
+/// and the target. <see cref="Trust"/> weighs the supplier's answers (null before any answer); <see cref="Evidence"/> is
+/// what the supplier and the buyer recorded to back them. Supplier-given ids are text: render them as text.
 /// </summary>
 public sealed record NodeView(
     Guid Id,
@@ -75,7 +86,38 @@ public sealed record NodeView(
     decimal CostEur,
     int LeadDays,
     IReadOnlyList<PlausibilityWarning> Warnings,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    NodeFigures Figures,
+    TrustAssessment? Trust,
+    EvidenceView Evidence);
+
+/// <summary>
+/// The three figures of a node (F7). <see cref="EstimateKg"/> is spend × the sector's factor. <see cref="ClaimedKg"/> and
+/// <see cref="CountedKg"/> exist once the node is VERIFIED with a known mass: the activity figure as the supplier's answers
+/// give it, and as counted, with every reduction nothing backs yet replaced by its fallback; the node's <c>carbonKg</c> is
+/// the counted one. <see cref="Target"/> is the best state the delivery could reach, illustrative like every lane figure.
+/// </summary>
+public sealed record NodeFigures(decimal EstimateKg, decimal? ClaimedKg, decimal? CountedKg, TargetView? Target);
+
+/// <summary>
+/// What backs a node's answers: the supplier's shipping document, dispatch date and certificate, and the buyer's
+/// goods-receipt date and customs record. Every field is null until someone gives it.
+/// </summary>
+public sealed record EvidenceView(
+    ShippingDocType? ShippingDocType,
+    string? ShippingDocId,
+    DateOnly? DispatchDate,
+    EnergyCertType? EnergyCertType,
+    string? EnergyCertId,
+    DateOnly? ReceivedOn,
+    TransportMode? CustomsBorderMode,
+    string? CustomsMrn)
+{
+    public static EvidenceView Of(TrustInputs? inputs) => new(
+        inputs?.Evidence?.ShippingDocType, inputs?.Evidence?.ShippingDocId, inputs?.Evidence?.DispatchDate,
+        inputs?.Evidence?.EnergyCertType, inputs?.Evidence?.EnergyCertId,
+        inputs?.Records?.ReceivedOn, inputs?.Records?.CustomsBorderMode, inputs?.Records?.CustomsMrn);
+}
 
 /// <summary>What a dashboard learns about a supplier answer: never the nonce or the address hash.</summary>
 public sealed record VerificationView(
@@ -89,13 +131,15 @@ public sealed record VerificationView(
 public sealed record IngestResult(NodeView Node, Kpis Kpis);
 
 /// <summary>
-/// Plausibility rules over a supplier's answers, serialised by their rule names. <c>SEA_TOO_FAST</c> needs dispatch and
-/// delivery dates that no invoice carries yet (D3), so it is part of the contract but not evaluated.
+/// Plausibility rules over a supplier's answers, serialised by their rule names. <c>SEA_TOO_FAST</c> compares the supplier's
+/// dispatch date with the buyer's goods-receipt date (F7), so it fires once both are known; <c>MASS_BELOW_INVOICE</c> is a
+/// confirmed shipping mass below the invoice's net goods mass.
 /// </summary>
 public enum PlausibilityCode
 {
     [JsonStringEnumMemberName("AIR_HEAVY")] AirHeavy,
     [JsonStringEnumMemberName("SEA_TOO_FAST")] SeaTooFast,
+    [JsonStringEnumMemberName("MASS_BELOW_INVOICE")] MassBelowInvoice,
 }
 
 /// <summary>A "please reconfirm" note; it never blocks a verification. <see cref="Detail"/> is English for logs and tooltips; UIs key on <see cref="Code"/>.</summary>
@@ -106,7 +150,8 @@ public sealed record LinkGrant(Guid NodeId, string Url, DateTimeOffset ExpiresAt
 
 /// <summary>
 /// What the supplier's phone page needs to ask its two questions, and nothing personal: company names, the invoiced item,
-/// the lane's modes with the default pre-selected, and the energy answers with grid pre-selected.
+/// the lane's modes with the default pre-selected, the energy answers with grid pre-selected, and the checkbox statement of
+/// the <see cref="Terms"/> the supplier must accept before submitting (both languages, so the page switches without a request).
 /// <see cref="ItemDescription"/> is invoice text: render it as text.
 /// </summary>
 public sealed record VerifyContext(
@@ -123,10 +168,51 @@ public sealed record VerifyContext(
     IReadOnlyList<EnergySource> EnergySources,
     EnergySource DefaultEnergy,
     decimal? MassT,
-    DateTimeOffset ExpiresAt);
+    DateTimeOffset ExpiresAt,
+    VerifyTerms Terms);
 
-/// <summary>The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.</summary>
-public sealed record VerifyAnswer(string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT);
+/// <summary>
+/// The supplier's answers. A null mode or energy source is a skipped question, which makes the node PARTIAL.
+/// <see cref="AcceptedTerms"/> is the <see cref="SupplierTerms.Sha256"/> of the terms the supplier ticked; anything else is refused.
+/// <see cref="Simulated"/> marks an answer the demo tool gave for a supplier, so its audit entry says so.
+/// <see cref="Evidence"/> is what the supplier gave to back the answers (optional, F7).
+/// </summary>
+public sealed record VerifyAnswer(
+    string Token, TransportMode? TransportMode, EnergySource? EnergySource, decimal? MassT, string? AcceptedTerms, bool Simulated = false,
+    AnswerEvidence? Evidence = null);
 
 /// <summary>What the phone page shows after a submit: the node's new status and any plausibility warnings.</summary>
 public sealed record VerifyOutcome(Guid NodeId, NodeStatus Status, IReadOnlyList<PlausibilityWarning> Warnings);
+
+/// <summary>
+/// The supplier page (F12): every delivery on the buyer's graph from the supplier the link was made for, with nothing
+/// personal and no carbon figure. Items still waiting for an answer come before confirmed ones. <see cref="Terms"/> is the
+/// checkbox statement of the supplier terms, as on the phone page: an answer sends back its SHA-256 once the supplier ticked it.
+/// </summary>
+public sealed record PortalView(
+    string SupplierLabel, string BuyerName, DateTimeOffset ExpiresAt, IReadOnlyList<PortalItem> Items, VerifyTerms Terms);
+
+/// <summary>
+/// One delivery on the supplier page, with what the phone page would ask for it. <see cref="DefaultMode"/> and
+/// <see cref="DefaultEnergy"/> are the answers to pre-select: an answer the node already has, else the lane's default mode
+/// and the power source the supplier gave most recently, else grid. <see cref="AnsweredMode"/> and
+/// <see cref="AnsweredEnergy"/> are what the supplier has confirmed so far (null when not answered).
+/// <see cref="ItemDescription"/> is invoice text: render it as text.
+/// </summary>
+public sealed record PortalItem(
+    Guid NodeId,
+    NodeStatus Status,
+    string InvoiceNumber,
+    DateOnly IssueDate,
+    string ItemDescription,
+    string Origin,
+    string Dest,
+    IReadOnlyList<TransportMode> Modes,
+    TransportMode DefaultMode,
+    IReadOnlyList<EnergySource> EnergySources,
+    EnergySource DefaultEnergy,
+    TransportMode? AnsweredMode,
+    EnergySource? AnsweredEnergy);
+
+/// <summary>What the supplier page gets back for an answer: the outcome, and the list as it now is, so one call is one confirmation.</summary>
+public sealed record PortalAnswerResult(VerifyOutcome Outcome, PortalView View);

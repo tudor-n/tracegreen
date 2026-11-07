@@ -108,6 +108,21 @@ public class IngestEndpointTests : IClassFixture<TestWebAppFactory>
     }
 
     [Fact]
+    public async Task AnImportKeepsTheReasonBehindItsCategory()
+    {
+        await Reset();
+
+        var response = await PostFile(File.ReadAllText(TestPaths.Invoice("adversarial.xml")));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var nodeId = (await Json(response)).GetProperty("node").GetProperty("id").GetGuid();
+        var repo = _factory.Services.GetRequiredService<IRepository>();
+        var node = await repo.GetNodeAsync(new Ctx(Ids.DemoWorkspace, "test"), nodeId, Ct);
+        Assert.Equal(ClassificationSource.Cache, node!.ClassificationSource);
+        Assert.False(string.IsNullOrWhiteSpace(node.ClassificationRationale));
+    }
+
+    [Fact]
     public async Task XmlBodyIsAcceptedLikeAFile()
     {
         await Reset();

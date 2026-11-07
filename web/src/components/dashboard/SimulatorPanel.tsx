@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AlternativeView, NodeView, ScenarioChange, ScenarioResult } from '@/api/client'
-import { Tag } from '@/components/dashboard/DrawerParts'
+import type { AlternativeView, NodeView, ScenarioChange, ScenarioResult, SuggestionView } from '@/api/client'
+import { ExplainedTag, Tag } from '@/components/shell/Page'
 import { FactorInfo } from '@/components/graph/FactorInfo'
 import { ScenarioBadge } from '@/components/graph/ScenarioBadge'
 import { Button } from '@/components/ui/button'
 import { scenarioCopy, simulatorCopy, transportModeCopy } from '@/copy/dashboard'
-import { ILLUSTRATIVE } from '@/copy/labels'
-import { saveScenario, simulateChange } from '@/lib/dashboard-actions'
+import { AI_SUGGESTED, ILLUSTRATIVE } from '@/copy/labels'
+import { fetchSuggestions, saveScenario, simulateChange } from '@/lib/dashboard-actions'
 import {
+  aiSuggestion,
   DELTA_STEP,
   type DeltaDirection,
   deltaDirection,
@@ -24,13 +25,13 @@ import {
   formatEuros,
   formatEurosDelta,
   formatTonnesCo2e,
-  formatTonnesDelta,
+  formatTonnesChange,
   type ScenarioPreview,
   useGraphStore,
 } from '@/store'
 
-// The simulator (B5), at the top of the node drawer while "Simulate" is pressed. Picking a mode, or one of the node's
-// alternative suppliers, asks the API for the change; the answer becomes the store's scenario preview, which this panel and the ghost node on the canvas both show.
+// The simulator (B5), the side panel's What if tab. Picking a mode, or one of the node's
+// alternative suppliers, asks the API for the change; the answer becomes the store's scenario preview, which this panel and the ghost row in the supplier tree both show.
 // The base node is never touched. Every figure, delta, the MAC and its badge come from the API as they are; cost, lead
 // time and the MAC rest on illustrative lane figures and carry the label. A later pick wins over an earlier answer.
 
@@ -42,9 +43,10 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
   const latest = useRef(0)
   const panel = useRef<HTMLElement>(null)
   const options = modeOptions(node.lane)
+  const suggestions = useSuggestions(node)
 
-  // The panel opens at the top of the drawer; bring it into view when the drawer is scrolled down. An answer that
-  // arrives after the panel closed must not put a ghost back on the canvas, so closing invalidates it.
+  // Bring the panel into view when the side panel is scrolled down. An answer that arrives after the panel closed
+  // must not put a ghost back on the tree, so closing invalidates it.
   useEffect(() => {
     panel.current?.scrollIntoView({ block: 'nearest' })
     const pickCount = latest
@@ -87,11 +89,11 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
   else body = <Message>{simulatorCopy.nothingToTry}</Message>
 
   return (
-    <section ref={panel} data-testid="simulator" className="flex flex-col gap-3 rounded-lg border p-3">
-      <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{simulatorCopy.title}</h3>
+    <section ref={panel} data-testid="simulator" className="flex flex-col gap-4">
+      <h3 className="text-[15px] font-semibold">{simulatorCopy.title}</h3>
       <div className="flex flex-col gap-1.5">
         <GroupLabel>{simulatorCopy.modes}</GroupLabel>
-        <div role="group" aria-label={simulatorCopy.modes} className="grid grid-cols-4 gap-1.5">
+        <div role="group" aria-label={simulatorCopy.modes} className="grid grid-cols-4 gap-1 rounded-full bg-[#e9e9ed] p-0.5">
           {options.map(({ mode, available, current }) => {
             const change: ScenarioChange = { mode, alternativeId: null }
             const pressed = sameChange(shown, change)
@@ -104,7 +106,10 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
                 disabled={!available || current}
                 data-testid={`sim-mode-${mode}`}
                 data-available={available}
-                className="h-auto flex-col gap-0 py-1"
+                className={cn(
+                  'h-auto min-h-8 flex-col gap-0 py-1',
+                  !pressed && 'bg-transparent hover:bg-card/70',
+                )}
                 onClick={() => void onPick(change)}
               >
                 {transportModeCopy[mode]}
@@ -127,28 +132,59 @@ export function SimulatorPanel({ node }: { node: NodeView }) {
               const change: ScenarioChange = { mode: null, alternativeId: alternative.id }
               const pressed = sameChange(shown, change)
               return (
-                <Button
-                  key={alternative.id}
-                  size="sm"
-                  variant={pressed ? 'default' : 'outline'}
-                  aria-pressed={pressed}
-                  data-testid={`sim-alt-${alternative.id}`}
-                  className="h-auto justify-between gap-2 py-1.5"
-                  onClick={() => void onPick(change)}
-                >
-                  <span className="truncate">{alternative.label}</span>
-                  <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-normal">
-                    {simulatorCopy.alternativeVia(alternative.country, transportModeCopy[alternative.mode])}
-                    {alternative.illustrative && <Tag>{ILLUSTRATIVE}</Tag>}
-                  </span>
-                </Button>
+                <div key={alternative.id} className="flex flex-col gap-1">
+                  <Button
+                    size="sm"
+                    variant={pressed ? 'default' : 'outline'}
+                    aria-pressed={pressed}
+                    data-testid={`sim-alt-${alternative.id}`}
+                    className="h-auto min-h-11 justify-between gap-2 rounded-2xl px-4 py-2"
+                    onClick={() => void onPick(change)}
+                  >
+                    <span className="truncate">{alternative.label}</span>
+                    <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-normal">
+                      {simulatorCopy.alternativeVia(alternative.country, transportModeCopy[alternative.mode])}
+                      {alternative.illustrative && <Tag>{ILLUSTRATIVE}</Tag>}
+                    </span>
+                  </Button>
+                  <Suggested pick={aiSuggestion(suggestions, alternative.id)} alternativeId={alternative.id} />
+                </div>
               )
             })}
           </div>
         )}
       </div>
-      <div aria-live="polite">{body}</div>
+      <div aria-live="polite" className="rounded-2xl bg-grouped p-4">{body}</div>
     </section>
+  )
+}
+
+/**
+ * The AI's picks among the node's alternatives (F11), asked once when the What if tab opens and dropped when it closes
+ * or the node changes. Until they arrive, or when the AI has none, the list looks exactly as without them.
+ */
+function useSuggestions(node: NodeView): readonly SuggestionView[] {
+  const [answer, setAnswer] = useState<{ nodeId: string; suggestions: readonly SuggestionView[] } | null>(null)
+  const hasAlternatives = node.alternatives.length > 0
+  useEffect(() => {
+    if (!hasAlternatives) return
+    const controller = new AbortController()
+    void fetchSuggestions(node.id, controller.signal).then((result) => {
+      if (!controller.signal.aborted && result.ok) setAnswer({ nodeId: node.id, suggestions: result.data.suggestions })
+    })
+    return () => controller.abort()
+  }, [node.id, hasAlternatives])
+  return answer?.nodeId === node.id ? answer.suggestions : []
+}
+
+/** Under an alternative the AI picked: the label once, with what it means, and the AI's reason when one is kept. */
+function Suggested({ pick, alternativeId }: { pick: { reason: string | null } | null; alternativeId: string }) {
+  if (pick === null) return null
+  return (
+    <p data-testid={`sim-alt-${alternativeId}-suggested`} className="flex flex-wrap items-baseline gap-1.5 px-4 text-xs text-muted-foreground">
+      <ExplainedTag help={simulatorCopy.suggestedHelp}>{AI_SUGGESTED}</ExplainedTag>
+      {pick.reason !== null && <span className="break-words">{simulatorCopy.why(pick.reason)}</span>}
+    </p>
   )
 }
 
@@ -239,7 +275,8 @@ function Figures({ result }: { result: ScenarioResult }) {
             <FactorInfo factors={result.inputs} />
           </span>
         }
-        delta={`${formatTonnesDelta(delta.carbonKg)} ${CO2E_UNIT}`}
+        // From the figures as shown: the node's figure (result minus the API's delta) and the result.
+        delta={`${formatTonnesChange(result.carbonKg, result.carbonKg - delta.carbonKg)} ${CO2E_UNIT}`}
         direction={deltaDirection(delta.carbonKg, DELTA_STEP.carbonKg)}
         testId="sim-delta-carbon"
       />
@@ -265,7 +302,7 @@ function Figures({ result }: { result: ScenarioResult }) {
             {simulatorCopy.mac}
             <Tag>{ILLUSTRATIVE}</Tag>
           </dt>
-          <dd data-testid="sim-mac" className="text-right tabular-nums">
+          <dd data-testid="sim-mac" className="text-right whitespace-nowrap tabular-nums">
             {simulatorCopy.perTonne(formatEuros(mac.macEurPerT), CO2E_UNIT)}
           </dd>
         </div>
@@ -276,8 +313,8 @@ function Figures({ result }: { result: ScenarioResult }) {
 
 // The status hues, a shade darker so small text keeps a 4.5:1 contrast on the card.
 const directionTone: Record<DeltaDirection, string> = {
-  lower: 'text-green-700',
-  higher: 'text-amber-700',
+  lower: 'text-verified-ink',
+  higher: 'text-estimated-ink',
   same: 'text-muted-foreground',
 }
 

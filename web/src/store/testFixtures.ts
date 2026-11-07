@@ -19,6 +19,7 @@ export const kpis = (totalKg: number, nodeCount = 1): Kpis => ({
   spendEur: 0,
   nodeCount,
   verifiedCount: 0,
+  kgAtRisk: 0,
 })
 
 export function node(id: string, carbonKg: number, overrides: Partial<NodeView> = {}): NodeView {
@@ -40,6 +41,9 @@ export function node(id: string, carbonKg: number, overrides: Partial<NodeView> 
       confidence: null,
       aiMapped: false,
       lineDescription: 'line',
+      review: 'notNeeded',
+      reviewedAt: null,
+      rationale: null,
     },
     invoice: { id: `inv-${id}`, number: `INV-${id}`, issueDate: '2026-10-01', currency: 'EUR', total: 1000 },
     lane: {
@@ -61,6 +65,18 @@ export function node(id: string, carbonKg: number, overrides: Partial<NodeView> 
     leadDays: 3,
     warnings: [],
     createdAt: '2026-10-20T10:00:00Z',
+    figures: { estimateKg: carbonKg, claimedKg: null, countedKg: null, target: null },
+    trust: null,
+    evidence: {
+      shippingDocType: null,
+      shippingDocId: null,
+      dispatchDate: null,
+      energyCertType: null,
+      energyCertId: null,
+      receivedOn: null,
+      customsBorderMode: null,
+      customsMrn: null,
+    },
     ...overrides,
   }
 }

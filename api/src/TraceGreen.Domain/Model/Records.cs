@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using TraceGreen.Domain.Trust;
 
 namespace TraceGreen.Domain.Model;
 
@@ -44,7 +45,8 @@ public sealed record Invoice(
     string RawXmlHash,
     string InvoiceHash,
     ExtractedInvoice Extracted,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string DocumentKind = "ubl");
 
 public sealed record SupplierNode(
     Guid Id,
@@ -66,13 +68,57 @@ public sealed record SupplierNode(
     int LeadDays,
     TransportMode? TransportMode,
     EnergySource? EnergySource,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    ClassificationReview Review = ClassificationReview.NotNeeded,
+    DateTimeOffset? ReviewedAt = null,
+    string? ClassificationRationale = null,
+    TrustInputs? Trust = null,
+    decimal? CountedKg = null,
+    TargetChoice? Target = null)
 {
-    /// <summary>The number the graph shows: activity-based once verified, otherwise the spend-based estimate.</summary>
-    public decimal CarbonKg => Status == NodeStatus.Verified && ActivityKg is { } activity ? activity : SpendKg;
+    /// <summary>
+    /// The number the graph shows and the KPIs add up: once verified, the activity figure as counted (each reduction nothing
+    /// backs yet replaced by its fallback, F7), otherwise the spend-based estimate. <see cref="ActivityKg"/> is the activity
+    /// figure as the supplier claimed it; <see cref="CountedKg"/> is null on rows written before the trust model, which
+    /// then count as claimed.
+    /// </summary>
+    public decimal CarbonKg => Status == NodeStatus.Verified && ActivityKg is { } activity ? CountedKg ?? activity : SpendKg;
 }
 
-/// <summary>The fields a supplier verification may change on a node; cost and lead time follow the confirmed mode.</summary>
+/// <summary>
+/// The fields a classification review changes on a node: the category and what follows from it (sector, spend figure,
+/// activity figure), the source <see cref="ClassificationSource.Buyer"/> with no AI confidence, and the review state.
+/// Cost and lead time depend on the lane and the mass only, so they stay.
+/// </summary>
+public sealed record ClassificationPatch(
+    string CategoryId,
+    string SectorId,
+    ClassificationSource Source,
+    double? Confidence,
+    ClassificationReview Review,
+    DateTimeOffset ReviewedAt,
+    decimal SpendKg,
+    decimal? ActivityKg,
+    decimal? CountedKg = null);
+
+/// <summary>
+/// What a review writes: the node's new classification fields, the audit entry that records the change, and the
+/// buyer's category remembered under <see cref="LineKey"/> (the <c>CacheKey</c> of the dominant line's description), so a
+/// later line with the same description gets it before the AI is asked.
+/// </summary>
+public sealed record ClassificationWrite(ClassificationPatch Patch, string LineKey, AuditBuilder Audit);
+
+/// <summary>
+/// Computes a review's write from the node as the repository holds it under the write's lock, so the recomputed figures
+/// always rest on the node's current answers and mass, whatever landed just before.
+/// </summary>
+public delegate ClassificationWrite ClassificationReviewer(SupplierNode current);
+
+/// <summary>
+/// The fields a supplier verification may change on a node; cost and lead time follow the confirmed mode. <see cref="Trust"/>
+/// is what the trust assessment reads after this answer (its evidence and how it arrived), <see cref="CountedKg"/> the
+/// figure it counts.
+/// </summary>
 public sealed record NodePatch(
     NodeStatus Status,
     decimal? ActivityKg,
@@ -80,7 +126,29 @@ public sealed record NodePatch(
     EnergySource? EnergySource,
     decimal? MassT,
     decimal CostEur,
-    int LeadDays);
+    int LeadDays,
+    TrustInputs? Trust = null,
+    decimal? CountedKg = null);
+
+/// <summary>
+/// Computes a verification's patch from the node as the repository holds it under the write's lock, so the answer's trust
+/// inputs keep a buyer's record or decision that landed after the caller read the node, and the figures rest on its
+/// current category (F7).
+/// </summary>
+public delegate NodePatch VerificationPatcher(SupplierNode current);
+
+/// <summary>
+/// A change to what a node's trust assessment reads (the buyer's records, a person's decision on a claim) or to its target,
+/// with the counted figure recomputed from it and the audit entry that records it. Written whole: the computing side copies
+/// what it does not change from the node it was given.
+/// </summary>
+public sealed record TrustWrite(TrustInputs? Trust, decimal? CountedKg, TargetChoice? Target, AuditBuilder Audit);
+
+/// <summary>
+/// Computes a trust write from the node as the repository holds it under the write's lock; null refuses the write (the node
+/// no longer matches what the caller's page showed), and nothing is written.
+/// </summary>
+public delegate TrustWrite? TrustUpdater(SupplierNode current);
 
 public sealed record Verification(
     Guid Id,
@@ -92,7 +160,10 @@ public sealed record Verification(
     decimal? MassTConfirmed,
     DateTimeOffset ConsumedAt,
     string IpHash,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? TermsVersion,
+    string? TermsSha256,
+    AnswerEvidence? Evidence = null);
 
 public sealed record AuditEntry(
     long Id,
@@ -147,13 +218,18 @@ public sealed record Alternative(
 
 public sealed record Category(string Id, string Label, string MaterialKey, string SectorKey);
 
+/// <summary>
+/// <see cref="KgAtRisk"/>: the reductions supplier answers claim that nothing backs yet, summed over the verified nodes. The
+/// totals already leave them out (each node counts its fallback), so this is what proving them could take off.
+/// </summary>
 public sealed record Kpis(
     decimal TotalKg,
     double PrimaryShare,
     double EstimatedShare,
     decimal SpendEur,
     int NodeCount,
-    int VerifiedCount);
+    int VerifiedCount,
+    decimal KgAtRisk);
 
 /// <summary>
 /// Everything the dashboard renders. <see cref="LastSeq"/> is read before the nodes, so an event published while the

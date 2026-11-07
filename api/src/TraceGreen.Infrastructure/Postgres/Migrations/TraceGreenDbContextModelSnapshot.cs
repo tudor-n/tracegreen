@@ -114,6 +114,31 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.BuyerClassificationRow", b =>
+                {
+                    b.Property<Guid>("WorkspaceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("workspace_id");
+
+                    b.Property<string>("LineKey")
+                        .HasColumnType("text")
+                        .HasColumnName("line_key");
+
+                    b.Property<string>("CategoryId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("WorkspaceId", "LineKey")
+                        .HasName("pk_buyer_classifications");
+
+                    b.ToTable("buyer_classifications", (string)null);
+                });
+
             modelBuilder.Entity("TraceGreen.Infrastructure.Postgres.BuyerRow", b =>
                 {
                     b.Property<Guid>("WorkspaceId")
@@ -212,6 +237,13 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("currency");
+
+                    b.Property<string>("DocumentKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("ubl")
+                        .HasColumnName("document_kind");
 
                     b.Property<string>("ExtractedJson")
                         .IsRequired()
@@ -326,6 +358,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("category_id");
 
+                    b.Property<string>("ClassificationRationale")
+                        .HasColumnType("text")
+                        .HasColumnName("classification_rationale");
+
                     b.Property<string>("ClassificationSource")
                         .IsRequired()
                         .HasColumnType("text")
@@ -334,6 +370,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.Property<decimal>("CostEur")
                         .HasColumnType("numeric")
                         .HasColumnName("cost_eur");
+
+                    b.Property<decimal?>("CountedKg")
+                        .HasColumnType("numeric")
+                        .HasColumnName("counted_kg");
 
                     b.Property<string>("Country")
                         .IsRequired()
@@ -370,6 +410,15 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("mass_t");
 
+                    b.Property<string>("Review")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("review");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
                     b.Property<string>("SectorId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -388,9 +437,17 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("status");
 
+                    b.Property<string>("TargetJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("target_json");
+
                     b.Property<string>("TransportMode")
                         .HasColumnType("text")
                         .HasColumnName("transport_mode");
+
+                    b.Property<string>("TrustJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("trust_json");
 
                     b.Property<Guid>("WorkspaceId")
                         .HasColumnType("uuid")
@@ -467,6 +524,10 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                         .HasColumnType("text")
                         .HasColumnName("energy_source");
 
+                    b.Property<string>("EvidenceJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("evidence_json");
+
                     b.Property<string>("IpHash")
                         .IsRequired()
                         .HasColumnType("text")
@@ -479,6 +540,14 @@ namespace TraceGreen.Infrastructure.Postgres.Migrations
                     b.Property<Guid>("NodeId")
                         .HasColumnType("uuid")
                         .HasColumnName("node_id");
+
+                    b.Property<string>("TermsSha256")
+                        .HasColumnType("text")
+                        .HasColumnName("terms_sha256");
+
+                    b.Property<string>("TermsVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("terms_version");
 
                     b.Property<string>("TokenNonce")
                         .IsRequired()

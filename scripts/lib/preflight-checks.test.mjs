@@ -9,6 +9,7 @@ import {
   factorDocMismatches,
   markdownTables,
   placeholderFactors,
+  placeholderTerms,
 } from './preflight-checks.mjs';
 
 const factorsJson = JSON.stringify(
@@ -107,4 +108,35 @@ test('banned terms are reported by line, and a phrase split across lines for the
   assert.equal(split.length, 1);
   assert.equal(split[0].line, null);
   assert.deepEqual(bannedTermFindings('c.md', 'a tamper-evident audit log'), []);
+});
+
+test('every operator placeholder in the supplier terms is reported at its line', () => {
+  const terms = [
+    '{',
+    '  "en": [',
+    '    "TraceGreen is a service operated by [PLACEHOLDER: operator legal name, CUI, registered seat] (the operator).",',
+    '    "Courts at [PLACEHOLDER: city]; write to [PLACEHOLDER: operator contact address].",',
+    '    "Romanian law applies."',
+    '  ]',
+    '}',
+  ].join('\n');
+  assert.deepEqual(placeholderTerms(terms, 'seed/supplier-terms.json'), [
+    { file: 'seed/supplier-terms.json', line: 3, message: 'the supplier terms still say "operator legal name, CUI, registered seat"' },
+    { file: 'seed/supplier-terms.json', line: 4, message: 'the supplier terms still say "city"' },
+    { file: 'seed/supplier-terms.json', line: 4, message: 'the supplier terms still say "operator contact address"' },
+  ]);
+});
+
+test('supplier terms without a placeholder pass, and a bare PLACEHOLDER is still caught', () => {
+  assert.deepEqual(placeholderTerms('{ "en": "Operated by Example SRL." }', 'seed/supplier-terms.json'), []);
+  assert.deepEqual(placeholderTerms('{ "en": "Operated by PLACEHOLDER." }', 'seed/supplier-terms.json'), [
+    { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still contain a placeholder' },
+  ]);
+});
+
+test('a bare PLACEHOLDER next to a bracketed one is reported too', () => {
+  assert.deepEqual(placeholderTerms('"Operated by [PLACEHOLDER: name], courts at PLACEHOLDER."', 'seed/supplier-terms.json'), [
+    { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still say "name"' },
+    { file: 'seed/supplier-terms.json', line: 1, message: 'the supplier terms still contain a placeholder' },
+  ]);
 });

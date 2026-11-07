@@ -1,11 +1,17 @@
 import {
   api,
+  type ChatAnswer,
+  type ChatModels,
+  type DraftInvoice,
+  type IngestResult,
+  type PdfDraftView,
   type ChainVerification,
   type ProblemCode,
   type RequestLinkResponse,
   type Scenario,
   type ScenarioChange,
   type ScenarioResult,
+  type SuggestionsView,
 } from '@/api/client'
 import { problemHeadlines, toolbarCopy } from '@/copy/dashboard'
 
@@ -90,6 +96,29 @@ export function importInvoice(file: File): Promise<ActionOutcome> {
   )
 }
 
+/**
+ * POST /api/ingest/pdf/extract (F9): an AI copies the PDF's fields into a draft for a person to check. Nothing is
+ * imported until the draft is confirmed.
+ */
+export function extractPdf(file: File): Promise<Answer<PdfDraftView>> {
+  return fetchBody(() =>
+    api.POST('/api/ingest/pdf/extract', {
+      // openapi-fetch sends no body unless one is given; the serializer below sends the File itself.
+      body: file as never,
+      bodySerializer: () => {
+        const form = new FormData()
+        form.append('file', file)
+        return form
+      },
+    }),
+  )
+}
+
+/** POST /api/ingest/pdf/confirm: import the fields as the person checked them; the node arrives through node.created. */
+export function confirmPdf(draftId: string, invoice: DraftInvoice): Promise<Answer<IngestResult>> {
+  return fetchBody(() => api.POST('/api/ingest/pdf/confirm', { body: { draftId, invoice } }))
+}
+
 /** POST /api/ingest/demo: seed N1 with its fixed ids. */
 export function loadDemoInvoice(): Promise<ActionOutcome> {
   return send(
@@ -115,6 +144,14 @@ export function requestLink(nodeId: string): Promise<Answer<RequestLinkResponse>
   return fetchBody(() => api.POST('/api/request-link', { body: { nodeId } }))
 }
 
+/**
+ * POST /api/portal-link: the supplier page link (F12) for the supplier of this node, reusable until it expires. Like a
+ * verification link, the token exists only inside `url`, so the answer stays in the component that shows it.
+ */
+export function requestPortalLink(nodeId: string): Promise<Answer<RequestLinkResponse>> {
+  return fetchBody(() => api.POST('/api/portal-link', { body: { nodeId } }))
+}
+
 /** POST /api/audit/verify: the API recomputes every hash of the audit log and names the first entry that fails. */
 export function verifyAuditChain(): Promise<Answer<ChainVerification>> {
   return fetchBody(() => api.POST('/api/audit/verify'))
@@ -135,6 +172,36 @@ export function simulateChange(nodeId: string, change: ScenarioChange): Promise<
  */
 export function saveScenario(nodeId: string, change: ScenarioChange): Promise<Answer<Scenario>> {
   return fetchBody(() => api.POST('/api/scenarios', { body: { nodeId, ...change } }))
+}
+
+/**
+ * GET /api/nodes/{id}/suggestions (F11): which of the node's curated alternatives the AI picks, each with a short reason.
+ * Never a figure and never a new supplier. Asked when the What if tab opens and aborted when it closes; a failure only
+ * means no suggestion, so it never blocks the simulator.
+ */
+export function fetchSuggestions(nodeId: string, signal?: AbortSignal): Promise<Answer<SuggestionsView>> {
+  return fetchBody(() => api.GET('/api/nodes/{nodeId}/suggestions', { params: { path: { nodeId } }, signal }))
+}
+
+/**
+ * POST /api/chat (F13): the question and the last three typed questions. The answer's sentence is the AI's, every value
+ * in it the API filled in from the data after checking the sentence; a question the data does not answer comes back
+ * notAnswered, never as a guess. `model` is one of GET /api/chat/models' ids, which then answers alone; null leaves the
+ * server to try its models in order.
+ */
+export function askChat(
+  question: string,
+  history: readonly string[],
+  model: string | null = null,
+  signal?: AbortSignal,
+): Promise<Answer<ChatAnswer>> {
+  const body = { question, history: [...history], ...(model === null ? {} : { model }) }
+  return fetchBody(() => api.POST('/api/chat', { body, signal }))
+}
+
+/** GET /api/chat/models (F13): the models the chat can be asked with, in the order Automatic tries them. */
+export function fetchChatModels(signal?: AbortSignal): Promise<Answer<ChatModels>> {
+  return fetchBody(() => api.GET('/api/chat/models', { signal }))
 }
 
 /** Whether the API runs with demo tools. Health answers 503 with the same body while the database is down. */

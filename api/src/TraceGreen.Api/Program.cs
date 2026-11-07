@@ -40,6 +40,13 @@ builder.Services.AddHttpClient<IAiClient, HttpAiClient>(client =>
     client.BaseAddress = aiOptions.BaseUrl;
     client.Timeout = aiOptions.Timeout;
 });
+// The longer calls (chat, PDF extraction) get their own client, so the 10 s classification client stays as it is; each
+// call is cut at its own budget by the service, the client timeout is only the backstop.
+builder.Services.AddHttpClient<IAiAssist, HttpAiAssist>(client =>
+{
+    client.BaseAddress = aiOptions.BaseUrl;
+    client.Timeout = TimeSpan.FromMilliseconds(Math.Max(config.AiChatTimeoutMs, config.AiExtractTimeoutMs) + 1000);
+});
 
 // Use-case services live in the Domain and get configuration through ServiceOptions, built here from AppConfig.
 // The address hash gets its own key, derived from the link secret, so one HMAC key never serves two purposes.
@@ -47,16 +54,28 @@ builder.Services.AddSingleton(new ServiceOptions(
     AiTimeout: TimeSpan.FromMilliseconds(config.AiTimeoutMs),
     LinkTtl: TimeSpan.FromSeconds(config.LinkTtlSeconds),
     IpHashKey: "ip-hash:" + config.LinkSecret,
-    EtsPriceEurPerT: config.EtsPriceEurPerT));
+    EtsPriceEurPerT: config.EtsPriceEurPerT,
+    AiChatTimeout: TimeSpan.FromMilliseconds(config.AiChatTimeoutMs),
+    AiExtractTimeout: TimeSpan.FromMilliseconds(config.AiExtractTimeoutMs)));
 builder.Services.AddSingleton<ILinkSigner>(new HmacLinkSigner(config.LinkSecret));
+// The supplier page link (F12) gets its own key the same way, so neither signer accepts the other's tokens.
+builder.Services.AddSingleton(new PortalLinkSigner("portal:" + config.LinkSecret));
 builder.Services.AddSingleton<NodeViewMapper>();
 builder.Services.AddSingleton<GraphService>();
 builder.Services.AddSingleton<LinkService>();
 builder.Services.AddSingleton<VerifyService>();
 builder.Services.AddSingleton<ScenarioService>();
+builder.Services.AddSingleton<PortalService>();
+builder.Services.AddSingleton<ClassificationService>();
+builder.Services.AddSingleton<TrustService>();
+builder.Services.AddSingleton<LinkOriginStore>();
 // Scoped: they hold the typed AI HttpClient, which the client factory hands out per resolution.
 builder.Services.AddScoped<IngestService>();
 builder.Services.AddScoped<DemoService>();
+builder.Services.AddScoped<SuggestionService>();
+builder.Services.AddScoped<ChatService>();
+builder.Services.AddScoped<PdfImportService>();
+builder.Services.AddSingleton<PdfDraftStore>();
 
 builder.Services.AddOpenApi(options =>
 {
@@ -85,14 +104,24 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = (context, ct) => new ValueTask(
         Problems.Result(ProblemCode.RateLimited, "Too many attempts from this address; wait a minute.").ExecuteAsync(context.HttpContext));
     // Read per request, so tests can override AppConfig the way they do for DEMO_TOOLS.
-    options.AddPolicy(VerifyEndpoints.RateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
-        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = http.RequestServices.GetRequiredService<AppConfig>().RateLimitPerMin,
-            Window = TimeSpan.FromMinutes(1),
-            QueueLimit = 0,
-        }));
+    // The supplier page (F12) counts apart from the verify routes, so a supplier going through a list never uses up the
+    // phone page's attempts from the same address, nor the other way round; its allowance is a multiple, as it holds a list.
+    foreach (var (policy, factor) in new[]
+    {
+        (VerifyEndpoints.RateLimitPolicy, 1),
+        (PortalEndpoints.RateLimitPolicy, PortalEndpoints.RateLimitFactor),
+        (ChatEndpoints.RateLimitPolicy, ChatEndpoints.RateLimitFactor),
+    })
+    {
+        options.AddPolicy(policy, http => RateLimitPartition.GetFixedWindowLimiter(
+            http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = http.RequestServices.GetRequiredService<AppConfig>().RateLimitPerMin * factor,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+    }
 });
 
 var app = builder.Build();
@@ -110,10 +139,18 @@ app.MapOpenApi();
 app.MapHealth();
 app.MapEvents();
 app.MapGraph();
+app.MapClassification();
+app.MapTrust();
+app.MapCategories();
 app.MapIngest();
 app.MapVerify();
+app.MapPortal();
+app.MapTerms();
 app.MapAudit();
 app.MapScenarios();
+app.MapSuggestions();
+app.MapChat();
+app.MapPdfImport();
 app.MapDev();
 
 app.Run();

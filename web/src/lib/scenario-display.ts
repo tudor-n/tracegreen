@@ -1,4 +1,4 @@
-import type { AlternativeView, LaneView, ScenarioChange, TransportMode } from '@/api/client'
+import type { AlternativeView, LaneView, ScenarioChange, SuggestionView, TransportMode } from '@/api/client'
 import { scenarioCopy, transportModeCopy } from '@/copy/dashboard'
 
 // What a simulated change shows, decided from the change, the node's alternatives and the API's result alone. Nothing
@@ -12,6 +12,17 @@ export function scenarioTitle(change: ScenarioChange, alternatives: readonly Alt
   if (change.mode !== null) return scenarioCopy.modeChange(transportModeCopy[change.mode])
   const alternative = alternatives.find((a) => a.id === change.alternativeId)
   return alternative === undefined ? scenarioCopy.supplierSwapUnnamed : scenarioCopy.supplierSwap(alternative.label)
+}
+
+/**
+ * The AI's pick of this alternative (F11), when it picked it: `reason` is null when no reason survived the API's checks,
+ * and the tag shows alone. Null when the AI did not pick it, so nothing is added under its button.
+ */
+export function aiSuggestion(suggestions: readonly SuggestionView[], alternativeId: string): { reason: string | null } | null {
+  const picked = suggestions.find((s) => s.alternativeId === alternativeId)
+  if (picked === undefined) return null
+  const reason = picked.rationale?.trim()
+  return { reason: reason ? reason : null }
 }
 
 /** Whether two changes ask for the same thing: the simulator presses the button of the change it shows. */

@@ -1,0 +1,79 @@
+using TraceGreen.Domain.Ports;
+
+namespace TraceGreen.Domain.Ai;
+
+/// <summary>
+/// One fact the chat model may cite (F13): its id, what it is about, and its value as the prompt shows it. The model
+/// never writes the value; it writes <c>{{id}}</c> and the API fills in the value from the data.
+/// </summary>
+public sealed record ChatFactInput(string Id, string About, string Value);
+
+/// <summary>
+/// The buyer's question, up to three earlier questions (never earlier answers) and the facts it may cite.
+/// <see cref="Model"/> is one of <see cref="IAiAssist.ChatModelsAsync"/>'s ids, which then answers alone; null asks the
+/// chat's models in order. <see cref="Retry"/> is set when the API refused that model's answer and asks once more.
+/// </summary>
+public sealed record ChatInput(
+    string Question, IReadOnlyList<string> History, IReadOnlyList<ChatFactInput> Facts, string? Model = null, ChatRetry? Retry = null);
+
+/// <summary>The model's answer the API's check refused, and what to do instead (<c>AnswerCheck.RetryHint</c>).</summary>
+public sealed record ChatRetry(string Text, string Problem);
+
+/// <summary>Why the AI service would not use the model a question named: it has no such model, or not its key.</summary>
+public enum ChatModelProblem { Unknown, NotReady }
+
+/// <summary>
+/// The model's answer: a sentence with <c>{{id}}</c> placeholders and the ids it cites, or <see cref="Answerable"/>
+/// false when the facts do not answer the question. <see cref="Provider"/> is the model id, or "stub".
+/// <see cref="ModelProblem"/> is set, and nothing answered, when the named model was refused.
+/// </summary>
+public sealed record ChatOutcome(bool Answerable, string Text, IReadOnlyList<string> FactIds, string Provider, ChatModelProblem? ModelProblem = null);
+
+/// <summary>
+/// A model the chat may use (F13): its own (<c>AI_CHAT_MODELS</c>, else <c>AI_MODELS</c>) in the order the chat tries
+/// them, with <see cref="Automatic"/> true, then the local Ollama server's other models, asked only when picked.
+/// <see cref="Reason"/> says why one is not ready, e.g. its key is not set.
+/// </summary>
+public sealed record ChatModelInfo(string Id, string Provider, string Model, bool Ready, string? Reason, bool Automatic);
+
+/// <summary>One invoice line as a model copied it from a PDF (F9); every value a string as printed, empty when not shown.</summary>
+public sealed record DraftLine(string Description, string Quantity, string UnitCode, string Amount, string ClassificationCode, string ClassificationScheme);
+
+/// <summary>The fields a model copied from a PDF invoice's text. Nothing here is trusted until a person confirms it.</summary>
+public sealed record DraftInvoice(
+    string SupplierName,
+    string SupplierTaxId,
+    string SupplierCountry,
+    string InvoiceNumber,
+    string IssueDate,
+    string Currency,
+    string TotalNet,
+    IReadOnlyList<DraftLine> Lines);
+
+/// <summary>Why a PDF could not be extracted.</summary>
+public enum ExtractFailure { NoText, Unreadable, TooLarge, Unavailable }
+
+/// <summary>
+/// The draft, and by field path ("invoiceNumber", "lines.0.amount") whether its value is in the PDF's text; or the failure.
+/// </summary>
+public sealed record ExtractOutcome(DraftInvoice? Invoice, IReadOnlyDictionary<string, bool> Found, string Provider, int Pages, ExtractFailure? Failure)
+{
+    public static ExtractOutcome Failed(ExtractFailure failure) => new(null, new Dictionary<string, bool>(), "stub", 0, failure);
+}
+
+/// <summary>
+/// The AI service's longer tasks, which no import waits on: the data chat (F13) and PDF extraction (F9).
+/// Implementations may throw on transport errors; callers fall back.
+/// </summary>
+public interface IAiAssist
+{
+    Task<ChatOutcome> ChatAsync(ChatInput input, CancellationToken ct);
+
+    /// <summary>The models the chat may use, in order, ready or not; empty when none is configured.</summary>
+    Task<IReadOnlyList<ChatModelInfo>> ChatModelsAsync(CancellationToken ct);
+
+    /// <summary>The text layer of a PDF invoice and the fields a model copied from it (F9); never imports anything.</summary>
+    Task<ExtractOutcome> ExtractPdfAsync(byte[] pdf, CancellationToken ct);
+
+    Task<HealthStatus> HealthAsync(CancellationToken ct);
+}

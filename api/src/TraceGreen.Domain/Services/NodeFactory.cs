@@ -1,25 +1,35 @@
 using TraceGreen.Domain.Carbon;
+using TraceGreen.Domain.Copy;
 using TraceGreen.Domain.Model;
 using TraceGreen.Domain.Security;
 using TraceGreen.Domain.Seed;
+using TraceGreen.Domain.Trust;
 using TraceGreen.Domain.Ubl;
 
 namespace TraceGreen.Domain.Services;
 
-/// <summary>How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted.</summary>
-public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source);
+/// <summary>
+/// How the dominant line was classified; <see cref="Confidence"/> is null when nothing could be trusted. <see cref="Rationale"/>
+/// is the one-line reason of whatever classified it (the invoice code, the cache or a model).
+/// </summary>
+public sealed record NodeClassification(string CategoryId, double? Confidence, ClassificationSource Source, string? Rationale = null);
 
 /// <summary>
 /// Builds an invoice and its supplier node the same way for the seed and for imports: spend estimate from the total,
 /// mass from the unit codes (or the supplier's confirmed mass), cost and lead time from the lane leg, and an activity
 /// estimate once the supplier answered and a mass is known. A verification rebuilds the node here so it ends up exactly
-/// as the seed would have built it from the same answers.
+/// as the seed would have built it from the same answers. The counted figure (F7) comes from <see cref="TrustAssessor"/>
+/// over the node's <see cref="TrustInputs"/>, so every rebuild (an answer, a review, a buyer's record) recomputes it.
 /// </summary>
 public static class NodeFactory
 {
-    public static Invoice NewInvoice(Guid id, Guid workspaceId, ExtractedInvoice extracted, string xml, DateTimeOffset createdAt) => new(
+    public static Invoice NewInvoice(Guid id, Guid workspaceId, ExtractedInvoice extracted, string xml, DateTimeOffset createdAt) =>
+        NewInvoiceFrom(id, workspaceId, extracted, Hashing.RawXmlHash(xml), createdAt, "ubl");
+
+    /// <summary>An invoice from any document: <paramref name="rawHash"/> refuses the same document twice, <paramref name="kind"/> says what it was.</summary>
+    public static Invoice NewInvoiceFrom(Guid id, Guid workspaceId, ExtractedInvoice extracted, string rawHash, DateTimeOffset createdAt, string kind) => new(
         id, workspaceId, extracted.Supplier.Name, extracted.Supplier.TaxId, extracted.Customer.TaxId,
-        extracted.IssueDate, extracted.Currency, extracted.Total, Hashing.RawXmlHash(xml), Hashing.InvoiceHash(extracted), extracted, createdAt);
+        extracted.IssueDate, extracted.Currency, extracted.Total, rawHash, Hashing.InvoiceHash(extracted), extracted, createdAt, kind);
 
     public static SupplierNode NewNode(
         Guid id,
@@ -32,7 +42,8 @@ public static class NodeFactory
         SeedBundle bundle,
         FactorTable table,
         DateTimeOffset createdAt,
-        decimal? confirmedMassT = null)
+        decimal? confirmedMassT = null,
+        TrustInputs? trust = null)
     {
         var extracted = invoice.Extracted;
         var category = bundle.CategoryOf(classification.CategoryId);
@@ -47,7 +58,7 @@ public static class NodeFactory
         var costPerKg = lane.CostPerKgByMode.GetValueOrDefault(mode) ?? 0m;
         var leadDays = lane.LeadDaysByMode.GetValueOrDefault(mode) ?? 0;
 
-        return new SupplierNode(
+        var node = new SupplierNode(
             Id: id,
             WorkspaceId: invoice.WorkspaceId,
             InvoiceId: invoice.Id,
@@ -67,6 +78,48 @@ public static class NodeFactory
             LeadDays: leadDays,
             TransportMode: transportMode,
             EnergySource: energySource,
-            CreatedAt: createdAt);
+            CreatedAt: createdAt,
+            Review: InitialReview(classification.Source),
+            ClassificationRationale: Reason(classification.Rationale),
+            Trust: trust);
+        return WithCounted(node, invoice, lane, bundle, table);
     }
+
+    /// <summary>The node with its counted figure recomputed from its answers and trust inputs as they now are.</summary>
+    public static SupplierNode WithCounted(SupplierNode node, Invoice invoice, Lane lane, SeedBundle bundle, FactorTable table) =>
+        node with { CountedKg = TrustAssessor.Assess(node, invoice, lane, bundle.CategoryOf(node.CategoryId), table)?.CountedKg };
+
+    /// <summary>Longest reason kept, the same cap the AI service applies to a model's rationale.</summary>
+    public const int MaxRationaleChars = 200;
+
+    /// <summary>
+    /// The reason as a reader may see it: whitespace collapsed, capped, and null when empty or against the copy rules. The
+    /// copy rules are checked on the whole text before the cut, so a name the cut would split is still caught, and the cut
+    /// never ends inside a surrogate pair (a lone surrogate is not valid UTF-8, and Postgres refuses it).
+    /// </summary>
+    public static string? Reason(string? rationale)
+    {
+        if (string.IsNullOrWhiteSpace(rationale))
+        {
+            return null;
+        }
+        var text = string.Join(' ', rationale.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (BannedTerms.Any(text))
+        {
+            return null;
+        }
+        if (text.Length > MaxRationaleChars)
+        {
+            var cut = char.IsHighSurrogate(text[MaxRationaleChars - 1]) ? MaxRationaleChars - 1 : MaxRationaleChars;
+            text = text[..cut].TrimEnd();
+        }
+        return BannedTerms.Clean(text);
+    }
+
+    /// <summary>
+    /// Every AI-mapped category waits for a person, whatever its confidence; an invoice code, the stub and a buyer's own
+    /// choice need no review.
+    /// </summary>
+    public static ClassificationReview InitialReview(ClassificationSource source) =>
+        source is ClassificationSource.Cache or ClassificationSource.Model ? ClassificationReview.Pending : ClassificationReview.NotNeeded;
 }

@@ -25,8 +25,8 @@ public class LineClassificationTests
             return classify(lines, ct);
         }
 
-        public Task<IReadOnlyList<Suggestion>> SuggestAsync(SupplierNode node, IReadOnlyList<Alternative> candidates, CancellationToken ct) =>
-            Task.FromResult<IReadOnlyList<Suggestion>>([]);
+        public Task<SuggestOutcome> SuggestAsync(SuggestNodeInput node, IReadOnlyList<SuggestCandidateInput> candidates, CancellationToken ct) =>
+            Task.FromResult(new SuggestOutcome([], "fake"));
 
         public Task<HealthStatus> HealthAsync(CancellationToken ct) => Task.FromResult(new HealthStatus(true, null));
     }
@@ -117,5 +117,48 @@ public class LineClassificationTests
 
         Assert.Equal(["a", "b", "c"], result.Select(r => r.LineId));
         Assert.Equal([ClassificationSource.Model, ClassificationSource.Invoice, ClassificationSource.Cache], result.Select(r => r.Source));
+    }
+
+    private static Dictionary<string, string> Buyer(string description, string categoryId) =>
+        new(StringComparer.Ordinal) { [CacheKey.Compute(description)] = categoryId };
+
+    [Fact]
+    public async Task ABuyersEarlierChoiceComesBeforeTheCacheAndTheAi()
+    {
+        var ai = Answering("pcb");
+        // The cache says connectors for this description; the buyer said plastics, under any spacing or case.
+        var buyer = Buyer("automotive connectors, 12-pin sealed", "plastics");
+
+        var result = await LineClassification.ClassifyLinesAsync(
+            [Line("1", "  automotive CONNECTORS, 12-pin sealed "), Line("2", "something new")], ai, Seed, Timeout, CancellationToken.None, buyer);
+
+        Assert.Equal("plastics", result[0].CategoryId);
+        Assert.Equal(ClassificationSource.Buyer, result[0].Source);
+        Assert.Equal(ClassificationSource.Model, result[1].Source);
+        Assert.Equal(1, ai.Calls);
+    }
+
+    [Fact]
+    public async Task AnInvoiceCodeStillComesBeforeABuyersChoice()
+    {
+        var ai = Answering("pcb");
+
+        var result = await LineClassification.ClassifyLinesAsync(
+            [Line("1", "some housing", "44410000", "CPV")], ai, Seed, Timeout, CancellationToken.None, Buyer("some housing", "plastics"));
+
+        Assert.Equal("zinc_diecast", result[0].CategoryId);
+        Assert.Equal(ClassificationSource.Invoice, result[0].Source);
+    }
+
+    [Fact]
+    public async Task ARememberedCategoryNoLongerOnTheListIsIgnored()
+    {
+        var ai = Answering("pcb");
+
+        var result = await LineClassification.ClassifyLinesAsync(
+            [Line("1", "something new")], ai, Seed, Timeout, CancellationToken.None, Buyer("something new", "steel"));
+
+        Assert.Equal("pcb", result[0].CategoryId);
+        Assert.Equal(ClassificationSource.Model, result[0].Source);
     }
 }

@@ -59,7 +59,23 @@ describe('hydrate', () => {
 
     store.getState().hydrate(snapshot(0, [node('a', 10)]))
     expect(store.getState().selectedNodeId).toBeNull()
-    expect(store.getState().openPanels).toEqual({ drawer: false, audit: false, simulator: false })
+    expect(store.getState().openPanels).toEqual({ drawer: false, simulator: false, chat: false })
+  })
+})
+
+describe('the chat panel', () => {
+  it('opens and closes on its own, and picking a supplier closes it so the side panel shows', () => {
+    const store = createGraphStore()
+    store.getState().hydrate(snapshot(1, [node('a', 10)]))
+    store.getState().setPanel('chat', true)
+    expect(store.getState().openPanels.chat).toBe(true)
+
+    store.getState().select('a')
+    expect(store.getState().openPanels).toEqual({ drawer: true, simulator: false, chat: false })
+
+    store.getState().setPanel('chat', true)
+    store.getState().select(null)
+    expect(store.getState().openPanels.chat).toBe(true)
   })
 })
 

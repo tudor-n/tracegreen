@@ -14,7 +14,8 @@ public static class ApiJson
 
     public static JsonSerializerOptions Configure(JsonSerializerOptions options)
     {
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+        // Names only: a number in place of an enum name would bind to a value outside the enum (F7 review), so it is a 400.
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
         options.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
         options.NumberHandling = JsonNumberHandling.Strict;
         options.RespectNullableAnnotations = true;
